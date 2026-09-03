@@ -1,4 +1,5 @@
 import localeEnGB from '@angular/common/locales/en-GB';
+import localeZh from '@angular/common/locales/zh';
 
 /**
  * All of available app languages
@@ -45,19 +46,11 @@ export const SUPPORTED_LANGUAGE_CODES: ReadonlySet<string> = new Set<string>(
 );
 
 /**
- * We're assuming that the other language speakers are likely to speak English
- * and as English offers most likely the best experience, we use it as default
+ * Browser languages that should be forced onto {@link DEFAULT_LANGUAGE} instead
+ * of using the detected locale. Empty: the default UI language is already
+ * Simplified Chinese, and forcing other locales onto it would be wrong.
  */
-export const AUTO_SWITCH_LNGS: LanguageCode[] = [
-  LanguageCode.zh,
-  LanguageCode.zh_tw,
-  LanguageCode.ar,
-  LanguageCode.fa,
-  LanguageCode.ja,
-  LanguageCode.ko,
-  LanguageCode.ru,
-  LanguageCode.tr,
-];
+export const AUTO_SWITCH_LNGS: LanguageCode[] = [];
 
 export const RTL_LANGUAGES: LanguageCode[] = [LanguageCode.ar, LanguageCode.fa];
 
@@ -90,7 +83,7 @@ export type DateTimeLocale = (typeof DateTimeLocales)[keyof typeof DateTimeLocal
 
 /**
  * Maps locale keys to dynamic import functions for lazy loading.
- * Only the default locale (en-GB) is statically imported; all others
+ * Only the default locale (zh) is statically imported; all others
  * are loaded on demand to reduce the initial bundle size.
  */
 export const LocaleImportFns: Record<
@@ -110,7 +103,7 @@ export const LocaleImportFns: Record<
   pt_br: () => import('@angular/common/locales/pt'),
   ru_ru: () => import('@angular/common/locales/ru'),
   ru: () => import('@angular/common/locales/ru'),
-  zh_cn: () => import('@angular/common/locales/zh'),
+  zh_cn: () => Promise.resolve({ default: localeZh }),
   ja_jp: () => import('@angular/common/locales/ja'),
   ja: () => import('@angular/common/locales/ja'),
   ko_kr: () => import('@angular/common/locales/ko'),
@@ -136,7 +129,7 @@ export const LocaleImportFns: Record<
   sk: () => import('@angular/common/locales/sk'),
   sv: () => import('@angular/common/locales/sv'),
   tr: () => import('@angular/common/locales/tr'),
-  zh: () => import('@angular/common/locales/zh'),
+  zh: () => Promise.resolve({ default: localeZh }),
   ro: () => import('@angular/common/locales/ro'),
   ro_ro: () => import('@angular/common/locales/ro'),
   ro_md: () => import('@angular/common/locales/ro-MD'),
@@ -181,8 +174,16 @@ export const NAVIGATOR_FALLBACK_LOCALE_IMPORT_FNS: Record<
 };
 
 /** Default locale data, statically imported for instant availability */
-export const DEFAULT_LOCALE_DATA = localeEnGB;
+export const DEFAULT_LOCALE_DATA = localeZh;
 
-export const DEFAULT_LANGUAGE = LanguageCode.en;
-export const DEFAULT_LOCALE = DateTimeLocales.en_gb;
+/** Default UI language (Simplified Chinese) */
+export const DEFAULT_LANGUAGE = LanguageCode.zh;
+
+/**
+ * Source-language fallback for missing translation keys and the offline-bundled
+ * English JSON. Keep this as English even when {@link DEFAULT_LANGUAGE} is not.
+ */
+export const TRANSLATION_FALLBACK_LANGUAGE = LanguageCode.en;
+
+export const DEFAULT_LOCALE = DateTimeLocales.zh_cn;
 export const DEFAULT_FIRST_DAY_OF_WEEK = 1; // monday

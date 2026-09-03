@@ -14,7 +14,11 @@ import { registerLocaleData } from '@angular/common';
 
 import { environment } from './environments/environment';
 import { IS_ELECTRON } from './app/app.constants';
-import { DEFAULT_LANGUAGE, LocaleImportFns } from './app/core/locale.constants';
+import {
+  DEFAULT_LANGUAGE,
+  LocaleImportFns,
+  TRANSLATION_FALLBACK_LANGUAGE,
+} from './app/core/locale.constants';
 import {
   registerDefaultLocale,
   registerNavigatorLocale,
@@ -201,7 +205,9 @@ bootstrapApplication(AppComponent, {
         registrationStrategy: 'registerWhenStable:30000',
       }),
       TranslateModule.forRoot({
-        fallbackLang: DEFAULT_LANGUAGE,
+        // Missing keys fall back to English (source language), while the default
+        // UI language is Simplified Chinese ({@link DEFAULT_LANGUAGE}).
+        fallbackLang: TRANSLATION_FALLBACK_LANGUAGE,
         loader: {
           provide: TranslateLoader,
           useClass: TranslateHttpLoaderWithFallback,

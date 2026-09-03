@@ -6,7 +6,7 @@ import { DEFAULT_LOCALE } from '../../core/locale.constants';
 
 // Module-scoped: Angular creates one pure-pipe instance per binding per
 // embedded view, so per-instance state would warn once per row, not once.
-// DEFAULT_LOCALE ('en-gb') resolves to the 'en' data registered statically
+// DEFAULT_LOCALE ('zh-cn') resolves to the 'zh' data registered statically
 // at bootstrap, so the fallback pipe never depends on lazy locale registration.
 const FALLBACK_DATE_PIPE = new DatePipe(DEFAULT_LOCALE);
 const WARNED_LOCALES = new Set<string>();

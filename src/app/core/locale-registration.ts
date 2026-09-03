@@ -1,11 +1,13 @@
 import { registerLocaleData } from '@angular/common';
 import localeEnUs from '@angular/common/locales/en';
+import localeEnGB from '@angular/common/locales/en-GB';
 import { TranslateService } from '@ngx-translate/core';
 import { Log } from './log';
 import {
   DateTimeLocales,
   DEFAULT_LANGUAGE,
   DEFAULT_LOCALE_DATA,
+  LanguageCode,
   NAVIGATOR_FALLBACK_LOCALE_IMPORT_FNS,
 } from './locale.constants';
 
@@ -17,23 +19,18 @@ import {
 const LOCALE_LOAD_TIMEOUT_MS = 1500;
 
 /**
- * Registers the statically imported default locale data (en-GB under the bare
- * 'en' id). Must run before Angular's first render: LocaleDatePipe is pure, so
- * a date rendered earlier would cache Angular's built-in en-US resolution for
- * the session. main.ts calls this at module scope, before bootstrapApplication.
+ * Registers the statically imported default locale data (Simplified Chinese
+ * under the bare 'zh' id). Must run before Angular's first render: LocaleDatePipe
+ * is pure, so a date rendered earlier would cache a wrong resolution for the
+ * session. main.ts calls this at module scope, before bootstrapApplication.
  *
- * en-US is the one English region the en-GB-under-'en' seed above gets wrong:
- * once 'en' is en-GB, an unregistered 'en-us' resolves through it and renders
- * day-first/24h (frozen there by the pure pipe) until the idle loop registers
- * en-US much later. On master, where 'en' was seeded only inside the bootstrap
- * `.then`, the same lookup fell through to Angular's built-in en-US and was
- * correct. So register en-US up front too, keeping an explicit "System default"
- * or dropdown en-US choice month-first/12h from first paint. The data file
- * self-reports 'en', so the explicit id is required — a keyless call would
- * clobber the en-GB 'en' seed.
+ * Also seed en-GB under bare 'en' and en-US under 'en-us' so English date/time
+ * choices stay correct from first paint (and navigator en-* fallbacks still
+ * resolve through a 24h English parent rather than Angular's built-in en-US).
  */
 export const registerDefaultLocale = (): void => {
   registerLocaleData(DEFAULT_LOCALE_DATA, DEFAULT_LANGUAGE);
+  registerLocaleData(localeEnGB, LanguageCode.en);
   registerLocaleData(localeEnUs, DateTimeLocales.en_us);
 };
 

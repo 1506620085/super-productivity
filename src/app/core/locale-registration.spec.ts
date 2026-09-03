@@ -23,20 +23,21 @@ describe('locale-registration', () => {
   });
 
   describe('registerDefaultLocale', () => {
-    it('registers en-GB data under the bare en id (day-first shortDate, 24h shortTime)', () => {
+    it('registers Simplified Chinese data under the bare zh id', () => {
+      registerDefaultLocale();
+      // zh shortDate is typically y/M/d; shortTime is 24h for the zh locale data.
+      expect(formatDate(onePm, 'shortDate', 'zh')).toMatch(/2024/);
+      expect(formatDate(onePm, 'shortTime', 'zh')).toMatch(/13:00|1:00/);
+    });
+
+    it('registers en-GB under bare en and en-US under en-us', () => {
       registerDefaultLocale();
       expect(formatDate(onePm, 'shortDate', 'en')).toBe('15/01/2024');
       expect(formatDate(onePm, 'shortTime', 'en')).toBe('13:00');
-    });
-
-    it('registers en-US under en-us so an explicit US locale is month-first/12h from first paint, not the en-GB seed', () => {
-      registerDefaultLocale();
       // Without the explicit en-US registration, 'en-us' would resolve through
       // the en-GB 'en' seed above and render '15/01/2024' / '13:00'.
       expect(formatDate(onePm, 'shortDate', 'en-us')).toBe('1/15/24');
       expect(formatDate(onePm, 'shortTime', 'en-us')).toMatch(/^1:00/);
-      // …and the en-GB seed under bare 'en' stays intact.
-      expect(formatDate(onePm, 'shortTime', 'en')).toBe('13:00');
     });
   });
 

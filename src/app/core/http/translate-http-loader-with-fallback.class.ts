@@ -5,7 +5,7 @@ import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { Log } from '../log';
-import { DEFAULT_LANGUAGE } from '../locale.constants';
+import { TRANSLATION_FALLBACK_LANGUAGE } from '../locale.constants';
 import EN_TRANSLATIONS from '../../../assets/i18n/en.json';
 
 /**
@@ -58,9 +58,9 @@ export class TranslateHttpLoaderWithFallback implements TranslateLoader {
    * fallback. An empty map for `en` itself would only ever yield raw keys.
    */
   private _getFallbackTranslations(lang: string): TranslationObject {
-    if (lang !== DEFAULT_LANGUAGE) {
+    if (lang !== TRANSLATION_FALLBACK_LANGUAGE) {
       Log.warn(
-        `No bundled translations for "${lang}"; using bundled "${DEFAULT_LANGUAGE}" as fallback.`,
+        `No bundled translations for "${lang}"; using bundled "${TRANSLATION_FALLBACK_LANGUAGE}" as fallback.`,
       );
     }
     return EN_TRANSLATIONS as TranslationObject;

@@ -1,5 +1,6 @@
 import { formatDate, registerLocaleData } from '@angular/common';
 import localeEn from '@angular/common/locales/en';
+import localeEnGB from '@angular/common/locales/en-GB';
 import { NAVIGATOR_FALLBACK_LOCALE_IMPORT_FNS } from './locale.constants';
 import { registerDefaultLocale, registerNavigatorLocale } from './locale-registration';
 
@@ -29,14 +30,12 @@ describe('NAVIGATOR_FALLBACK_LOCALE_IMPORT_FNS', () => {
   };
 
   beforeAll(async () => {
-    // Register the en-GB baseline under the bare 'en' id first, matching prod
-    // (main.ts calls registerDefaultLocale before the app initializer). Without
-    // it, an unregistered en-* resolves through Angular's built-in en (=en-US,
-    // already 12h), so a 12h assertion would pass even if registration below
-    // were a no-op — vacuous for exactly the six 12h variants this fix exists
-    // for. With the en-GB (24h) baseline, "renders 12h" means the regional data
-    // genuinely won.
+    // Register the en-GB baseline under the bare 'en' id first. Production
+    // default UI language is zh, so registerDefaultLocale alone no longer seeds
+    // en-GB; this suite still needs the 24h English parent so 12h regional
+    // assertions are not vacuous.
     registerDefaultLocale();
+    registerLocaleData(localeEnGB, 'en');
     await Promise.all(
       Object.entries(NAVIGATOR_FALLBACK_LOCALE_IMPORT_FNS).map(async ([key, load]) => {
         const m = await load();
