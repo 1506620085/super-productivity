@@ -1,36 +1,36 @@
-# Environment Configuration Setup
+# 环境配置设置
 
-This project uses a hybrid approach for environment configuration:
+本项目对环境配置采用混合方式：
 
-- **Base configuration** (production/stage flags) are in static TypeScript files
-- **Secrets and dynamic values** are loaded from `.env` files and converted to TypeScript constants
+- **基础配置**（production/stage 标志）在静态 TypeScript 文件中
+- **密钥与动态值**从 `.env` 文件加载并转换为 TypeScript 常量
 
-## Overview
+## 概览
 
-### Static Environment Files
+### 静态环境文件
 
-- `src/environments/environment.ts` - Development configuration
-- `src/environments/environment.prod.ts` - Production configuration
-- `src/environments/environment.stage.ts` - Staging configuration
+- `src/environments/environment.ts` - 开发配置
+- `src/environments/environment.prod.ts` - 生产配置
+- `src/environments/environment.stage.ts` - 预发配置
 
-These files contain base configuration like `production`, `stage`, and `version` flags.
+这些文件包含 `production`、`stage`、`version` 等基础配置标志。
 
-### Dynamic Environment Variables
+### 动态环境变量
 
-- `.env` - Environment variables for all environments
-- `src/app/config/env.generated.ts` - Auto-generated TypeScript constants (gitignored)
+- `.env` - 所有环境共用的环境变量
+- `src/app/config/env.generated.ts` - 自动生成的 TypeScript 常量（已 gitignore）
 
-The `.env` file contains secrets and environment-specific values that should not be committed to version control.
+`.env` 文件包含不应提交到版本控制的密钥与环境相关值。
 
-## Setup Instructions
+## 设置步骤
 
-1. **Create your .env file**
+1. **创建你的 .env 文件**
 
    ```bash
    cp .env.example .env
    ```
 
-2. **Add your environment variables**
+2. **添加环境变量**
 
    ```bash
    # .env
@@ -38,90 +38,90 @@ The `.env` file contains secrets and environment-specific values that should not
    DROPBOX_API_KEY=your-api-key-here
    ```
 
-3. **Access environment variables in your code**
+3. **在代码中访问环境变量**
 
    ```typescript
-   // Import from the generated constants (type-safe!)
+   // 从生成的常量导入（类型安全！）
    import { ENV } from './app/config/env.generated';
 
-   // Direct access
+   // 直接访问
    const googleToken = ENV.GOOGLE_DRIVE_TOKEN;
 
-   // Or using utility functions (with type safety)
+   // 或使用工具函数（带类型安全）
    import { getEnv, getEnvOrDefault } from './app/util/env';
 
    const googleToken = getEnv('GOOGLE_DRIVE_TOKEN');
    const dropboxKey = getEnvOrDefault('DROPBOX_API_KEY', 'default-key');
    ```
 
-## Running the Application
+## 运行应用
 
-The npm scripts automatically generate TypeScript constants from `.env` before running:
+npm 脚本在运行前会自动从 `.env` 生成 TypeScript 常量：
 
 ```bash
-# Development
+# 开发
 npm run startFrontend
 
-# Production configuration
+# 生产配置
 npm run startFrontend:prod
 
-# Staging configuration
+# 预发配置
 npm run startFrontend:stage
 ```
 
-Note: All commands use the same `.env` file. The difference between environments is controlled by the Angular configuration (production/stage flags).
+注意：所有命令使用同一个 `.env` 文件。环境差异由 Angular 配置（production/stage 标志）控制。
 
-## Build Commands
+## 构建命令
 
-Build commands also generate constants before building:
+构建命令在构建前也会生成常量：
 
 ```bash
-# Production build
+# 生产构建
 npm run buildFrontend:prod:es6
 
-# Staging build
+# 预发构建
 npm run buildFrontend:stage:es6
 ```
 
-## How It Works
+## 工作原理
 
-1. **load-env.js** reads the `.env` file and generates `src/app/config/env.generated.ts`
-2. **TypeScript constants** are imported and used throughout the app (no process.env needed!)
-3. **Type safety** - The utility functions use `keyof typeof ENV` for autocomplete and type checking
-4. **Gitignored** - The generated file is never committed, keeping secrets safe
+1. **load-env.js** 读取 `.env` 文件并生成 `src/app/config/env.generated.ts`
+2. **TypeScript 常量** 在应用中导入使用（无需 process.env！）
+3. **类型安全** — 工具函数使用 `keyof typeof ENV` 实现自动补全与类型检查
+4. **已 gitignore** — 生成文件永不提交，密钥保持安全
 
-## Security Notes
+## 安全说明
 
-- Never commit `.env` files to version control
-- The generated `env.generated.ts` is gitignored automatically
-- Secrets are compiled into the bundle at build time (not exposed as environment variables)
-- Only add non-sensitive values to `.env.example`
+- 绝不要将 `.env` 文件提交到版本控制
+- 生成的 `env.generated.ts` 会自动被 gitignore
+- 密钥在构建时编译进包（不以环境变量形式暴露）
+- 只把非敏感值加到 `.env.example`
 
-## Adding New Environment Variables
+## 添加新环境变量
 
-1. Add to `.env`:
+1. 加到 `.env`：
 
    ```bash
    NEW_API_KEY=your-api-key-here
    ```
 
-2. The TypeScript types are automatically generated when you run any build/serve command
+2. 运行任意 build/serve 命令时会自动生成 TypeScript 类型
 
-3. Use in your code with full type safety:
+3. 在代码中以完整类型安全使用：
 
    ```typescript
    import { ENV } from './app/config/env.generated';
    const apiKey = ENV.NEW_API_KEY;
 
-   // Or with utility function
+   // 或用工具函数
    import { getEnv } from './app/util/env';
-   const apiKey = getEnv('NEW_API_KEY'); // TypeScript knows all available keys!
+   const apiKey = getEnv('NEW_API_KEY'); // TypeScript 知道所有可用键！
    ```
 
-## Benefits of This Approach
+## 此方式的好处
 
-- ✅ **Type Safety**: Full TypeScript support with autocomplete
-- ✅ **No Runtime Dependencies**: Constants are compiled into the bundle
-- ✅ **Works Everywhere**: No need for process.env or special webpack config
-- ✅ **Simple**: Just import and use the constants
-- ✅ **Secure**: Secrets stay in `.env` and never in version control
+- ✅ **类型安全**：完整 TypeScript 支持与自动补全
+- ✅ **无运行时依赖**：常量编译进包
+- ✅ **处处可用**：无需 process.env 或特殊 webpack 配置
+- ✅ **简单**：导入并使用常量即可
+- ✅ **安全**：密钥留在 `.env`，永不进入版本控制

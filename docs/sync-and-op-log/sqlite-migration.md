@@ -1,149 +1,99 @@
-# Native SQLite Op-Log Migration
+# 原生 SQLite 操作日志迁移
 
-**Status (July 2026):** Foundation implemented and tested in CI; native rollout
-not wired. IndexedDB remains the live op-log backend on every platform.
+**状态（2026 年 7 月）：** 基础已实现并在 CI 中测试；原生上线尚未接线。IndexedDB 仍是每个平台上的实际操作日志后端。
 
-This document is the single status, rationale, and rollout contract for the
-native SQLite work associated with #7892 and #7931.
+本文档是与 #7892 和 #7931 相关的原生 SQLite 工作的唯一状态、理由与上线契约。
 
-## Goal and scope
+## 目标与范围
 
-On Capacitor Android, critical op-log state currently lives in WebView
-IndexedDB (`SUP_OPS`), which can be lost if WebView storage is evicted. The goal
-is to move that database to app-private SQLite on native iOS/Android while
-preserving the operation log's atomicity and recovery behavior.
+在 Capacitor Android 上，关键操作日志状态目前位于 WebView IndexedDB（`SUP_OPS`）中，若 WebView 存储被驱逐则可能丢失。目标是将该数据库移到原生 iOS/Android 上的应用私有 SQLite，同时保留操作日志的原子性与恢复行为。
 
-This is not a global storage rewrite:
+这不是全局存储重写：
 
-- web/PWA remain on IndexedDB;
-- Electron keeps its current persistence and rotated backups;
-- theme, credential, OAuth, and other small IndexedDB databases are outside the
-  #7892 critical-data scope; and
-- no native backend may become the default until migration and rollback are
-  proven on real devices.
+- web/PWA 仍使用 IndexedDB；
+- Electron 保留其当前持久化与轮换备份；
+- 主题、凭证、OAuth 及其他小型 IndexedDB 数据库不在 #7892 关键数据范围内；以及
+- 在真实设备上证明迁移与回滚之前，任何原生后端都不得成为默认。
 
-The mobile local-backup safeguards from #7924/#7925 are already active. They
-reduce the blast radius but do not replace durable app-private storage.
+来自 #7924/#7925 的移动本地备份保障已处于活跃状态。它们缩小了爆炸半径，但不能替代耐用的应用私有存储。
 
-## Current implementation
+## 当前实现
 
-### Landed, inactive foundation
+### 已落地、未激活的基础
 
-- `OpLogDbAdapter` / `OpLogTx` define the backend-neutral persistence and
-  transaction contract; `OP_LOG_DB_SCHEMA` describes the stores and indexes.
-- `IndexedDbOpLogAdapter` is the production backend. Both
-  `OperationLogStoreService` and `ArchiveStoreService` obtain adapters through
-  `OP_LOG_DB_ADAPTER_FACTORY`.
-- Store initialization supports both connection-adopting IndexedDB adapters and
-  self-managing adapters: the latter call `adapter.init()` and do not open the
-  WebView database.
-- `SqliteOpLogAdapter` implements the port against a minimal `SqliteDb`
-  interface. It is covered by the in-memory translation tests, a real `sql.js`
-  contract pass, and a store-level integration pass.
-- Separate adapters that share one physical `SqliteDb` also share a FIFO queue
-  keyed by that connection, preventing overlapping `BEGIN` statements and
-  statements leaking into another transaction.
-- `migrateOpLogBackend()` copies all op-log stores into an empty destination
-  transaction and verifies operation count, last sequence, and vector clock
-  before commit. It is validated in CI for real IndexedDB to `sql.js`.
-- `local-rules/no-adapter-in-tx` enforces the SQLite re-entrancy rule: code in a
-  transaction callback must use its `tx` handle, not enqueue another adapter
-  call behind its own transaction.
+- `OpLogDbAdapter` / `OpLogTx` 定义后端中立的持久化与事务契约；`OP_LOG_DB_SCHEMA` 描述 store 与索引。
+- `IndexedDbOpLogAdapter` 是生产后端。`OperationLogStoreService` 与 `ArchiveStoreService` 都通过 `OP_LOG_DB_ADAPTER_FACTORY` 获取适配器。
+- Store 初始化同时支持采纳连接的 IndexedDB 适配器与自我管理的适配器：后者调用 `adapter.init()` 且不打开 WebView 数据库。
+- `SqliteOpLogAdapter` 针对最小的 `SqliteDb` 接口实现该端口。它由内存翻译测试、真实的 `sql.js` 契约通过，以及 store 级集成通过覆盖。
+- 共享同一物理 `SqliteDb` 的独立适配器也共享按该连接键控的 FIFO 队列，防止重叠的 `BEGIN` 语句以及语句泄漏到另一事务。
+- `migrateOpLogBackend()` 将所有操作日志 store 复制到空的目标事务中，并在提交前验证操作计数、最后序列与向量时钟。它在 CI 中针对真实 IndexedDB 到 `sql.js` 得到验证。
+- `local-rules/no-adapter-in-tx` 强制 SQLite 重入规则：事务回调中的代码必须使用其 `tx` 句柄，而不是在自身事务之后再入队另一次适配器调用。
 
-### Not wired
+### 未接线
 
-- The project does not include a native SQLite plugin or a native `SqliteDb`
-  wrapper.
-- `OP_LOG_DB_ADAPTER_FACTORY` still returns `IndexedDbOpLogAdapter` everywhere.
-- `migrateOpLogBackend()` has no startup trigger or completion marker.
-- No platform has a SQLite feature flag or fallback selection.
-- `SqliteOpLogAdapter` still falls back to sequence `0` if `SqliteDb.run()`
-  omits `lastId`; native rollout must replace that invalid fallback with a
-  positive-integer assertion.
-- The Capacitor bridge, native SQLite build, lifecycle behavior, and bulk-write
-  performance have not been validated on a device.
+- 项目尚未包含原生 SQLite 插件或原生 `SqliteDb` 包装。
+- `OP_LOG_DB_ADAPTER_FACTORY` 在各处仍返回 `IndexedDbOpLogAdapter`。
+- `migrateOpLogBackend()` 没有启动触发器或完成标记。
+- 没有任何平台有 SQLite 功能标志或回退选择。
+- 若 `SqliteDb.run()` 省略 `lastId`，`SqliteOpLogAdapter` 仍回退到序列 `0`；原生上线必须用正整数断言替换该无效回退。
+- Capacitor 桥接、原生 SQLite 构建、生命周期行为与批量写入性能尚未在设备上验证。
 
-Nothing in the landed SQLite foundation changes runtime storage behavior for
-current users.
+已落地的 SQLite 基础不会改变当前用户的运行时存储行为。
 
-## Storage contract that must not change
+## 不得更改的存储契约
 
-The SQLite backend must preserve the same observable guarantees as IndexedDB:
+SQLite 后端必须保留与 IndexedDB 相同的可观察保证：
 
-1. `ops.seq` is a positive, monotonically allocated primary key and `op.id` is
-   unique.
-2. `appendWithVectorClockOverwrite()` writes the operation and vector clock
-   atomically.
-3. Destructive state replacement writes operations, state cache, vector clock,
-   client ID, and archive state atomically.
-4. A transaction commits only when its callback resolves and rolls back on any
-   thrown/rejected operation.
-5. Two adapter instances over the same physical SQLite connection serialize
-   against one another.
-6. A transaction callback uses only the supplied `OpLogTx`. Re-entering a
-   public adapter method would wait behind the transaction's own queue slot.
-7. SQLite errors retain the error semantics callers rely on, including
-   duplicate-operation and quota failures.
+1. `ops.seq` 是正的、单调分配的主键，且 `op.id` 唯一。
+2. `appendWithVectorClockOverwrite()` 原子地写入操作与向量时钟。
+3. 破坏性状态替换原子地写入操作、状态缓存、向量时钟、客户端 ID 与归档状态。
+4. 仅当事务回调 resolve 时才提交，并在任何抛出/拒绝的操作上回滚。
+5. 同一物理 SQLite 连接上的两个适配器实例彼此串行化。
+6. 事务回调只使用所提供的 `OpLogTx`。重新进入公共适配器方法会等待在事务自身的队列槽之后。
+7. SQLite 错误保留调用方依赖的错误语义，包括重复操作与配额失败。
 
-The native wrapper must return the inserted row ID from the same write. An
-absent, zero, non-integer, or separately queried ID must fail before it can
-become an operation sequence.
+原生包装必须从同一次写入返回插入的行 ID。缺失、零、非整数或另行查询的 ID 必须在成为操作序列之前失败。
 
-## Migration safety contract
+## 迁移安全契约
 
-The first native rollout must treat backend migration as a high-risk state
-replacement, not as a best-effort copy:
+首次原生上线必须将后端迁移视为高风险状态替换，而非尽力而为的复制：
 
-1. Gate the SQLite selection behind a native-only feature flag that defaults
-   off.
-2. Quiesce op capture and every writer that can mutate `SUP_OPS`.
-3. Run only when the SQLite destination is empty and the legacy IndexedDB
-   source exists.
-4. Copy every store while preserving primary keys, including gaps in operation
-   sequences.
-5. Verify at least operation count, last sequence, and vector clock before the
-   destination transaction commits. Any mismatch rolls back.
-6. Write the completion marker only after the verified commit.
-7. Keep the IndexedDB source untouched for at least one released version and
-   provide an explicit fallback path.
-8. Never merge two non-empty backends.
+1. 将 SQLite 选择门控在默认关闭的仅原生功能标志之后。
+2. 静默操作捕获以及每一个能变更 `SUP_OPS` 的写入者。
+3. 仅在 SQLite 目标为空且遗留 IndexedDB 源存在时运行。
+4. 复制每一个 store，同时保留主键，包括操作序列中的空隙。
+5. 在目标事务提交前至少验证操作计数、最后序列与向量时钟。任何不匹配都回滚。
+6. 仅在经验证的提交之后写入完成标记。
+7. 至少保留一个已发布版本期间不动 IndexedDB 源，并提供显式回退路径。
+8. 绝不合并且两个非空后端。
 
-`migrateOpLogBackend()` implements the copy and verify-before-commit core.
-Startup quiescence, detection, marker/fallback policy, and lifecycle handling
-remain caller responsibilities.
+`migrateOpLogBackend()` 实现复制与提交前验证核心。启动静默、检测、标记/回退策略与生命周期处理仍是调用方的责任。
 
-## Remaining rollout gates
+## 剩余上线门槛
 
-Complete these in order:
+按顺序完成这些：
 
-1. Add the native SQLite dependency and a thin `SqliteDb` wrapper over one
-   app-private database connection.
-2. Validate insert IDs, transaction/error mapping, app pause/resume, abrupt
-   termination, and representative bulk writes on Android and iOS.
-3. Provide the two persistence services separate adapters over the same
-   physical connection.
-4. Add the native-only, default-off provider selection.
-5. Wire startup detection, quiescence, `migrateOpLogBackend()`, the completion
-   marker, retained-source fallback, and interrupted-migration recovery.
-6. Dogfood with the flag, then use a staged native rollout. Remove the
-   IndexedDB fallback and transitional `adoptConnection` bridge only after the
-   retained-source window and rollback evidence are complete.
+1. 添加原生 SQLite 依赖，以及覆盖单个应用私有数据库连接的薄 `SqliteDb` 包装。
+2. 在 Android 与 iOS 上验证插入 ID、事务/错误映射、应用暂停/恢复、突然终止，以及有代表性的批量写入。
+3. 为两个持久化服务提供覆盖同一物理连接的独立适配器。
+4. 添加仅原生、默认关闭的提供方选择。
+5. 接线启动检测、静默、`migrateOpLogBackend()`、完成标记、保留源回退，以及中断迁移恢复。
+6. 用该标志 dogfood，然后进行分阶段原生上线。仅在保留源窗口与回滚证据完成后，才移除 IndexedDB 回退与过渡性的 `adoptConnection` 桥接。
 
-Do not expand the migration to non-critical IndexedDB databases as part of
-these gates.
+不要将这些门槛的一部分扩展到非关键 IndexedDB 数据库的迁移。
 
-## Executable owners and verification
+## 可执行所有者与验证
 
-| Concern                                    | Owner                                                     |
+| 关注点                                    | 所有者                                                     |
 | ------------------------------------------ | --------------------------------------------------------- |
-| Persistence port and transaction rules     | `src/app/op-log/persistence/op-log-db-adapter.ts`         |
-| Backend DI default                         | `src/app/op-log/persistence/op-log-db-adapter.token.ts`   |
-| IndexedDB backend                          | `src/app/op-log/persistence/indexed-db-op-log-adapter.ts` |
-| SQLite backend and shared-connection queue | `src/app/op-log/persistence/sqlite-op-log-adapter.ts`     |
-| Backend migration core                     | `src/app/op-log/persistence/op-log-backend-migration.ts`  |
+| 持久化端口与事务规则     | `src/app/op-log/persistence/op-log-db-adapter.ts`         |
+| 后端 DI 默认                         | `src/app/op-log/persistence/op-log-db-adapter.token.ts`   |
+| IndexedDB 后端                          | `src/app/op-log/persistence/indexed-db-op-log-adapter.ts` |
+| SQLite 后端与共享连接队列 | `src/app/op-log/persistence/sqlite-op-log-adapter.ts`     |
+| 后端迁移核心                     | `src/app/op-log/persistence/op-log-backend-migration.ts`  |
 | Schema                                     | `src/app/op-log/persistence/op-log-db-schema.ts`          |
 
-Focused CI checks:
+聚焦的 CI 检查：
 
 ```bash
 npm run test:file src/app/op-log/persistence/sqlite-op-log-adapter.spec.ts
@@ -151,6 +101,4 @@ npm run test:file src/app/op-log/persistence/op-log-backend-migration.spec.ts
 npm run test:file src/app/op-log/testing/integration/remote-apply-store-port.integration.spec.ts
 ```
 
-CI proves adapter and SQLite-engine semantics, not the Capacitor bridge or
-device lifecycle. The rollout remains blocked until the on-device gates above
-are reproducible.
+CI 证明适配器与 SQLite 引擎语义，而非 Capacitor 桥接或设备生命周期。上线仍被阻塞，直到上述设备上门槛可复现。

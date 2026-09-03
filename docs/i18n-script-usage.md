@@ -1,40 +1,40 @@
-# I18n Translation Management Script
+# I18n 翻译管理脚本
 
-This document describes the usage of the `tools/add-missing-i18n-variables.js` script, which helps manage internationalization (i18n) files for Super Productivity.
+本文档说明 `tools/add-missing-i18n-variables.js` 脚本的用法，用于管理 Super Productivity 的国际化（i18n）文件。
 
-## Overview
+## 概览
 
-The script manages translation files located in `src/assets/i18n/`. The base language is English (`en.json`), and other languages like `de.json` (German), `tr.json` (Turkish), etc., contain translations.
+脚本管理位于 `src/assets/i18n/` 的翻译文件。基础语言为英语（`en.json`），其他语言如 `de.json`（德语）、`tr.json`（土耳其语）等包含翻译。
 
-The script supports three modes:
+脚本支持三种模式：
 
-- **Extract mode**: Creates work-in-progress (WIP) files with missing translations for a specific language.
-- **Merge mode**: Merges translated WIP files back into the main language file.
-- **Legacy mode**: Adds missing keys to all language files (default when no mode is specified).
+- **Extract 模式**：为特定语言创建仅含缺失翻译的进行中（WIP）文件。
+- **Merge 模式**：将已翻译的 WIP 文件合并回主语言文件。
+- **Legacy 模式**：向所有语言文件添加缺失键（未指定模式时的默认）。
 
-## File Structure
+## 文件结构
 
-- `en.json`: The reference English file with all keys.
-- `{lang}.json`: Main translation files (e.g., `de.json`, `tr.json`).
-- `{lang}-wip.json`: Temporary work-in-progress files containing only missing translations.
+- `en.json`：含全部键的英文参考文件。
+- `{lang}.json`：主翻译文件（例如 `de.json`、`tr.json`）。
+- `{lang}-wip.json`：仅含缺失翻译的临时进行中文件。
 
-## Usage
+## 用法
 
-### Extract Missing Translations
+### 提取缺失翻译
 
-To extract missing translations for a specific language (e.g., Turkish):
+为特定语言（例如土耳其语）提取缺失翻译：
 
 ```bash
 node tools/add-missing-i18n-variables.js extract tr
 ```
 
-This creates `tr-wip.json` with all keys that exist in `en.json` but are missing or empty in `tr.json`.
+这会创建 `tr-wip.json`，包含存在于 `en.json` 但在 `tr.json` 中缺失或为空的所有键。
 
-### Translate WIP File
+### 翻译 WIP 文件
 
-Edit the generated `{lang}-wip.json` file and provide translations for the keys.
+编辑生成的 `{lang}-wip.json` 文件并为键提供翻译。
 
-Example `tr-wip.json`:
+示例 `tr-wip.json`：
 
 ```json
 {
@@ -51,41 +51,41 @@ Example `tr-wip.json`:
 }
 ```
 
-### Merge Translations
+### 合并翻译
 
-After translating the WIP file, merge it back into the main language file:
+翻译 WIP 文件后，合并回主语言文件：
 
 ```bash
 node tools/add-missing-i18n-variables.js merge tr
 ```
 
-This:
+这会：
 
-- Merges translations from `tr-wip.json` into `tr.json`
-- Maintains the same key order as `en.json`
-- Validates that all keys are present
-- Deletes the `tr-wip.json` file
+- 将 `tr-wip.json` 的翻译合并进 `tr.json`
+- 保持与 `en.json` 相同的键顺序
+- 校验所有键都存在
+- 删除 `tr-wip.json` 文件
 
-### Legacy Mode (Update All Files)
+### Legacy 模式（更新全部文件）
 
-To add missing keys to all language files at once (preserving existing translations):
+一次向所有语言文件添加缺失键（保留既有翻译）：
 
 ```bash
 node tools/add-missing-i18n-variables.js
 ```
 
-This updates all `{lang}.json` files to include any new keys from `en.json`, placing them in the same order.
+这会更新所有 `{lang}.json` 文件以包含 `en.json` 中的任何新键，并按相同顺序放置。
 
-## Workflow Example
+## 工作流示例
 
-1. New features are added, updating `en.json` with new keys.
-2. Run extract for your language: `node tools/add-missing-i18n-variables.js extract de`
-3. Translate the keys in `de-wip.json`.
-4. Run merge: `node tools/add-missing-i18n-variables.js merge de`
-5. Submit a pull request with the updated `de.json`.
+1. 新功能添加，更新 `en.json` 中的新键。
+2. 为你的语言运行 extract：`node tools/add-missing-i18n-variables.js extract de`
+3. 在 `de-wip.json` 中翻译键。
+4. 运行 merge：`node tools/add-missing-i18n-variables.js merge de`
+5. 提交包含更新后 `de.json` 的 pull request。
 
-## Notes
+## 说明
 
-- The script preserves the order of keys to match `en.json`.
-- Empty strings in translation files trigger English fallback.
-- WIP files are temporary and will be deleted by the merge command.
+- 脚本保持键顺序与 `en.json` 一致。
+- 翻译文件中的空字符串会触发英文回退。
+- WIP 文件是临时的，会被 merge 命令删除。

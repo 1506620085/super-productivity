@@ -1,32 +1,32 @@
-# Translation Guide
+# 翻译指南
 
-Super Productivity uses JSON files for translations, located in `src/assets/i18n/`.
+Super Productivity 使用 JSON 文件存放翻译，位于 `src/assets/i18n/`。
 
-## How to Contribute
+## 如何贡献
 
-> **Important:** When adding or changing translation keys, **only edit `en.json` directly**. Other locale files are managed via the i18n script workflow described in [i18n-script-usage.md](i18n-script-usage.md). Editing other locale files by hand may cause your changes to be overwritten.
+> **重要：** 添加或更改翻译键时，**只直接编辑 `en.json`**。其他语言文件通过 [i18n-script-usage.md](i18n-script-usage.md) 中描述的 i18n 脚本工作流管理。手改其他语言文件可能导致你的改动被覆盖。
 
-1. Add or update translation keys in `src/assets/i18n/en.json`
-2. Run the i18n script to propagate changes to other locales (see [i18n-script-usage.md](i18n-script-usage.md))
-3. Submit a pull request
+1. 在 `src/assets/i18n/en.json` 中添加或更新翻译键
+2. 运行 i18n 脚本将变更传播到其他语言（见 [i18n-script-usage.md](i18n-script-usage.md)）
+3. 提交 pull request
 
-## Important Notes
+## 重要说明
 
-### Fallback Language
+### 回退语言
 
-**English (`en.json`) is the fallback language.** If a translation is missing or empty, the app automatically displays the English text.
+**英语（`en.json`）是回退语言。** 若某翻译缺失或为空，应用会自动显示英文文本。
 
-### Suffixes for Inflected/Dative Forms (`_NTH`)
+### 屈折/与格形式后缀（`_NTH`）
 
-Some keys have duplicates with an `_NTH` suffix (e.g., `ORD_FIRST` vs `ORD_FIRST_NTH`).
+某些键有带 `_NTH` 后缀的重复项（例如 `ORD_FIRST` 与 `ORD_FIRST_NTH`）。
 
-- `ORD_FIRST` is used as a standalone option in the quick-setting menu (e.g., "first").
-- `ORD_FIRST_NTH` is used inside full sentences (e.g., dative/inflected form in German or other inflected languages like "Monthly on the first Monday").
-- In languages without inflection (like English), these values are identical.
+- `ORD_FIRST` 用作快速设置菜单中的独立选项（例如 "first"）。
+- `ORD_FIRST_NTH` 用在完整句子中（例如德语或其他屈折语言中的与格/屈折形式，如 "Monthly on the first Monday"）。
+- 在无屈折的语言（如英语）中，这些值相同。
 
-### Empty Values Are Intentional
+### 空值是有意的
 
-When you see empty strings (`""`), this is **intentional** - it triggers the English fallback. Do not copy the English text into empty fields unless you're providing an actual translation.
+当你看到空字符串（`""`）时，这是**有意的**——它会触发英文回退。除非你正在提供实际翻译，否则不要把英文文本复制进空字段。
 
 ```json
 {
@@ -34,15 +34,15 @@ When you see empty strings (`""`), this is **intentional** - it triggers the Eng
 }
 ```
 
-The above will display the English text for `SOME_KEY`.
+上面会对 `SOME_KEY` 显示英文文本。
 
-### File Format
+### 文件格式
 
-- Nested JSON structure
-- Keys use SCREAMING_SNAKE_CASE
-- Keep the structure intact - only change the string values
+- 嵌套 JSON 结构
+- 键使用 SCREAMING_SNAKE_CASE
+- 保持结构完整——只改字符串值
 
-### Example
+### 示例
 
 ```json
 {
@@ -53,12 +53,12 @@ The above will display the English text for `SOME_KEY`.
 }
 ```
 
-## Tips
+## 提示
 
-- Use `en.json` as reference for context
-- Keep translations concise (UI space is limited)
-- Test your translations locally if possible (`ng serve`)
+- 用 `en.json` 作上下文参考
+- 保持翻译简洁（UI 空间有限）
+- 尽量在本地测试翻译（`ng serve`）
 
-## Translation Management Script
+## 翻译管理脚本
 
-For managing missing translations and maintaining consistency, use the `tools/add-missing-i18n-variables.js` script. See [i18n-script-usage.md](i18n-script-usage.md) for detailed instructions.
+用于管理缺失翻译并保持一致性，请使用 `tools/add-missing-i18n-variables.js` 脚本。详细说明见 [i18n-script-usage.md](i18n-script-usage.md)。

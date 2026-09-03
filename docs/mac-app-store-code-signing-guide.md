@@ -1,52 +1,37 @@
-# Mac App Store code signing
+# Mac App Store 代码签名
 
-> **Related macOS docs:**
+> **相关 macOS 文档：**
 >
-> - [Release and publishing](release-and-publishing.md)
-> - [Certificate rotation](update-mac-certificates.md)
+> - [发布与上架](release-and-publishing.md)
+> - [证书轮换](update-mac-certificates.md)
 
-Mac App Store validation requires the application signing identity to match a
-certificate embedded in its provisioning profile. Certificate names,
-fingerprints, and owners change at every rotation, so derive them from the
-current keychain and profile rather than copying maintainer-specific values into
-configuration or documentation.
+Mac App Store 校验要求应用签名身份与配置描述文件中嵌入的证书匹配。证书名称、指纹与所有者在每次轮换时都会变化，因此应从当前钥匙串与配置文件推导它们，而不是把维护者特定值复制进配置或文档。
 
-## Sources of truth
+## 权威来源
 
-- [`build/electron-builder.mas.yaml`](../build/electron-builder.mas.yaml) owns the
-  MAS target, entitlements, application ID, and profile path.
-- [The Mac App Store workflow](../.github/workflows/build-publish-to-mac-store-on-release.yml)
-  owns certificate import, secret names, profile installation, diagnostics, and
-  upload.
-- The Apple Developer portal owns the active certificates and provisioning
-  profiles.
+- [`build/electron-builder.mas.yaml`](../build/electron-builder.mas.yaml) 拥有 MAS 目标、entitlements、应用 ID 与配置文件路径。
+- [Mac App Store workflow](../.github/workflows/build-publish-to-mac-store-on-release.yml) 拥有证书导入、secret 名称、配置文件安装、诊断与上传。
+- Apple Developer 门户拥有活跃证书与配置描述文件。
 
-Keep identity selection automatic unless the executable configuration changes.
-Do not add a copied certificate name or fingerprint to electron-builder config.
+除非可执行配置变更，否则保持身份选择自动化。不要向 electron-builder 配置添加复制的证书名或指纹。
 
-## Create the provisioning profile
+## 创建配置描述文件
 
-1. Confirm that the intended current **Apple Distribution** identity and private
-   key are installed:
+1. 确认拟用的当前 **Apple Distribution** 身份与私钥已安装：
 
    ```bash
    security find-identity -v -p codesigning
    ```
 
-2. In the
-   [Apple Developer profile portal](https://developer.apple.com/account/resources/profiles/list),
-   create a **Mac App Store Connect** distribution profile for
-   `com.super-productivity.app`.
-3. Select the current Apple Distribution certificate shown by the portal. Do
-   not select a superseded legacy Mac App Distribution certificate merely
-   because it has a familiar owner name.
-4. Save the profile as `tools/mac-profiles/mas.provisionprofile`.
+2. 在
+   [Apple Developer 配置文件门户](https://developer.apple.com/account/resources/profiles/list)
+   中，为 `com.super-productivity.app` 创建 **Mac App Store Connect** 分发配置文件。
+3. 选择门户显示的当前 Apple Distribution 证书。不要仅因熟悉的所有者名称而选择已被取代的遗留 Mac App Distribution 证书。
+4. 将配置文件保存为 `tools/mac-profiles/mas.provisionprofile`。
 
-## Verify the profile dynamically
+## 动态验证配置文件
 
-List every certificate embedded in the profile. The script prints its subject
-and SHA-1 fingerprint; SHA-1 is used here only because macOS identity listings
-use that identifier.
+列出配置文件中嵌入的每个证书。脚本打印其主题与 SHA-1 指纹；此处使用 SHA-1 仅因为 macOS 身份列表使用该标识符。
 
 ```bash
 PROFILE_PATH="tools/mac-profiles/mas.provisionprofile" python3 - <<'PY'
@@ -88,20 +73,18 @@ with tempfile.TemporaryDirectory() as directory:
 PY
 ```
 
-Confirm that at least one fingerprint exactly matches the intended Apple
-Distribution identity from `security find-identity`.
+确认至少一个指纹与 `security find-identity` 中拟用的 Apple Distribution 身份精确匹配。
 
-## Update CI and test
+## 更新 CI 并测试
 
-1. Encode the verified profile:
+1. 编码已验证的配置文件：
 
    ```bash
    base64 -i tools/mac-profiles/mas.provisionprofile -o mas-profile.b64
    ```
 
-2. Update the `mas_provision_profile` GitHub Actions secret. Do not commit the
-   encoded profile.
-3. Build locally with the same profile:
+2. 更新 `mas_provision_profile` GitHub Actions secret。不要提交编码后的配置文件。
+3. 用同一配置文件本地构建：
 
    ```bash
    cp tools/mac-profiles/mas.provisionprofile embedded.provisionprofile
@@ -109,7 +92,7 @@ Distribution identity from `security find-identity`.
    npm run dist:mac:mas:buildOnly
    ```
 
-4. Inspect the actual app signature and package:
+4. 检查实际应用签名与包：
 
    ```bash
    codesign -dv --verbose=4 \
@@ -118,37 +101,29 @@ Distribution identity from `security find-identity`.
      .tmp/app-builds/mas-universal/super*.pkg
    ```
 
-5. Run the Mac App Store workflow and compare its profile-certificate diagnostic
-   with the identity reported during signing. They must refer to the same
-   current certificate before upload.
+5. 运行 Mac App Store workflow，并将其配置文件-证书诊断与签名期间报告的身份比较。上传前它们必须指向同一当前证书。
 
-## Troubleshooting
+## 故障排除
 
-### Provisioning-profile certificate mismatch
+### 配置描述文件证书不匹配
 
-If Apple reports that the executable was not signed by a certificate contained
-in the profile:
+若 Apple 报告可执行文件未由配置文件中包含的证书签名：
 
-1. Re-run the profile inspection above.
-2. Check the build log for the identity electron-builder selected.
-3. Confirm that the CI PKCS#12 bundle contains that identity and its private key.
-4. Recreate the profile with the selected current Apple Distribution
-   certificate, or replace the CI bundle if the selected identity is
-   unintended.
+1. 重新运行上方配置文件检查。
+2. 在构建日志中查看 electron-builder 选择的身份。
+3. 确认 CI PKCS#12 包包含该身份及其私钥。
+4. 用所选当前 Apple Distribution 证书重新创建配置文件，或在所选身份非预期时替换 CI 包。
 
-Do not fix a mismatch by pasting a maintainer name or old fingerprint into
-configuration.
+不要通过把维护者姓名或旧指纹粘贴进配置来修复不匹配。
 
-### Package is signed but unavailable in App Store Connect
+### 包已签名但在 App Store Connect 中不可用
 
-- Wait for Apple's processing to finish.
-- Complete the build's export-compliance questions.
-- Confirm the version and build number have not already been used.
-- Confirm the build appears under the macOS platform.
+- 等待 Apple 处理完成。
+- 完成构建的出口合规问题。
+- 确认版本与构建号尚未被使用。
+- 确认构建出现在 macOS 平台下。
 
-## Rotation
+## 轮换
 
-Create and test replacement certificates, profiles, and CI secrets before
-revoking the working identities. Follow
-[the rotation runbook](update-mac-certificates.md); it keeps the current release
-path available until both replacement build paths pass.
+在撤销可用身份之前，创建并测试替换证书、配置文件与 CI secrets。遵循
+[轮换操作手册](update-mac-certificates.md)；它会在两条替换构建路径都通过之前保持当前发布路径可用。

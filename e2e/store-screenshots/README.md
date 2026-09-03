@@ -1,8 +1,8 @@
-# Automated screenshot pipeline
+# 自动化截图流水线
 
-Reproducible app-store screenshots driven by Playwright + a single seed dataset.
+由 Playwright 驱动、基于单一种子数据集的可复现应用商店截图。
 
-## Quick start
+## 快速开始
 
 ```bash
 # Capture the web-store matrix (all web viewports × matching scenarios)
@@ -23,71 +23,71 @@ npx playwright test --config e2e/playwright.store-screenshots.config.ts \
   --project=desktopMaster --grep "desktop all"
 ```
 
-## Environment overrides
+## 环境变量覆盖
 
-| Var                                                        | Effect                                                                                                                                    |
+| 变量                                                        | 作用                                                                                                                                    |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `SCREENSHOT_MODE=electron`                                 | Switches the fixture to the Electron pipeline (set by `screenshots:capture:electron`).                                                    |
-| `SCREENSHOT_BASE_DATE=2026-05-06T09:30:00`                 | Pin the "today" anchor used by the seed builder. Default is a Wednesday well clear of midnight in CI timezones.                           |
-| `SP_SCREENSHOT_BG_DARK_URL` / `SP_SCREENSHOT_BG_LIGHT_URL` | Override the default Unsplash backgrounds (e.g. point to a vendored asset for offline / privacy-sensitive runs).                          |
-| `SP_SCREENSHOT_BG_DISABLE=1`                               | Drop background images entirely (set by `screenshots:flathub`).                                                                           |
-| `SP_SCREENSHOT_BG_OVERLAY_OPACITY=80`                      | Drives the per-context "Darken/lighten background image for better contrast" slider (0–99). Default 80 for screenshots vs. 20 in the app. |
-| `SP_SCREENSHOTS_STORE=flathub`                             | Restrict post-processing to one store rule. Used by `screenshots:build:flathub` so Linux captures do not regenerate Mac App Store output. |
+| `SCREENSHOT_MODE=electron`                                 | 将 fixture 切换到 Electron 流水线（由 `screenshots:capture:electron` 设置）。                                                    |
+| `SCREENSHOT_BASE_DATE=2026-05-06T09:30:00`                 | 固定种子构建器使用的「今天」锚点。默认取一个远离午夜、在 CI 各时区都安全的周三。                           |
+| `SP_SCREENSHOT_BG_DARK_URL` / `SP_SCREENSHOT_BG_LIGHT_URL` | 覆盖默认 Unsplash 背景（例如指向本地资源，用于离线 / 隐私敏感场景）。                          |
+| `SP_SCREENSHOT_BG_DISABLE=1`                               | 完全去掉背景图（由 `screenshots:flathub` 设置）。                                                                           |
+| `SP_SCREENSHOT_BG_OVERLAY_OPACITY=80`                      | 驱动各上下文中「加深/变亮背景图以提升对比度」滑块（0–99）。截图默认 80，应用内默认 20。 |
+| `SP_SCREENSHOTS_STORE=flathub`                             | 将后处理限制为某一商店规则。由 `screenshots:build:flathub` 使用，避免 Linux 截图重新生成 Mac App Store 输出。 |
 
-Master captures land in `dist/screenshots/_master/<viewport>/<locale>/<theme>/<scenario>/<name>.png`.
-Per-store assets land in `dist/screenshots/<store>/<locale>/NN-name.png` (and the F-Droid `fastlane/...` layout).
-Web and Microsoft Store share the generic desktop output at `dist/screenshots/desktop/<locale>/`.
+主截图落在 `dist/screenshots/_master/<viewport>/<locale>/<theme>/<scenario>/<name>.png`。
+各商店资源落在 `dist/screenshots/<store>/<locale>/NN-name.png`（以及 F-Droid 的 `fastlane/...` 布局）。
+Web 与 Microsoft Store 共用通用桌面输出：`dist/screenshots/desktop/<locale>/`。
 
-## Scenario lineup
+## 场景阵容
 
-| Slot       | Platform | Theme | What it shows                                                     |
+| 槽位       | 平台 | 主题 | 展示内容                                                     |
 | ---------- | -------- | ----- | ----------------------------------------------------------------- |
-| mobile-00  | mobile   | dark  | Cover/hero — Today list with marketing caption overlay            |
-| desktop-00 | desktop  | dark  | Cover/hero — Today list with marketing caption overlay            |
-| tablet-00  | tablet   | dark  | Cover/hero — Today list with marketing caption overlay            |
-| mobile-01  | mobile   | dark  | Planner                                                           |
-| mobile-02  | mobile   | dark  | Planner with calendar nav expanded                                |
-| mobile-03  | mobile   | dark  | Eisenhower matrix board                                           |
-| mobile-04  | mobile   | light | Planner expanded (light variant)                                  |
-| mobile-05  | mobile   | dark  | Schedule view                                                     |
-| mobile-06  | mobile   | dark  | Today task list                                                   |
-| desktop-01 | desktop  | dark  | Today + schedule day-panel open                                   |
-| desktop-02 | desktop  | dark  | Eisenhower matrix board                                           |
-| desktop-03 | desktop  | dark  | Schedule view                                                     |
-| desktop-04 | desktop  | light | Project (Work) + notes panel populated                            |
-| desktop-05 | desktop  | dark  | Focus mode                                                        |
-| desktop-06 | desktop  | light | Schedule (light variant)                                          |
-| desktop-07 | desktop  | dark  | Project (Work) view, no wallpaper — regular palette reads cleanly |
-| desktop-08 | desktop  | dark  | Planner                                                           |
-| desktop-09 | desktop  | light | Project (Work) + issue provider panel open                        |
-| desktop-10 | desktop  | dark  | Project (Work) + task detail panel open                           |
+| mobile-00  | mobile   | dark  | 封面/主视觉 — 今日列表并叠加营销文案            |
+| desktop-00 | desktop  | dark  | 封面/主视觉 — 今日列表并叠加营销文案            |
+| tablet-00  | tablet   | dark  | 封面/主视觉 — 今日列表并叠加营销文案            |
+| mobile-01  | mobile   | dark  | 规划器                                                           |
+| mobile-02  | mobile   | dark  | 规划器且日历导航展开                                |
+| mobile-03  | mobile   | dark  | 艾森豪威尔矩阵看板                                           |
+| mobile-04  | mobile   | light | 规划器展开（浅色变体）                                  |
+| mobile-05  | mobile   | dark  | 日程视图                                                     |
+| mobile-06  | mobile   | dark  | 今日任务列表                                                   |
+| desktop-01 | desktop  | dark  | 今日 + 日程日面板打开                                   |
+| desktop-02 | desktop  | dark  | 艾森豪威尔矩阵看板                                           |
+| desktop-03 | desktop  | dark  | 日程视图                                                     |
+| desktop-04 | desktop  | light | 项目（工作）+ 笔记面板已填充                            |
+| desktop-05 | desktop  | dark  | 专注模式                                                        |
+| desktop-06 | desktop  | light | 日程（浅色变体）                                          |
+| desktop-07 | desktop  | dark  | 项目（工作）视图，无壁纸 — 常规配色更干净 |
+| desktop-08 | desktop  | dark  | 规划器                                                           |
+| desktop-09 | desktop  | light | 项目（工作）+ 议题提供者面板打开                        |
+| desktop-10 | desktop  | dark  | 项目（工作）+ 任务详情面板打开                           |
 
-Specs are platform-grouped: `scenarios/desktop/all.spec.ts` and `scenarios/mobile/all.spec.ts` each capture every slot in a single session, flipping `DARK_MODE` between groups via `applyTheme()` (Playwright `addInitScript` is append-only, so a later script wins on each reload). Each spec runs once per locale (en + de).
+规格按平台分组：`scenarios/desktop/all.spec.ts` 与 `scenarios/mobile/all.spec.ts` 各自在单次会话中捕获所有槽位，组间通过 `applyTheme()` 切换 `DARK_MODE`（Playwright 的 `addInitScript` 为追加式，因此每次 reload 时后执行的脚本生效）。每个规格对每个语言环境（en + de）各运行一次。
 
-## Files
+## 文件
 
-| Path                                        | Purpose                                                                                                                                                                                  |
+| 路径                                        | 用途                                                                                                                                                                                  |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `matrix.ts`                                 | Locales, themes, viewports, mobile/desktop classification, store rules, shared desktop output                                                                                            |
-| `seed/seed.template.json`                   | Curated dataset with date offsets and `@@PLANNER_OFFSET_+N` placeholders                                                                                                                 |
-| `seed/build-seed.ts`                        | Materializes offsets to absolute dates, injects `locale` + `customTheme`                                                                                                                 |
-| `fixture.ts`                                | Pins clock, applies dark-mode, imports seed via UI flow, exposes `screenshotMaster` (which reads live `DARK_MODE` so light/dark scenes land in the right directory)                      |
-| `helpers.ts`                                | `gotoAndSettle`, panel open helpers, `resetView`, `applyTheme`, `applyLocale`, `applyTimeTrackingEnabled`, `applySideNavCollapsed`, `setPlannerCalendarExpanded`, `showMarketingOverlay` |
-| `marketing-copy.ts`                         | Headline + subline shown on the slot-00 hero overlay                                                                                                                                     |
-| `scenarios/desktop/all.spec.ts`             | 12 desktop captures: hero + 11 scenes / light variants                                                                                                                                   |
-| `scenarios/mobile/all.spec.ts`              | 7 mobile slots: hero + 6 scenes                                                                                                                                                          |
-| `scenarios/tablet/all.spec.ts`              | 6 tablet slots: hero + 5 scenes                                                                                                                                                          |
-| `build-store-assets.ts`                     | Renames + copies masters into shared/per-store layouts; filters/frames Flathub; JPEG re-encode for `maxBytes`-capped stores (Snap); emits `_preview.html` contact sheet                  |
-| `../playwright.store-screenshots.config.ts` | Separate Playwright config; one project per viewport                                                                                                                                     |
+| `matrix.ts`                                 | 语言环境、主题、视口、移动/桌面分类、商店规则、共享桌面输出                                                                                            |
+| `seed/seed.template.json`                   | 带日期偏移与 `@@PLANNER_OFFSET_+N` 占位符的精选数据集                                                                                                                 |
+| `seed/build-seed.ts`                        | 将偏移物化为绝对日期，注入 `locale` + `customTheme`                                                                                                                 |
+| `fixture.ts`                                | 固定时钟、应用深色模式、经 UI 流程导入种子，暴露 `screenshotMaster`（读取实时 `DARK_MODE`，使浅色/深色场景落在正确目录）                      |
+| `helpers.ts`                                | `gotoAndSettle`、面板打开辅助、`resetView`、`applyTheme`、`applyLocale`、`applyTimeTrackingEnabled`、`applySideNavCollapsed`、`setPlannerCalendarExpanded`、`showMarketingOverlay` |
+| `marketing-copy.ts`                         | slot-00 主视觉叠加层显示的标题 + 副标题                                                                                                                                     |
+| `scenarios/desktop/all.spec.ts`             | 12 张桌面截图：主视觉 + 11 个场景 / 浅色变体                                                                                                                                   |
+| `scenarios/mobile/all.spec.ts`              | 7 个移动槽位：主视觉 + 6 个场景                                                                                                                                                          |
+| `scenarios/tablet/all.spec.ts`              | 6 个平板槽位：主视觉 + 5 个场景                                                                                                                                                          |
+| `build-store-assets.ts`                     | 重命名并复制主图到共享/各商店布局；过滤/装帧 Flathub；对有 `maxBytes` 上限的商店（Snap）做 JPEG 重编码；生成 `_preview.html` 联系表                  |
+| `../playwright.store-screenshots.config.ts` | 独立 Playwright 配置；每个视口一个 project                                                                                                                                     |
 
-## How it works
+## 工作原理
 
-1. **Per-test seed file** is materialized to `.tmp/screenshot-seeds/seed-<date>-<locale>[-<customTheme>].json`.
-2. **Fixture** boots the app with `page.clock.install({ time: SCREENSHOT_BASE_DATE })`, sets `localStorage.DARK_MODE`, pins browser context to `en-US` (so `ImportPage`'s English text matchers always work), then imports the seed via `BackupService.importCompleteBackup`. Locale flows through `globalConfig.localization.lng` → `applyLanguageFromState$` effect. Custom themes flow through `globalConfig.misc.customTheme`.
-3. **Each scenario spec** drives the app to a state and calls `screenshotMaster(scenario, name)`. The Playwright project name (e.g. `desktopMaster`) determines the viewport.
-4. **Post-processor** copies masters into shared/per-store layouts. No resizing — captures are already at native size for each store.
+1. **每个测试的种子文件**物化到 `.tmp/screenshot-seeds/seed-<date>-<locale>[-<customTheme>].json`。
+2. **Fixture** 以 `page.clock.install({ time: SCREENSHOT_BASE_DATE })` 启动应用，设置 `localStorage.DARK_MODE`，将浏览器上下文固定为 `en-US`（使 `ImportPage` 的英文文本匹配始终有效），然后通过 `BackupService.importCompleteBackup` 导入种子。语言环境经 `globalConfig.localization.lng` → `applyLanguageFromState$` effect 流转。自定义主题经 `globalConfig.misc.customTheme` 流转。
+3. **每个场景规格**将应用驱动到某状态并调用 `screenshotMaster(scenario, name)`。Playwright project 名称（如 `desktopMaster`）决定视口。
+4. **后处理器**将主图复制到共享/各商店布局。不做缩放——截图已是各商店所需的原生尺寸。
 
-## Adding a scenario
+## 添加场景
 
 ```ts
 // scenarios/desktop/08-new-thing.spec.ts
@@ -109,18 +109,18 @@ for (const locale of LOCALES) {
 }
 ```
 
-## Per-store gotchas
+## 各商店注意事项
 
-- **Web / MS Store** share `dist/screenshots/desktop/<locale>/`; MS Store reserves bottom 1/4 for system-rendered captions and accepts up to 10 screenshots, so pick at most 10 from the shared desktop set before upload.
-- **Mac App Store** rejects letterboxed 16:9 in 16:10 frames — capture native 2880×1800.
-- **Snap** uses the same desktop master content but stays separate because it caps at 5 items, ≤2 MB each, single global gallery (no per-locale). Pipeline emits all desktops re-encoded as JPEG (mozjpeg, q90→q60 step-down) so each fits the cap; **trim manually to 5 before Snap upload**.
-- **Play / Apple** explicitly forbid / discourage device frames.
-- **Apple** requires only iPhone 6.9" (1290×2796) and iPad 13" (2064×2752); smaller sizes auto-derive.
-- **Flathub** requires native window chrome and forbids overlays — sourced from the Electron capture pipeline (single global gallery). Run on a Linux X11/Wayland host via `npm run screenshots:flathub`; it disables decorative backgrounds, drops the marketing hero/duplicate variants, and frames the final PNGs with transparent rounded corners + shadow.
+- **Web / MS Store** 共用 `dist/screenshots/desktop/<locale>/`；MS Store 底部 1/4 留给系统渲染文案，最多接受 10 张截图，因此上传前请从共享桌面集中最多挑 10 张。
+- **Mac App Store** 拒绝在 16:10 画幅中加黑边的 16:9——请以原生 2880×1800 捕获。
+- **Snap** 使用相同的桌面主图内容，但保持独立，因其上限为 5 张、每张 ≤2 MB，且为单一全局图库（无按语言区分）。流水线将所有桌面图重编码为 JPEG（mozjpeg，q90→q60 逐步降低）以满足上限；**上传 Snap 前请手动裁剪到 5 张**。
+- **Play / Apple** 明确禁止 / 不鼓励设备外框。
+- **Apple** 仅要求 iPhone 6.9"（1290×2796）与 iPad 13"（2064×2752）；更小尺寸自动派生。
+- **Flathub** 要求原生窗口装饰并禁止叠加层——来源于 Electron 捕获流水线（单一全局图库）。在 Linux X11/Wayland 主机上通过 `npm run screenshots:flathub` 运行；它会禁用装饰性背景、去掉营销主视觉/重复变体，并以透明圆角 + 阴影装帧最终 PNG。
 
-## Electron pipeline (Mac App Store, Flathub)
+## Electron 流水线（Mac App Store、Flathub）
 
-Web Chromium captures don't look "native" on macOS — wrong fonts, wrong scrollbars, no traffic-lights. Flathub explicitly _requires_ native window chrome. So there's a parallel pipeline that runs the actual SP Electron build via Playwright's `_electron` API. macOS captures use Electron renderer screenshots plus a deterministic hiddenInset traffic-light overlay; Linux captures use OS-level region tools (`grim`/`import`) so Flathub gets real GTK chrome.
+Web Chromium 截图在 macOS 上看起来不够「原生」——字体不对、滚动条不对、没有红绿灯按钮。Flathub 明确_要求_原生窗口装饰。因此有一条并行流水线，通过 Playwright 的 `_electron` API 运行真实的 SP Electron 构建。macOS 捕获使用 Electron 渲染器截图加上确定性的 hiddenInset 红绿灯叠加；Linux 捕获使用系统级区域工具（`grim`/`import`），以便 Flathub 获得真实的 GTK 装饰。
 
 ```bash
 # Capture only — masters land in dist/screenshots/_master_electron/.
@@ -135,28 +135,28 @@ npm run screenshots:electron
 npm run screenshots:flathub
 ```
 
-Same scenarios, same fixture file — `store-screenshots/fixture.ts` branches on the `SCREENSHOT_MODE` env var (the npm script sets it). Each desktop spec runs unchanged in either mode.
+相同场景、相同 fixture 文件——`store-screenshots/fixture.ts` 根据 `SCREENSHOT_MODE` 环境变量分支（由 npm 脚本设置）。每个桌面规格在两种模式下均可不变运行。
 
-On macOS, Playwright-launched Electron is not always treated like a LaunchServices-started `.app`, and OS capture can miss AppKit's hiddenInset traffic lights even when the window content is correct. The fixture avoids that fragile path: it captures the renderer at the target 2560×1600 Retina size and composites the three traffic lights at AppKit's hiddenInset coordinates.
+在 macOS 上，Playwright 启动的 Electron 并不总是被当作 LaunchServices 启动的 `.app`，即使窗口内容正确，系统捕获也可能漏掉 AppKit 的 hiddenInset 红绿灯。fixture 避开这条脆弱路径：以目标 2560×1600 Retina 尺寸捕获渲染器，并在 AppKit hiddenInset 坐标合成三个红绿灯。
 
-On Linux, the OS-level capture grabs the full window rect including titlebar, shadow, and GTK decoration. Bounds come from `BrowserWindow.getBounds()`; on X11/Wayland bounds == pixels.
+在 Linux 上，系统级捕获抓取包含标题栏、阴影与 GTK 装饰的完整窗口矩形。边界来自 `BrowserWindow.getBounds()`；在 X11/Wayland 上 bounds == 像素。
 
-Per-OS tooling (must be on PATH):
+各 OS 工具（必须在 PATH 中）：
 
-- **macOS** — no external capture tool; the fixture forces Retina-scale capture so the renderer screenshot lands at 2560×1600.
-- **Linux X11** — ImageMagick (`apt install imagemagick`, ships `import`)
-- **Linux Wayland** — `grim` (`apt install grim`, wlroots-based compositors only)
+- **macOS** — 无需外部捕获工具；fixture 强制 Retina 缩放捕获，使渲染器截图落在 2560×1600。
+- **Linux X11** — ImageMagick（`apt install imagemagick`，提供 `import`）
+- **Linux Wayland** — `grim`（`apt install grim`，仅 wlroots 系合成器）
 
-The Mac App Store and Flathub store rules have `masterDir: 'electron'` in `STORE_RULES`, so the post-processor pulls those captures into `dist/screenshots/macappstore/` and `dist/screenshots/flathub/`. Flathub additionally pins its gallery order and applies rounded transparent window framing in `build-store-assets.ts`. All other stores still come from the web pipeline.
+Mac App Store 与 Flathub 商店规则在 `STORE_RULES` 中设有 `masterDir: 'electron'`，因此后处理器将这些截图拉取到 `dist/screenshots/macappstore/` 与 `dist/screenshots/flathub/`。Flathub 还在 `build-store-assets.ts` 中固定图库顺序并应用圆角透明窗口装帧。其余商店仍来自 web 流水线。
 
-## Status
+## 状态
 
-- ✅ Foundation: matrix, seed builder, fixture (web + electron modes), helpers, post-processor
-- ✅ 26 captures covering planner, boards, schedule, focus, notes, project view, task details, and issue provider setup
-- ✅ Per-build `_preview.html` contact sheet under `dist/screenshots/` for one-click QA
-- ✅ Electron-mode pipeline with macOS traffic-light compositing and Linux OS chrome capture (`grim` / `import`)
-- ✅ Mac App Store wired to source from `_master_electron/`
-- ✅ Flathub STORE_RULE (single-gallery, sourced from `_master_electron/`, filtered/framed for Flathub)
-- ✅ Snap JPEG re-encode under 2 MB cap (mozjpeg, automatic per-file)
-- ✅ Tooltip suppression + cursor parking so leftover Material tooltips don't bleed into captures
-- ⏳ Smoke-test the Electron pipeline on a real Mac (or Linux X11 for plumbing)
+- ✅ 基础：矩阵、种子构建器、fixture（web + electron 模式）、辅助函数、后处理器
+- ✅ 26 张截图覆盖规划器、看板、日程、专注、笔记、项目视图、任务详情与议题提供者设置
+- ✅ 每次构建在 `dist/screenshots/` 下生成 `_preview.html` 联系表，便于一键 QA
+- ✅ Electron 模式流水线，含 macOS 红绿灯合成与 Linux OS 装饰捕获（`grim` / `import`）
+- ✅ Mac App Store 已接入从 `_master_electron/` 取源
+- ✅ Flathub STORE_RULE（单一图库，取自 `_master_electron/`，经过滤/装帧以适配 Flathub）
+- ✅ Snap JPEG 重编码以满足 2 MB 上限（mozjpeg，按文件自动）
+- ✅ 抑制 tooltip + 光标停靠，避免残留 Material tooltip 渗入截图
+- ⏳ 在真实 Mac（或 Linux X11 做连通性）上对 Electron 流水线做冒烟测试

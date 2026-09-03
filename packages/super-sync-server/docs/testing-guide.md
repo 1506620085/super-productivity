@@ -1,6 +1,5 @@
-# Encryption-at-rest testing guide (retired)
+# 静态加密测试指南（已退役）
 
-The former guide exercised an abandoned LUKS deployment and must not be used.
-Current status and security boundaries are documented in
-[Database encryption at rest](encryption-at-rest.md); current server test
-commands live in the package `README.md` and `package.json`.
+先前的指南演练的是已废弃的 LUKS 部署，不得再使用。
+当前状态与安全边界见
+[数据库静态加密](encryption-at-rest.md)；当前服务器测试命令位于包的 `README.md` 与 `package.json`。

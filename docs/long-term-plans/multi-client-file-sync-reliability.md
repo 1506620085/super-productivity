@@ -1,164 +1,139 @@
-# Making File-Based Sync Reliable with Multiple Concurrent Clients
+# 使基于文件的同步在多并发客户端下可靠
 
-> **Status: Planned**
+> **状态：已规划**
 
-## Current Vulnerabilities
+## 当前脆弱点
 
-The single-file approach (`sync-data.json`) has these specific weaknesses when multiple clients sync simultaneously:
+单文件方案（`sync-data.json`）在多个客户端同时同步时有以下具体弱点：
 
-### 1. Bounded retries on upload conflict
+### 1. 上传冲突时的有界重试
 
-`_uploadWithMismatchFallback()` (`file-based-sync-adapter.service.ts`) makes up to `1 + _MAX_UPLOAD_RETRIES` conditional attempts (`_MAX_UPLOAD_RETRIES` is currently `2`, so 3 total) and never force-overwrites. On a rev mismatch it re-downloads: if the remote rev actually changed it treats that as a genuine concurrent write and throws a retryable error **immediately** (the extra attempts exist only for the transient case where the re-downloaded rev is unchanged). The next sync cycle then downloads the concurrent ops and rebuilds a consistent snapshot. This handles a concurrent write that is _visible at check time_; it does **not** close the check-then-write race described in §5.
+`_uploadWithMismatchFallback()`（`file-based-sync-adapter.service.ts`）最多进行 `1 + _MAX_UPLOAD_RETRIES` 次有条件尝试（`_MAX_UPLOAD_RETRIES` 当前为 `2`，共 3 次），且从不强制覆盖。在 rev 不匹配时会重新下载：若远端 rev 确实已变，则视为真正的并发写入，并**立即**抛出可重试错误（额外尝试仅用于重新下载后 rev 未变的瞬时情况）。随后的同步周期会下载并发操作并重建一致快照。这能处理在_检查时可见_的并发写入；但**不能**关闭 §5 所述的 check-then-write 竞态。
 
-### 2. Wide race window
+### 2. 宽竞态窗口
 
-The upload cycle is: download → read state snapshot → merge ops → encrypt → compress → upload. This can take seconds (especially with large state + archives). Any other client uploading during that window causes a conflict.
+上传周期为：下载 → 读取状态快照 → 合并操作 → 加密 → 压缩 → 上传。这可能耗时数秒（尤其是大状态 + 归档）。该窗口内任何其他客户端上传都会导致冲突。
 
-### 3. Full state on every upload
+### 3. 每次上传都是完整状态
 
-Every upload includes the **complete application state** (line 452: `getStateSnapshot()`), both archives, and 500 recent ops. This makes the file large and the upload slow, widening the race window.
+每次上传都包含**完整应用状态**（第 452 行：`getStateSnapshot()`）、两个归档，以及 500 条近期操作。这使文件变大、上传变慢，从而拉宽竞态窗口。
 
-### 4. WebDAV revision tracking is coarse
+### 4. WebDAV 修订跟踪较粗
 
-WebDAV uses `lastmod` (seconds resolution) as the revision. Two uploads within the same second can't be distinguished. The `syncVersion` counter inside the file compensates, but only if the file is actually re-downloaded between attempts.
+WebDAV 使用 `lastmod`（秒级精度）作为修订号。同一秒内的两次上传无法区分。文件内的 `syncVersion` 计数器可补偿，但仅当两次尝试之间实际重新下载了文件时才有效。
 
-### 5. No atomic CAS for LocalFile (accepted limitation — #8898)
+### 5. LocalFile 无原子 CAS（已接受的限制 — #8898）
 
-For local file sync there is no server-side compare-and-swap. `uploadFile()`
-(`local-file-sync-base.ts`) does the rev check (`downloadFile` + hash compare)
-and the `writeFile` as two separate, non-atomic steps, so a concurrent writer
-that lands **between** check and write is not detected and can be overwritten (a
-classic TOCTOU race). This is an **accepted limitation**, LOW severity in
-practice because several layers narrow the window or soften the outcome:
+本地文件同步没有服务端 compare-and-swap。`uploadFile()`
+（`local-file-sync-base.ts`）将 rev 检查（`downloadFile` + 哈希比较）
+与 `writeFile` 作为两个独立、非原子步骤，因此落在检查与写入**之间**的并发写入者不会被检测到，并可能被覆盖（经典的 TOCTOU 竞态）。这是**已接受的限制**，实践中严重度为 LOW，因为多层机制缩小了窗口或缓和了后果：
 
-- Within one client, concurrent uploads share an upload lock (`LockService`,
-  `LOCK_NAMES.UPLOAD` — Web Locks cross-tab, in-process mutex fallback on
-  Electron/Android), so a client's own upload cycles don't race on the file. This
-  does **not** extend across machines. (Downloads use a separate lock; only
-  uploads write the file.)
-- Cross-machine contention needs multiple writers on the same file — an external
-  folder-sync tool (Syncthing/Dropbox) or a directly shared/network-mounted sync
-  folder. An OS-level lock wouldn't help across machines anyway.
-- A concurrent write that is _visible at check time_ is caught, not clobbered:
-  `_uploadWithMismatchFallback` never force-overwrites; on a rev mismatch it
-  re-downloads and throws retryably, and the next cycle re-applies the concurrent
-  ops. Only a write landing inside the check→write window escapes this.
-- Backup-before-overwrite (`.bak`, #8786, best-effort): the current remote content
-  is copied to a `.bak` before overwrite, letting the next download recover a
-  **corrupt/interrupted** primary. It does **not** recover a valid concurrent
-  overwrite, nor a primary that went fully missing (e.g. an Android
-  delete-then-crash), and the `.bak` write is non-fatal if it fails.
+- 在同一客户端内，并发上传共享上传锁（`LockService`，
+  `LOCK_NAMES.UPLOAD` — Web Locks 跨标签页，Electron/Android 上回退为进程内互斥），因此同一客户端的上传周期不会在文件上竞态。这
+  **不**跨机器。（下载使用单独的锁；只有上传会写文件。）
+- 跨机器争用需要多个写入者写同一文件——外部文件夹同步工具（Syncthing/Dropbox）或直接共享/网络挂载的同步文件夹。OS 级锁跨机器本来也帮不上忙。
+- 在_检查时可见_的并发写入会被捕获而非覆盖：
+  `_uploadWithMismatchFallback` 从不强制覆盖；rev 不匹配时会重新下载并抛出可重试错误，下一周期会重新应用并发操作。只有落在 check→write 窗口内的写入会逃脱。
+- 覆盖前备份（`.bak`，#8786，尽力而为）：覆盖前将当前远端内容复制到 `.bak`，使下次下载能恢复**损坏/中断**的主文件。它**不能**恢复合法的并发覆盖，也不能恢复主文件完全丢失的情况（例如 Android 上先删除再崩溃），且 `.bak` 写入失败时非致命。
 
-So the residual risk is narrow but real: a writer whose write falls inside another
-client's check→write window can have its update lost — recoverable only if that
-client's local op-log still holds the ops and re-uploads them on a later cycle.
-Two distinct problems live here; keep them separate:
+因此剩余风险窄但真实：若某写入者的写入落在另一客户端的 check→write 窗口内，其更新可能丢失——仅当该客户端本地 op-log 仍持有这些操作并在后续周期重新上传时才能恢复。这里有两个不同问题，请分开看待：
 
-- **Torn writes** (crash mid-write → partial/corrupt file) are already prevented
-  on **Electron/desktop**: `FILE_SYNC_SAVE` (`electron/local-file-sync.ts`) writes
-  to a temp file (`flag: 'wx'`) then `renameSync` (atomic on ext4/APFS/NTFS), with
-  temp cleanup on failure. **Android SAF still writes in place**
-  (`SafBridgePlugin.writeFile` → `openOutputStream`), so a torn write is possible
-  there — only partly mitigated by the best-effort `.bak` recovery above (and not
-  at all if the primary goes missing rather than corrupt). A native
-  temp-DocumentFile + rename would close it, but it's low value (mobile is
-  effectively single-writer).
-- **The check-then-write CAS race itself** is NOT closed by atomic rename — rename
-  only makes the write atomic, not the read-compare-write sequence. Portably
-  closing it needs OS-level CAS (`O_EXCL` / advisory locks) that isn't uniformly
-  available across the LocalFile backends. Left as accepted.
+- **撕裂写入**（写到一半崩溃 → 部分/损坏文件）在 **Electron/桌面** 上已防止：
+  `FILE_SYNC_SAVE`（`electron/local-file-sync.ts`）先写到临时文件（`flag: 'wx'`）再 `renameSync`（在 ext4/APFS/NTFS 上原子），失败时清理临时文件。**Android SAF 仍原地写入**
+  （`SafBridgePlugin.writeFile` → `openOutputStream`），因此仍可能发生撕裂写入——仅部分由上文尽力而为的 `.bak` 恢复缓解（若主文件丢失而非损坏则完全无效）。原生 temp-DocumentFile + rename 可关闭此问题，但价值较低（移动端实际上是单写入者）。
+- **check-then-write CAS 竞态本身**不能由原子 rename 关闭——rename 只使写入原子，不能使 read-compare-write 序列原子。可移植地关闭它需要 OS 级 CAS（`O_EXCL` / 咨询锁），而 LocalFile 各后端并非一致可用。作为已接受限制保留。
 
-## How Bad Is It in Practice?
+## 实践中有多严重？
 
-**It works reasonably well for 2 clients** because:
+**对 2 个客户端通常还算好用**，因为：
 
-- The piggybacking mechanism merges concurrent uploads on the retry
-- Vector clocks + LWW correctly resolve entity-level conflicts
-- The 500-op buffer is generous enough to catch concurrent changes
-- Sync intervals (e.g., 5 minutes) usually provide enough separation
+- 搭便车（piggybacking）机制在重试时合并并发上传
+- 向量时钟 + LWW 能正确解决实体级冲突
+- 500 条操作缓冲足以捕获并发变更
+- 同步间隔（例如 5 分钟）通常提供足够间隔
 
-**It gets fragile with 3+ clients** or short sync intervals because the single retry isn't enough, and the large file size makes uploads slow.
+**在 3+ 客户端或短同步间隔下会变脆弱**，因为单次重试不够，且大文件使上传变慢。
 
 ---
 
-## Three Levels of Improvement
+## 三级改进
 
-### Level 1: Harden the Single-File Approach (Small Change)
+### 第 1 级：加固单文件方案（小改动）
 
-**What**: Fix the most obvious weaknesses without changing the storage model.
+**内容**：在不改变存储模型的前提下修复最明显的弱点。
 
-**Changes to `file-based-sync-adapter.service.ts`:**
+**对 `file-based-sync-adapter.service.ts` 的改动：**
 
-1. **Retry loop with exponential backoff** instead of single retry
-   - Replace `_uploadWithRetry()` with a loop: attempt up to 3-5 times
-   - Add randomized backoff (200ms, 400ms, 800ms + jitter) between retries
-   - Each retry re-downloads, re-merges, re-uploads
-   - ~30 lines changed
+1. **带指数退避的重试循环**，替代单次重试
+   - 将 `_uploadWithRetry()` 替换为循环：最多尝试 3–5 次
+   - 重试间加入随机退避（200ms、400ms、800ms + jitter）
+   - 每次重试重新下载、重新合并、重新上传
+   - 约改动 30 行
 
-2. **Lock file before upload** (optional, for providers that support it)
-   - Write a `sync.lock` file with client ID + timestamp before uploading
-   - Other clients check the lock and skip/wait if it's recent (< 30s)
-   - Delete lock after upload
-   - Already have precedent: `migration.lock` in the codebase
-   - ~50 lines added
+2. **上传前加锁文件**（可选，适用于支持的提供方）
+   - 上传前写入带客户端 ID + 时间戳的 `sync.lock` 文件
+   - 其他客户端检查锁，若较新（< 30s）则跳过/等待
+   - 上传后删除锁
+   - 代码库中已有先例：`migration.lock`
+   - 约新增 50 行
 
-3. **WebDAV: use ETag headers** instead of `lastmod` for revision
-   - More precise conflict detection
-   - Requires checking WebDAV provider implementation
+3. **WebDAV：用 ETag 头**替代 `lastmod` 作为修订
+   - 冲突检测更精确
+   - 需检查 WebDAV 提供方实现
 
-**Pros**: Minimal code change, backward compatible, no migration needed
-**Cons**: Still fundamentally limited — single file remains the bottleneck
-**Reliability improvement**: Good enough for 3-4 clients with reasonable sync intervals (2+ minutes)
+**优点**：代码改动最小，向后兼容，无需迁移
+**缺点**：仍有根本限制——单文件仍是瓶颈
+**可靠性提升**：在合理同步间隔（2+ 分钟）下，对 3–4 个客户端足够好
 
 ---
 
-### Level 2: Separate Operations from State (Medium Change)
+### 第 2 级：将操作与状态分离（中等改动）
 
-**What**: Split into two files — a **state snapshot** (updated infrequently) and an **operations log** (updated every sync). This reduces contention because most sync cycles only touch the ops file.
+**内容**：拆成两个文件——**状态快照**（不频繁更新）与**操作日志**（每次同步更新）。由于多数同步周期只触碰 ops 文件，争用减少。
 
-**Storage structure:**
+**存储结构：**
 
 ```
-sync-data.json          → state snapshot (updated every Nth sync or on demand)
-sync-ops.jsonl          → append-only operation log (updated every sync)
-sync-meta.json          → vector clock + syncVersion + metadata
+sync-data.json          → 状态快照（每第 N 次同步或按需更新）
+sync-ops.jsonl          → 仅追加的操作日志（每次同步更新）
+sync-meta.json          → 向量时钟 + syncVersion + 元数据
 ```
 
-**How it works:**
+**工作方式：**
 
-- **Upload ops**: Append new operations to `sync-ops.jsonl`. This is smaller and faster than rewriting the full state.
-- **Download ops**: Read `sync-ops.jsonl`, filter to new ops. Fast because it's just the ops, not the full state.
-- **Snapshot update**: Periodically (every 10th sync, or when ops file gets large), rewrite `sync-data.json` with current state and reset `sync-ops.jsonl`.
-- **Conflict**: `sync-meta.json` has the `syncVersion` counter. Only contested during uploads, and the file is tiny (fast upload → small race window).
+- **上传 ops**：将新操作追加到 `sync-ops.jsonl`。比重写完整状态更小更快。
+- **下载 ops**：读取 `sync-ops.jsonl`，过滤出新操作。快，因为只有 ops，没有完整状态。
+- **快照更新**：定期（每第 10 次同步，或 ops 文件变大时）用当前状态重写 `sync-data.json` 并重置 `sync-ops.jsonl`。
+- **冲突**：`sync-meta.json` 含 `syncVersion` 计数器。仅在上传时争用，且文件很小（上传快 → 竞态窗口小）。
 
-**The key insight**: Most sync cycles don't need to touch the large state file at all. Ops are small. Conflicts on a small file are rare and fast to resolve.
+**关键洞见**：多数同步周期根本无需触碰大状态文件。Ops 很小。小文件上的冲突少且解决快。
 
-**Pros**: Significantly less contention, smaller uploads, backward-compatible migration path
-**Cons**: Three files to manage instead of one; append-only JSONL needs periodic compaction; providers that don't support append (Dropbox) would need to re-upload the ops file
-**Reliability improvement**: Handles 4-5+ concurrent clients well
+**优点**：争用显著减少，上传更小，有向后兼容的迁移路径
+**缺点**：要管理三个文件而非一个；仅追加 JSONL 需要定期压缩；不支持 append 的提供方（Dropbox）需重新上传整个 ops 文件
+**可靠性提升**：能很好处理 4–5+ 并发客户端
 
-**Files to modify:**
+**需修改的文件：**
 
-- `file-based-sync-adapter.service.ts` — split upload/download into ops-only and snapshot paths
-- `file-based-sync.types.ts` — add new file type constants, ops file format
-- Provider interfaces — possibly add `appendFile()` method (or just re-upload the ops file for providers that don't support append)
+- `file-based-sync-adapter.service.ts` — 将上传/下载拆为仅 ops 与快照路径
+- `file-based-sync.types.ts` — 新增文件类型常量、ops 文件格式
+- 提供方接口 — 可能增加 `appendFile()` 方法（或不支持 append 的提供方直接重新上传 ops 文件）
 
 ---
 
-### Level 3: Per-Client Files (Large Change, Most Robust)
+### 第 3 级：每客户端文件（大改动，最稳健）
 
-**What**: Each client writes only to its own files. Other clients only read. **Zero write conflicts by design.**
+**内容**：每个客户端只写自己的文件。其他客户端只读。**设计上零写冲突。**
 
-**Storage structure:**
+**存储结构：**
 
 ```
 sp-sync/
   clients/
     <client-id-A>/
-      manifest.json                 # Batch list + vector clock (unencrypted)
+      manifest.json                 # 批次列表 + 向量时钟（未加密）
       ops/
-        <timestamp>-<seq>.jsonl     # Immutable operation batch files
-      snapshot.json                  # This client's state snapshot (encrypted)
+        <timestamp>-<seq>.jsonl     # 不可变操作批次文件
+      snapshot.json                  # 该客户端的状态快照（加密）
       snapshot-archive-young.json
       snapshot-archive-old.json
     <client-id-B>/
@@ -167,136 +142,136 @@ sp-sync/
         ...
 ```
 
-**How it works:**
+**工作方式：**
 
-- **Upload**: Write a new batch file to `clients/<myId>/ops/`, update `manifest.json`. Never modify another client's files.
-- **Download**: For each known peer, read `manifest.json` → download new batch files by exact path.
-- **Bootstrap**: New client reads any peer's `snapshot.json` for initial state, then catches up with batch files.
-- **GC**: Client deletes its own old batch files once all peers' vector clocks show they've advanced past them.
+- **上传**：向 `clients/<myId>/ops/` 写入新批次文件，更新 `manifest.json`。永不修改其他客户端的文件。
+- **下载**：对每个已知对等端，读取 `manifest.json` → 按精确路径下载新批次文件。
+- **引导**：新客户端读取任一对方的 `snapshot.json` 作为初始状态，再用批次文件追赶。
+- **GC**：一旦所有对等端的向量时钟显示已推进越过旧批次，客户端删除自己的旧批次文件。
 
-**Why it eliminates conflicts:**
+**为何消除冲突：**
 
-- No two clients ever write the same file
-- Batch files are immutable once written (append-only model)
-- `manifest.json` is the only mutable file per client, and only the owning client writes it
-- Works with ANY file storage: WebDAV, Dropbox, LocalFile, **and** Syncthing/Resilio
+- 没有两个客户端会写同一文件
+- 批次文件一旦写入即不可变（仅追加模型）
+- `manifest.json` 是每客户端唯一可变文件，且仅所属客户端写入
+- 适用于任意文件存储：WebDAV、Dropbox、LocalFile，**以及** Syncthing/Resilio
 
-**Implementation**: This would be a **new provider** (not modifying existing file-based sync), implementing `OperationSyncCapable` directly. The existing `FileBasedSyncAdapterService` stays unchanged for users who don't need multi-client reliability.
+**实现**：这将是**新提供方**（不修改现有基于文件的同步），直接实现 `OperationSyncCapable`。现有 `FileBasedSyncAdapterService` 对不需要多客户端可靠性的用户保持不变。
 
-**Pros**: Zero contention, scales to any number of clients, works with folder sync tools
-**Cons**: More files to manage, needs directory listing support, biggest implementation effort, needs migration path
-**Reliability improvement**: Handles unlimited concurrent clients reliably
+**优点**：零争用，可扩展到任意数量客户端，可与文件夹同步工具配合
+**缺点**：要管理更多文件，需要目录列表支持，实现工作量最大，需要迁移路径
+**可靠性提升**：可靠处理无限并发客户端
 
-**New files:**
+**新文件：**
 
 - `src/app/op-log/sync-providers/file-based/multi-client/multi-client-sync-adapter.service.ts`
 - `src/app/op-log/sync-providers/file-based/multi-client/multi-client-sync.types.ts`
 - `src/app/op-log/sync-providers/file-based/multi-client/multi-client-gc.service.ts`
 
-**Modified files:**
+**修改的文件：**
 
-- `provider.const.ts` — new provider ID (or config flag on existing providers)
-- `provider-manager.service.ts` — register new provider
-- `global-config.model.ts` — config for multi-client mode
-- `sync-form.const.ts` — UI toggle or separate provider option
-
----
-
-## Recommendation
-
-**Level 1** (retry + backoff) is a quick win worth doing regardless — it's a small change that makes the current system more robust.
-
-**Level 3** (per-client files) is the correct long-term solution if multi-client reliability is a priority. It also naturally enables Syncthing compatibility as a side effect. Level 2 is a half-measure that adds complexity without fully solving the problem.
-
-The question is whether to go **1 → 3** (quick fix now, proper solution later) or **straight to 3**.
+- `provider.const.ts` — 新提供方 ID（或现有提供方上的配置开关）
+- `provider-manager.service.ts` — 注册新提供方
+- `global-config.model.ts` — 多客户端模式配置
+- `sync-form.const.ts` — UI 开关或独立提供方选项
 
 ---
 
-## Level 3 Coordination Design
+## 建议
 
-### Do we need `listFiles()`?
+**第 1 级**（重试 + 退避）无论怎样都值得做——小改动即可让当前系统更稳健。
 
-**Yes, but only for peer discovery** — and it can be minimized with a manifest approach.
+若多客户端可靠性是优先事项，**第 3 级**（每客户端文件）是正确的长期方案。它还顺带自然支持 Syncthing 兼容。第 2 级是半吊子方案，增加复杂度却不能彻底解决问题。
 
-Level 3 needs `listFiles()` for two things:
+问题在于走 **1 → 3**（现在快速修，以后做正道）还是**直接做 3**。
 
-1. **Discover peers**: List `clients/` directory to find other client IDs
-2. **Find batch files**: List `clients/<peerId>/ops/` to find new operation batches
+---
 
-We can eliminate need #2 entirely with **per-client manifest files**. Each client updates its own `manifest.json` with the list of its batch files. Other clients read the manifest by exact path (`clients/<peerId>/manifest.json`) — no directory listing needed.
+## 第 3 级协调设计
 
-This reduces `listFiles()` to **just peer discovery** (listing `clients/` once to find new peers). Known peers are cached locally.
+### 是否需要 `listFiles()`？
 
-### Coordination flow (minimal `listFiles()`)
+**需要，但仅用于对等端发现**——可用清单方式最小化。
 
-**First sync / peer discovery** (needs `listFiles()` once):
+第 3 级需要 `listFiles()` 做两件事：
 
-1. `listFiles('clients/')` → discover peer directories
-2. Store known peer IDs locally (localStorage)
-3. Read each peer's `manifest.json` → get their batch files + vector clock
-4. Download batch files by exact path → apply operations
-5. If bootstrapping: read any peer's `snapshot.json` for initial state
+1. **发现对等端**：列出 `clients/` 目录以找到其他客户端 ID
+2. **查找批次文件**：列出 `clients/<peerId>/ops/` 以找到新操作批次
 
-**Normal sync cycle** (no `listFiles()` needed):
+用**每客户端清单文件**可完全消除需求 #2。每个客户端用自己的批次文件列表更新自己的 `manifest.json`。其他客户端按精确路径读取清单（`clients/<peerId>/manifest.json`）——无需目录列表。
 
-1. **Upload**: Write new batch file → update own `manifest.json`
-2. **Download**: For each known peer, read `manifest.json` → download new batch files
-3. **Periodic discovery**: `listFiles('clients/')` occasionally (every Nth cycle) to find new peers
+这将 `listFiles()` 缩减为**仅对等端发现**（列出一次 `clients/` 以找新对等端）。已知对等端本地缓存。
 
-### Can we avoid `listFiles()` entirely?
+### 协调流程（最小化 `listFiles()`）
 
-**Alternatives considered:**
+**首次同步 / 对等端发现**（需调用一次 `listFiles()`）：
 
-1. **User-configured peers**: User manually enters device IDs. Works for 2-3 devices but bad UX.
-2. **Registration file per client**: Each client writes `register/<myId>.json`. Still needs listing `register/` to find peers.
-3. **Shared registry file**: One `peers.json` listing all peers. Creates the shared-mutable-file problem we're trying to avoid.
+1. `listFiles('clients/')` → 发现对等端目录
+2. 本地存储已知对等端 ID（localStorage）
+3. 读取每个对等端的 `manifest.json` → 获取其批次文件 + 向量时钟
+4. 按精确路径下载批次文件 → 应用操作
+5. 若在引导：读取任一对方的 `snapshot.json` 作为初始状态
 
-**Verdict**: `listFiles()` is the cleanest solution. The missing implementations are trivial:
+**正常同步周期**（无需 `listFiles()`）：
 
-- **Electron**: Add `ipcMain.handle(IPC_FILE_SYNC_LIST_FILES, ...)` with `fs.readdirSync()` — ~10 lines
-- **Android SAF**: Call `DocumentFile.listFiles()` in Capacitor plugin — natural SAF capability
+1. **上传**：写入新批次文件 → 更新自己的 `manifest.json`
+2. **下载**：对每个已知对等端，读取 `manifest.json` → 下载新批次文件
+3. **定期发现**：偶尔 `listFiles('clients/')`（每第 N 个周期）以找新对等端
 
-Implementing `listFiles()` is much simpler than designing a discovery mechanism that avoids it.
+### 能否完全避免 `listFiles()`？
 
-### Directory creation requirements
+**考虑过的替代方案：**
 
-Level 3 needs `clients/<id>/ops/` directories to exist:
+1. **用户配置的对等端**：用户手动输入设备 ID。对 2–3 台设备可行，但 UX 差。
+2. **每客户端注册文件**：每个客户端写入 `register/<myId>.json`。仍需列出 `register/` 才能找对等端。
+3. **共享注册表文件**：一个列出所有对等端的 `peers.json`。又回到我们试图避免的共享可变文件问题。
 
-- **WebDAV**: Auto-creates parent directories via MKCOL on upload (already implemented)
-- **Dropbox**: `create_folder_v2` API (already available in the Dropbox API)
-- **Electron**: `fs.mkdirSync(path, { recursive: true })` — add to IPC handler
-- **Android SAF**: `DocumentFile.createDirectory()` — add to Capacitor plugin
+**结论**：`listFiles()` 是最干净的方案。缺失的实现很琐碎：
 
-### Level 3 prerequisites by provider
+- **Electron**：添加 `ipcMain.handle(IPC_FILE_SYNC_LIST_FILES, ...)`，配合 `fs.readdirSync()` — 约 10 行
+- **Android SAF**：在 Capacitor 插件中调用 `DocumentFile.listFiles()` — 自然的 SAF 能力
 
-| Prerequisite                  | WebDAV       | Dropbox                  | Electron                          | Android                        |
+实现 `listFiles()` 远比设计避开它的发现机制简单。
+
+### 目录创建要求
+
+第 3 级需要存在 `clients/<id>/ops/` 目录：
+
+- **WebDAV**：上传时通过 MKCOL 自动创建父目录（已实现）
+- **Dropbox**：`create_folder_v2` API（Dropbox API 已可用）
+- **Electron**：`fs.mkdirSync(path, { recursive: true })` — 加入 IPC handler
+- **Android SAF**：`DocumentFile.createDirectory()` — 加入 Capacitor 插件
+
+### 按提供方的第 3 级前置条件
+
+| 前置条件                      | WebDAV       | Dropbox                  | Electron                          | Android                        |
 | ----------------------------- | ------------ | ------------------------ | --------------------------------- | ------------------------------ |
-| `listFiles()`                 | exists       | exists                   | **needs IPC handler** (~10 lines) | **needs implementation**       |
-| Directory creation            | auto (MKCOL) | needs `createDir()` call | needs `mkdirSync()` call          | needs `createDirectory()` call |
-| `uploadFile()` to subdirs     | works        | works                    | works                             | works                          |
-| `downloadFile()` from subdirs | works        | works                    | works                             | works                          |
+| `listFiles()`                 | 已有         | 已有                     | **需要 IPC handler**（约 10 行）  | **需要实现**                   |
+| 目录创建                    | 自动 (MKCOL) | 需调用 `createDir()`     | 需调用 `mkdirSync()`              | 需调用 `createDirectory()`     |
+| 向子目录 `uploadFile()`       | 可用         | 可用                     | 可用                              | 可用                           |
+| 从子目录 `downloadFile()`     | 可用         | 可用                     | 可用                              | 可用                           |
 
 ---
 
-## Additional Findings
+## 额外发现
 
-### Resolved: Piggybacking removed (commit 6ec885cce2)
+### 已解决：搭便车已移除（commit 6ec885cce2）
 
-Piggybacking was removed from the file-based sync adapter. Remote ops are now discovered exclusively via `downloadOps()` on the next sync cycle, eliminating the stale piggyback bug and simplifying the upload path.
+搭便车已从基于文件的同步适配器中移除。远端操作现在仅通过下一同步周期的 `downloadOps()` 发现，消除了过期搭便车 bug，并简化了上传路径。
 
-### Unused checksum field
+### 未使用的校验和字段
 
-`FileBasedSyncData` already has an unused `checksum?: string` field (line 83 in `file-based-sync.types.ts`). Could be leveraged for integrity verification in any level of improvement.
+`FileBasedSyncData` 已有未使用的 `checksum?: string` 字段（`file-based-sync.types.ts` 第 83 行）。可在任一级改进中用于完整性校验。
 
-### Confirmed in the wild
+### 野外已证实
 
-Recent commit `87d884ed17` ("fix(sync): prevent recurring task duplication across clients") confirms multi-client sync issues are a real problem users hit, not just theoretical.
+近期 commit `87d884ed17`（「fix(sync): prevent recurring task duplication across clients」）证实多客户端同步问题是用户真实遇到的，而非仅理论。
 
-### Electron LocalFile also missing `listFiles()`
+### Electron LocalFile 也缺少 `listFiles()`
 
-The IPC event `FILE_SYNC_LIST_FILES` is defined in `ipc-events.const.ts:46` and exposed in `preload.ts:47-48`, but there is **no `ipcMain.handle()` implementation** in the Electron main process. So `listFiles()` is missing on both Android SAF and Electron LocalFile.
+IPC 事件 `FILE_SYNC_LIST_FILES` 已在 `ipc-events.const.ts:46` 定义，并在 `preload.ts:47-48` 暴露，但 Electron 主进程中**没有 `ipcMain.handle()` 实现**。因此 Android SAF 与 Electron LocalFile 都缺少 `listFiles()`。
 
-### Directory creation varies by provider
+### 目录创建因提供方而异
 
-- **WebDAV**: Auto-creates parent directories via MKCOL on upload (lines 314-345 in `webdav-api.ts`)
-- **Dropbox & LocalFile**: Do NOT auto-create directories — uploads fail if parent doesn't exist
+- **WebDAV**：上传时通过 MKCOL 自动创建父目录（`webdav-api.ts` 第 314–345 行）
+- **Dropbox 与 LocalFile**：不会自动创建目录——父目录不存在时上传失败

@@ -1,20 +1,17 @@
-# Feature & PR Review Guide
+# 功能与 PR 评审指南
 
-The full form of two AGENTS.md _Project rules_ — "Does it earn its place?" and
-"Code review". The short invariants stay in AGENTS.md; the verification
-mechanics live here. Read this before reviewing a feature PR, and when deciding
-whether a feature you are about to build should exist at all.
+AGENTS.md 中两条 _项目规则_ 的完整形式——「是否值得存在？」与「代码评审」。简短不变量留在 AGENTS.md；验证机制在此。评审功能 PR 前，以及决定即将构建的功能是否该存在时，请阅读本文。
 
-## Does it earn its place?
+## 是否值得存在？
 
-For a new feature, the first review question is whether it should exist at all — not whether the diff is correct. Complexity added is permanent, so the burden is on the change to justify it. Is there real demand (reactions and distinct participants on the linked issue, not just the author)? Has the same idea been declined before — search **closed** issues, because a prior "no" needs new evidence, not a new PR. Does the PR's stated motivation survive checking: are the issues it cites actually open, or already fixed more cheaply (`git log -S`, `git tag --contains`)? Treat the motivation as a claim to verify, not context to accept. A correct, well-tested implementation of something that doesn't earn its place is still a decline, and the leanest fix that resolves the reported symptom usually wins.
+对新功能，首要评审问题是它是否该存在——不是 diff 是否正确。增加的复杂度是永久的，因此举证责任在改动一方。是否有真实需求（关联 issue 上的反应与不同参与者，而不只是作者）？同一想法是否曾被拒绝——搜索**已关闭**的 issue，因为先前的「否」需要新证据，而不是新 PR。PR 所述动机是否经得起核对：它引用的 issue 是否仍开放，还是已用更廉价方式修好（`git log -S`、`git tag --contains`）？把动机当作待验证主张，而非可接受的上下文。一个正确、测得很好却不值得存在的实现仍应拒绝；通常能解决所报告症状的最精简修复会胜出。
 
-## Long-term cost of a change
+## 改动的长期成本
 
-When reviewing new features, always double-check the potential long-term costs and risks a change introduces — maintenance burden, hard-to-reverse choices (data shapes, public/plugin APIs, sync formats), locked-in dependencies/abstractions, and footguns that only surface at scale or across synced clients — not just whether the immediate diff is correct.
+评审新功能时，务必复查改动引入的潜在长期成本与风险——维护负担、难逆转选择（数据形态、公共/插件 API、同步格式）、被锁定的依赖/抽象，以及仅在规模或跨同步客户端时才暴露的坑——而不只看眼前 diff 是否正确。
 
-## Related
+## 相关
 
-- Product principles (feature creep, calm defaults) → [AGENTS.md](../AGENTS.md) § Product principles
-- Load-bearing decisions already made → [ARCHITECTURE-DECISIONS.md](../ARCHITECTURE-DECISIONS.md)
-- Sync-bug severity triage → [sync-and-op-log/sync-severity-triage.md](./sync-and-op-log/sync-severity-triage.md)
+- 产品原则（功能膨胀、平静默认）→ [AGENTS.md](../AGENTS.md) § 产品原则
+- 已做出的关键决策 → [ARCHITECTURE-DECISIONS.md](../ARCHITECTURE-DECISIONS.md)
+- 同步 Bug 严重程度分流 → [sync-and-op-log/sync-severity-triage.md](./sync-and-op-log/sync-severity-triage.md)

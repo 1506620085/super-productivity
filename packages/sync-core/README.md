@@ -1,10 +1,10 @@
 # @sp/sync-core
 
-Framework-agnostic primitives for the Super Productivity sync engine: operation-log types, vector clocks, conflict resolution, gzip compression, and end-to-end encryption. Consumed by the main app and the SuperSync server; no Angular/Electron/Capacitor dependencies.
+Super Productivity 同步引擎的框架无关原语：操作日志类型、向量时钟、冲突解决、gzip 压缩与端到端加密。由主应用与 SuperSync 服务器消费；无 Angular/Electron/Capacitor 依赖。
 
-## Encryption
+## 加密
 
-The encryption layer provides Argon2id key derivation and AES-256-GCM authenticated encryption, with a WebCrypto path and an `@noble/ciphers` fallback for environments where `crypto.subtle` is unavailable (notably Android Capacitor on `http://localhost`).
+加密层提供 Argon2id 密钥派生与 AES-256-GCM 认证加密，包含 WebCrypto 路径，以及在 `crypto.subtle` 不可用时（尤其是 Android Capacitor 上的 `http://localhost`）的 `@noble/ciphers` 回退。
 
 ```ts
 import {
@@ -20,49 +20,49 @@ const cipher = await encrypt('hello', password);
 const plain = await decrypt(cipher, password);
 ```
 
-### Wire format (public contract)
+### 线上格式（公开契约）
 
 | Format   | Bytes                                                           |
 | -------- | --------------------------------------------------------------- |
 | Argon2id | `[SALT (16)] [IV (12)] [AES-GCM ciphertext + auth tag (>= 16)]` |
 | Legacy   | `[IV (12)] [AES-GCM ciphertext + auth tag (>= 16)]`             |
 
-All ciphertexts are base64-encoded for transport. The format is discriminated by length: `< 28` bytes is invalid, `< 44` bytes is unambiguously legacy, `>= 44` bytes is treated as Argon2id with a legacy fallback on auth failure. Do not change this without a versioning migration.
+所有密文均以 base64 编码以便传输。格式按长度区分：`< 28` 字节无效，`< 44` 字节明确为旧版，`>= 44` 字节视为 Argon2id，并在认证失败时回退到旧版。未经版本化迁移请勿更改此约定。
 
-### Salt and IV semantics
+### Salt 与 IV 语义
 
-- The **IV** (12 bytes) is freshly random per call. AES-GCM security under a fixed key reduces to IV uniqueness, which this guarantees.
-- The **salt** (16 bytes) is derived once per `(process session, password)` pair and reused across every `encrypt`/`encryptBatch` call in that session. This is intentional — it lets the session cache amortize the ~500 ms–2 s Argon2id derivation. Two encryptions of the same plaintext within a session therefore share the salt prefix and differ only in IV and ciphertext. Do not assert per-call salt uniqueness in tests.
+- **IV**（12 字节）每次调用都新鲜随机。固定密钥下 AES-GCM 的安全性归结为 IV 唯一性，本实现保证这一点。
+- **salt**（16 字节）按 `(进程会话, 密码)` 对派生一次，并在该会话中的每次 `encrypt`/`encryptBatch` 调用中复用。这是有意为之——让会话缓存摊销约 500 ms–2 s 的 Argon2id 派生。因此同一会话内对同一明文的两次加密会共享 salt 前缀，仅 IV 与密文不同。测试中不要断言每次调用的 salt 唯一性。
 
-### Session key caching
+### 会话密钥缓存
 
-`encrypt`/`decrypt`/`encryptBatch`/`decryptBatch` all share three in-memory caches (encrypt key, decrypt key by salt, legacy PBKDF2 key) that survive across sync cycles. Argon2id derivation is expensive (~500–2000 ms on mobile with the default 64 MiB / 3 iterations); the cache turns repeated syncs from minutes into seconds.
+`encrypt`/`decrypt`/`encryptBatch`/`decryptBatch` 共享三个内存缓存（加密密钥、按 salt 的解密密钥、旧版 PBKDF2 密钥），可跨同步周期存活。Argon2id 派生开销大（默认 64 MiB / 3 次迭代时移动端约 500–2000 ms）；缓存使重复同步从分钟级变为秒级。
 
-Call `clearSessionKeyCache()` whenever the user changes their password or logs out. Keys live in memory only and are never persisted.
+每当用户更改密码或登出时调用 `clearSessionKeyCache()`。密钥仅存在于内存，永不持久化。
 
-### Legacy-KDF migration
+### 旧版 KDF 迁移
 
-Old data was encrypted with PBKDF2 using the password as its own salt — cryptographically weak. `decrypt()` and `decryptBatch()` still read legacy ciphertexts so existing sync data remains accessible.
+旧数据使用以密码自身为盐的 PBKDF2 加密——在密码学上较弱。`decrypt()` 与 `decryptBatch()` 仍可读旧密文，使现有同步数据仍可访问。
 
-`setLegacyKdfWarningHandler(fn)` registers a callback fired on every successful legacy decrypt, regardless of which entry point was used. The host throttles user-facing messages (e.g. show a deprecation banner once per session).
+`setLegacyKdfWarningHandler(fn)` 注册一个回调，在每次成功的旧版解密时触发，无论从哪个入口调用。宿主应节流面向用户的消息（例如每个会话只显示一次弃用横幅）。
 
-### Argon2id parameters
+### Argon2id 参数
 
-Defaults are OWASP 2023 mobile guidance (parallelism: 1, iterations: 3, memorySize: 64 MiB). Tests can weaken them via `setArgon2ParamsForTesting({ ... })` — this throws when called with `NODE_ENV === 'production'` in Node bundles. Restore defaults by calling with no argument.
+默认为 OWASP 2023 移动端建议（parallelism: 1, iterations: 3, memorySize: 64 MiB）。测试可通过 `setArgon2ParamsForTesting({ ... })` 减弱参数——在 Node 打包且 `NODE_ENV === 'production'` 时调用会抛错。不带参数调用可恢复默认值。
 
-## Other exports
+## 其他导出
 
-- `OpType`, `Operation`, `VectorClock` and friends — op-log primitive types
-- `compareVectorClocks`, `mergeVectorClocks`, `limitVectorClockSize` — clock algebra
-- `classifyOpAgainstSyncImport` — full-state-import op disposition
-- `createSyncFilePrefixHelpers` — host-configured file prefix codec
-- `compressWithGzip`, `decompressGzipFromString` — gzip helpers
-- `replayOperationBatch`, `applyRemoteOperations` — replay and apply coordinators
-- `planRegularOpsAfterFullStateUpload`, `planSnapshotHydration`, etc. — sync planning
+- `OpType`、`Operation`、`VectorClock` 及同类 — 操作日志原语类型
+- `compareVectorClocks`、`mergeVectorClocks`、`limitVectorClockSize` — 时钟代数
+- `classifyOpAgainstSyncImport` — 全量状态导入的操作处置
+- `createSyncFilePrefixHelpers` — 宿主配置的文件前缀编解码
+- `compressWithGzip`、`decompressGzipFromString` — gzip 辅助
+- `replayOperationBatch`、`applyRemoteOperations` — 回放与应用协调器
+- `planRegularOpsAfterFullStateUpload`、`planSnapshotHydration` 等 — 同步规划
 
-See `src/index.ts` for the full barrel and the JSDoc on individual symbols for usage.
+完整 barrel 见 `src/index.ts`，各符号用法见其 JSDoc。
 
-## Tests
+## 测试
 
 ```bash
 npm test           # typecheck specs + vitest run, Node WebCrypto + @noble fallback
@@ -70,4 +70,4 @@ npm run test:watch # watch mode
 npm run build      # tsup -> ESM + CJS + .d.ts
 ```
 
-Browser-context smoke coverage lives in the consuming app at `src/app/op-log/encryption/encryption.browser.spec.ts` (Karma + real Chrome).
+浏览器上下文烟雾覆盖位于消费方应用：`src/app/op-log/encryption/encryption.browser.spec.ts`（Karma + 真实 Chrome）。

@@ -1,7 +1,7 @@
-# Security Policy
+# 安全策略
 
-I am a web developer with a frontend focus and no security expert. I tried to follow the best practices as much as possible and I update electron often, but I can offer no guarantees. Any help with this subject by more dedicated experts would be very much appreciated!
+我是一名偏向前端的 Web 开发者，并非安全专家。我尽可能遵循最佳实践，并经常更新 Electron，但无法提供任何保证。如果更专注于此领域的专家愿意提供帮助，将不胜感激！
 
-## Reporting a Vulnerability
+## 报告漏洞
 
-Please report any vulnerabilities using the [form here on github](https://github.com/super-productivity/super-productivity/security/advisories/new).
+请通过 [GitHub 上的此表单](https://github.com/super-productivity/super-productivity/security/advisories/new) 报告任何漏洞。

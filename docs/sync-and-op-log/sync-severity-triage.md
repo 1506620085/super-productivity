@@ -1,37 +1,30 @@
-# Judging Sync Severity
+# 判断同步严重程度
 
-Triage rules — how to decide whether a sync bug is real and how bad it is.
-AGENTS.md points here from _Required reading per task_; the rules below were
-moved out of that file verbatim to keep it skimmable. Each one is here because
-getting it wrong already produced a confidently wrong conclusion. Statistics are
-dated where cited — re-measure before relying on them.
+分流规则 — 如何判断同步缺陷是否真实及其严重程度。
+AGENTS.md 在「按任务必读」中指向此处；下列规则原样从该文件移出，以保持其可浏览性。每一条都在此，是因为弄错它已经产生过自信却错误的结论。所引统计在注明处标注日期 — 依赖它们前请重新测量。
 
-1. **`master` ships to real users. "It's only on master" never downgrades severity.** Every master
-   push auto-publishes to the Play **internal track** (`.github/workflows/build-android.yml`,
-   `tracks: internal` + `status: completed` → testers' phones auto-update within minutes, on their
-   real data). `ghcr.io/super-productivity/supersync:latest` **is** master and has no
-   release-tagged build at all — it is the default in `packages/super-sync-server/docker-compose.yml`,
-   so self-hosters on `docker compose pull` run master HEAD. Snap `edge` is also published from
-   every master push. Only desktop/web/F-Droid/Play-production/Snap-stable are release-gated.
-2. **Never infer "shipped" from dates or the latest tag — prove it.** Use
-   `git merge-base --is-ancestor <commit> v<tag>` / `git tag --contains <commit>`. Tags are cut from
-   a point in time, and sync features routinely land just after: **#8874's disjoint-field merge
-   landed ~24h after v18.14.0 was tagged and is in no release**, so whole-entity-LWW field loss
-   (rename dies when another device marks the task done, #9095) is live in **every shipped version**.
-3. **"Restores released behavior" ≠ safe. The released behavior can be the bug.** #9061 froze the
-   disjoint merge on exactly that reasoning and silently re-armed shipped data loss (#9095).
-   A freeze/revert needs the same "what breaks for users?" analysis as a feature.
-4. **Users do report sync bugs — in non-technical words. There is no `sync` label.** Keyword-grepping
-   `sync`/`op-log`/`conflict` undercounts by ~50×. Search what users actually write: _lost,
+1. **`master` 会交付给真实用户。「只在 master 上」绝不能降低严重程度。** 每一次 master 推送都会自动发布到 Play **internal track**（`.github/workflows/build-android.yml`，
+   `tracks: internal` + `status: completed` → 测试者手机在数分钟内用真实数据自动更新）。`ghcr.io/super-productivity/supersync:latest` **就是** master，且根本没有
+   带发布标签的构建 — 它是 `packages/super-sync-server/docker-compose.yml` 中的默认值，
+   因此执行 `docker compose pull` 的自托管者运行的是 master HEAD。Snap `edge` 也从
+   每一次 master 推送发布。只有 desktop/web/F-Droid/Play-production/Snap-stable 受发布门控。
+2. **切勿从日期或最新标签推断「已发布」— 要证明它。** 使用
+   `git merge-base --is-ancestor <commit> v<tag>` / `git tag --contains <commit>`。标签是在某个时间点切出的，而同步功能经常刚好在之后落地：**#8874 的不相交字段合并
+   在 v18.14.0 打标签约 24 小时后落地，且不在任何发布中**，因此整实体 LWW 字段丢失
+   （另一台设备将任务标为完成时，重命名会丢失，#9095）在**每一个已发布版本**中都是活的。
+3. **「恢复已发布行为」≠ 安全。已发布行为本身可能就是缺陷。** #9061 正是基于该推理冻结了
+   不相交合并，并静默地重新武装了已发布的数据丢失（#9095）。
+   冻结/回退需要与功能相同的「对用户会破坏什么？」分析。
+4. **用户确实会报告同步缺陷 — 用非技术用语。没有 `sync` 标签。** 在
+   `sync`/`op-log`/`conflict` 上做关键词检索会少计约 50 倍。搜索用户实际写的内容：_lost,
    disappeared, gone, missing, duplicate, reverted, old version, overwritten, reset, not syncing_
-   (#7892 "all data deleted overnight"; #8107 user rebuilt lost projects from memory; #7549 done
-   tasks resurrecting). ~53 user-reported sync/data-loss issues from 44 authors in 90 days ≈ one
-   every 2 days (measured 2026-07). And silent data loss is structurally under-reported — absence of reports is never
-   evidence of absence.
-5. **Audit-generated findings are low-precision, not low-yield — verify them, don't dismiss them.**
-   ~89% of sync fixes since v18.14.0 repaired code present in the release, yet ~97% of the self-filed
-   sync issues carried no reproduction (both measured 2026-07). So both failure modes are live: **do not close an unreproduced
-   finding as speculation** (#8960/#9073/#8751/#9040 had no repro and were all real and shipped), and
-   **do not fix one blind** — the _fix_ must carry a test that fails without it, and you must confirm
-   the fix actually fires on a real op (#9045 shipped an `entityIds` security check that **never fired**;
-   #9025 was self-retracted as "not a live data-loss bug"). The reproduction gates the _fix_, not belief.
+   （#7892「一夜之间所有数据被删除」；#8107 用户凭记忆重建丢失的项目；#7549 已完成
+   任务复活）。90 天内约 53 个用户报告的同步/数据丢失问题，来自 44 位作者 ≈ 每 2 天一次（测量于 2026-07）。而静默数据丢失在结构上会被少报 — 没有报告
+   绝不能作为不存在的证据。
+5. **审计生成的发现是低精度，而非低收益 — 核实它们，不要驳回它们。**
+   自 v18.14.0 以来约 89% 的同步修复修补的是发布中已有的代码，而约 97% 的自提交
+   同步问题没有复现（两者均测量于 2026-07）。因此两种失败模式都是活的：**不要把未复现的
+   发现当作臆测关闭**（#8960/#9073/#8751/#9040 没有复现，却都是真实且已发布的），以及
+   **不要盲目修复一处** — *修复* 必须带有没有它就会失败的测试，且你必须确认
+   该修复在真实 op 上确实会触发（#9045 上线了一个**从未触发**的 `entityIds` 安全检查；
+   #9025 被自行撤回，称「不是活的数据丢失缺陷」）。复现门控的是 *修复*，而非信念。

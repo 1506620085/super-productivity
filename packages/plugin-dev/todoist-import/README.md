@@ -1,58 +1,49 @@
-# Todoist import plugin
+# Todoist 导入插件
 
-This bundled, one-time importer adds active Todoist data to Super Productivity.
-It is additive: it never replaces existing app data and is not a live Todoist
-integration.
+此捆绑的一次性导入器将活跃的 Todoist 数据添加到 Super Productivity。
+它是增量式的：永不替换现有应用数据，也不是实时的 Todoist 集成。
 
-## Data and privacy boundary
+## 数据与隐私边界
 
-- The plugin requests Todoist unified Sync API v1 at
-  `https://api.todoist.com/api/v1/sync`, first with `sync_token=*` and then with
-  the returned token so changes during a delayed snapshot are included.
-- The personal API token exists only in iframe memory for the import session. It
-  is sent only to `api.todoist.com` and is never stored, synced, or logged.
-- The manifest therefore declares `http` and exactly
-  `allowedHosts: ["api.todoist.com"]`.
-- The import is project-by-project and is not transactional. A failure can leave
-  the current project partial; the result tells the user which project to delete
-  before retrying.
+- 插件请求 Todoist 统一 Sync API v1：
+  `https://api.todoist.com/api/v1/sync`，先使用 `sync_token=*`，再用返回的
+  token，以便包含延迟快照期间的变更。
+- 个人 API token 仅在 iframe 内存中存在于导入会话期间。它只发送到
+  `api.todoist.com`，永不存储、同步或记录日志。
+- 因此清单声明 `http`，且精确为
+  `allowedHosts: ["api.todoist.com"]`。
+- 导入按项目进行，非事务性。失败可能使当前项目处于部分导入状态；结果会告知
+  用户在重试前应删除哪个项目。
 
-## Mapping and deliberate losses
+## 映射与有意舍弃
 
-The importer handles active projects, top-level tasks, two levels of subtasks,
-notes/comments, labels on top-level tasks, due dates/times, and minute-based time
-estimates.
+导入器处理活跃项目、顶级任务、两层子任务、备注/评论、顶级任务上的标签、
+截止日期/时间，以及基于分钟的时间估算。
 
-Current limitations are surfaced in preview and summary:
+当前限制会在预览与摘要中展示：
 
-- nested projects are flattened and sections are not imported;
-- deeper subtasks are re-parented to the top-level ancestor;
-- subtask labels and priorities are omitted because SP subtasks cannot hold tags;
-- recurrence keeps the next due date and appends the Todoist recurrence text to
-  notes; no `TaskRepeatCfg` is created;
-- day-based durations, assignees, file attachments, completed history, and
-  reminders are not imported; and
-- collision detection sees active SP projects only, so an archived prior import
-  may not be recognized.
+- 嵌套项目会被展平，分区不会导入；
+- 更深的子任务会重新挂到顶级祖先下；
+- 子任务标签与优先级会省略，因为 SP 子任务无法持有标签；
+- 重复规则保留下一个截止日期，并将 Todoist 重复文本追加到备注；不会创建
+  `TaskRepeatCfg`；
+- 基于天的时长、指派人、文件附件、已完成历史与提醒不会导入；并且
+- 冲突检测仅看活跃的 SP 项目，因此可能无法识别已归档的先前导入。
 
-## Batch invariants
+## 批处理不变量
 
-`src/map/plan-import.ts` and `src/map/run-import.ts` deliberately:
+`src/map/plan-import.ts` 与 `src/map/run-import.ts` 有意：
 
-- send at most 50 operations per awaited `batchUpdateForProject` call;
-- create parents before children;
-- use `temp-`-prefixed IDs for unresolved parents; and
-- replace parent temp IDs with returned real IDs before a later batch call.
+- 每次 awaited 的 `batchUpdateForProject` 调用最多发送 50 个操作；
+- 先创建父任务再创建子任务；
+- 对未解析的父任务使用 `temp-` 前缀的 ID；并且
+- 在后续批次调用前，用返回的真实 ID 替换父任务的临时 ID。
 
-Changing any of these can orphan and delete imported subtasks or collapse many
-dispatches into one event-loop turn. The batch result is not authoritative, so
-the importer re-reads tasks and compares landed counts with the plan.
+更改其中任何一项都可能导致导入的子任务被孤立并删除，或将多次派发压成同一事件循环轮次。批次结果并非权威，因此导入器会重新读取任务，并将落地数量与计划比较。
 
-Due dates, timed due values, and tags are follow-up `updateTask` calls because
-the batch-create contract does not carry them. `TODAY` is virtual and must never
-be written to `task.tagIds`.
+截止日期、带时间的到期值与标签是后续的 `updateTask` 调用，因为批量创建契约不携带它们。`TODAY` 是虚拟的，绝不能写入 `task.tagIds`。
 
-## Development
+## 开发
 
 ```bash
 cd packages/plugin-dev/todoist-import
@@ -60,6 +51,4 @@ npm test
 npm run build
 ```
 
-Pure parsing, mapping, lossy-summary, localization, and executor behavior are
-covered by colocated Jest specs. Also run `npm run plugins:build` from the
-repository root after packaging changes.
+纯解析、映射、有损摘要、本地化与执行器行为由同目录的 Jest 规格覆盖。打包变更后，还请从仓库根目录运行 `npm run plugins:build`。

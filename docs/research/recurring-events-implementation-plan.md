@@ -1,120 +1,114 @@
-# Recurring Events Implementation Plan
+# 重复事件实现计划
 
-> **Read `rrule-epic-roadmap.md` on `feat/rrule-epic` first.** This plan is the
-> _design rationale_ companion to a live epic, not a greenfield proposal. Much of
-> what follows is already implemented on that branch (forward/inverse RRULE
-> converters, the old-client compatibility contract, an off-by-default per-device
-> engine flag), and the branch resolved several questions this document still
-> poses as open. Check there before planning or building anything here.
+> **先阅读 `feat/rrule-epic` 上的 `rrule-epic-roadmap.md`。** 本计划是一份
+> 活跃 epic 的 _设计理据_ 配套文档，而非从零开始的提案。下文所述内容在该分支上
+> 大多已实现（正向/逆向 RRULE 转换器、旧客户端兼容契约、默认关闭的按设备
+> 引擎开关），且该分支已解决本文仍按「开放问题」提出的若干问题。在此规划或
+> 构建任何内容之前，请先去那边核对。
 >
-> **Reconciled 2026-08-21: the branch's raw-`rrule`-string design stands** —
-> see the Decision note below for what is superseded and why it is kept.
+> **已于 2026-08-21 对齐：分支的原始 `rrule` 字符串设计成立** —
+> 见下方 Decision 说明，了解哪些内容被取代以及为何保留。
 
-> **Revision note (verified against code 2026-06-02).** Rewritten after two rounds
-> of multi-axis review against the actual codebase. The original draft was built on
-> three false premises and several sync-unsafe steps; a later "raw RRULE string as
-> the model" revision was then corrected again after review surfaced real costs in
-> this codebase. Net premises now driving the plan:
+> **修订说明（相对代码于 2026-06-02 核实）。** 经两轮相对真实代码库的多轴审查后重写。
+> 原稿建立在三个错误前提与若干对同步不安全的步骤之上；随后「以原始 RRULE 字符串
+> 作为模型」的修订在审查暴露出本代码库中的真实成本后再次被纠正。当前驱动本计划的
+> 前提净结果为：
 >
-> 1. **The RRULE engine is already in the repo.** `ical.js@2.2.1` is already in
->    `package.json` (a **devDependency**, not `dependencies`), lazy-loaded (`src/app/features/schedule/ical/ical-lazy-loader.ts`), and
->    expands RRULEs in **two** places
->    (`get-relevant-events-from-ical.ts`,
->    `packages/plugin-dev/caldav-calendar-provider/src/plugin.ts`).
->    `caldav-client.service.ts` uses ical.js only to parse VTODO — it does **not**
->    expand RRULEs. **Do not add `rrule` (rrule.js).** _(Superseded on this
->    point: the epic added pinned `rrule@2.8.1` as its engine — see the
->    Decision note.)_
-> 2. **The headline "critical gaps" already shipped.** Nth-weekday of month
->    (#6040), last-day-of-month (#7726), EXDATE (`deletedInstanceDates`). Earlier
->    gap-analysis/industry-standards research drafts marked these missing; that was
->    stale and those docs have been folded into this one (see Appendices A–B).
-> 3. **`TaskRepeatCfg` is synced state.** The model change must go through the
->    op-log schema-migration system (`packages/shared-schema/src/migrations/`),
->    keep the deterministic ID `rpt_${repeatCfgId}_${dueDay}` stable, and not break
->    cross-version sync. This dominates the risk profile.
+> 1. **RRULE 引擎已在仓库中。** `ical.js@2.2.1` 已在
+>    `package.json` 中（是 **devDependency**，不是 `dependencies`），经懒加载
+>    （`src/app/features/schedule/ical/ical-lazy-loader.ts`），并在
+>    **两处** 展开 RRULE
+>    （`get-relevant-events-from-ical.ts`、
+>    `packages/plugin-dev/caldav-calendar-provider/src/plugin.ts`）。
+>    `caldav-client.service.ts` 仅用 ical.js 解析 VTODO — 它
+>    **不** 展开 RRULE。**不要添加 `rrule`（rrule.js）。** _（本点已在该
+>    方向被取代：epic 添加了钉死的 `rrule@2.8.1` 作为其引擎 — 见
+>    Decision 说明。）_
+> 2. **标题级的「关键缺口」已经上线。** 月内第 N 个星期几
+>    （#6040）、月末最后一天（#7726）、EXDATE（`deletedInstanceDates`）。更早的
+>    缺口分析/行业标准研究草稿将这些标为缺失；那已过时，那些文档已并入本文
+>    （见附录 A–B）。
+> 3. **`TaskRepeatCfg` 是同步状态。** 模型变更必须走
+>    op-log schema 迁移系统（`packages/shared-schema/src/migrations/`），
+>    保持确定性 ID `rpt_${repeatCfgId}_${dueDay}` 稳定，且不破坏
+>    跨版本同步。这主导了风险画像。
 
 ---
 
-## Decision (superseded): a typed, RRULE-isomorphic recurrence model
+## Decision（已取代）：类型化的、与 RRULE 同构的重复模型
 
-> **Superseded 2026-08-21.** The standing decision is the epic branch's: a raw
-> `rrule?: string` added alongside the legacy flat fields, which stay
-> dual-written forever as the wire format. Everything from here down is the
-> superseded typed-model plan, kept because its correctness constraints
-> (DTSTART/noon anchoring, EXDATE day-string matching, `UNTIL` inclusivity,
-> WKST, monthly-anchor precedence, the parity gate, the wire-rename and
-> migration warnings) apply to the epic's serializer and engine just the same —
-> only the persisted shape differs.
+> **已于 2026-08-21 取代。** 现行决定以 epic 分支为准：在遗留扁平字段旁加性添加原始
+> `rrule?: string`，遗留字段作为线格式永久双写。自此以下全部是被取代的
+> 类型化模型计划，予以保留是因为其正确性约束
+> （DTSTART/正午锚定、EXDATE 日字符串匹配、`UNTIL` 包容性、
+> WKST、月锚点优先级、对等门禁、线格式重命名与
+> 迁移警告）同样适用于 epic 的序列化器与引擎 —
+> 只是持久化形态不同。
 
-The superseded plan: the recurrence **pattern** becomes a single typed,
-structured field — a discriminated union that maps **1:1 to RFC 5545** —
-replacing the ~14 interdependent flat fields (`repeatCycle`, `repeatEvery`, the
-7 weekday booleans, `monthlyWeekOfMonth`, `monthlyWeekday`, `monthlyLastDay`,
-`quickSetting`).
+被取代的计划：重复 **模式** 变为单一类型化、
+结构化字段 — 一个与 **RFC 5545 1:1 映射** 的可判别联合 —
+取代约 14 个相互依赖的扁平字段（`repeatCycle`、`repeatEvery`、
+7 个星期几布尔值、`monthlyWeekOfMonth`、`monthlyWeekday`、`monthlyLastDay`、
+`quickSetting`）。
 
-The RFC-5545 **RRULE string is produced/parsed only at the boundary** (`.ics`
-export, CalDAV). **The raw string is never the persisted/synced field.**
+RFC-5545 **RRULE 字符串仅在边界处生成/解析**（`.ics`
+导出、CalDAV）。**原始字符串绝不是持久化/同步字段。**
 
-### Why the raw-string rejection was stale (reconciled 2026-08-21)
+### 为何「拒绝原始字符串」已过时（2026-08-21 对齐）
 
-An earlier revision rejected a raw `rrule` string as the canonical field on
-three grounds. Checked against what `feat/rrule-epic` actually built, each
-objection is answered by a design decision the rejection did not anticipate:
+更早的修订基于三条理由拒绝将原始 `rrule` 字符串作为规范字段。相对
+`feat/rrule-epic` 实际构建的内容核对后，每条异议都被拒绝时未预见到的设计决定所回答：
 
-- **"Un-queryable."** The branch adds `rrule?: string` _additively_ and
-  **dual-writes the legacy flat fields forever** — they are the wire format for
-  old clients (roadmap, "Dual-engine endgame" §4). Selectors and any field-level
-  consumer keep a structured representation; nothing is forced to parse the
-  string on projection.
-- **"Un-diffable / un-repairable."** Same dual-write: the op-log still diffs the
-  legacy fields, and `data-repair.ts` still repairs them. For the string itself
-  the branch has an explicit policy instead of silent corruption: the engine is
-  fail-soft (malformed `rrule` → log + `null`, never a throw), `isRRuleValid`
-  gates routing (invalid → legacy fallback), and the decided post-legacy-engine
-  behavior for an invalid string is **pause + repair prompt**, never silent
-  rescheduling.
-- **"Hot-path performance."** The objection assumed the expansion engine would
-  be ical.js (async, lazy-loaded, forward-only). The branch's engine is
-  **rrule.js (`rrule@2.8.1`, pinned exact) — synchronous** — in a dedicated
-  day-granular, UTC-based occurrence util (`store/rrule-occurrence.util.ts`).
-  It runs inside the existing sync calculators; no async dependency enters the
-  selector path. (Implementation specifics live on the branch — the roadmap is
-  the source of truth for current mechanics.)
+- **「不可查询。」** 分支 _加性_ 添加 `rrule?: string`，并
+  **永久双写遗留扁平字段** — 它们是旧客户端的线格式（roadmap，
+  「Dual-engine endgame」§4）。选择器与任何字段级消费者仍持有结构化表示；没有任何东西
+  被迫在投影时解析该字符串。
+- **「不可 diff / 不可修复。」** 同样的双写：op-log 仍 diff
+  遗留字段，且 `data-repair.ts` 仍修复它们。对字符串本身，
+  分支有明确策略而非静默损坏：引擎是 fail-soft
+  （畸形 `rrule` → 日志 + `null`，永不抛出），`isRRuleValid`
+  门控路由（无效 → 遗留回退），且已决定的遗留引擎退役后
+  对无效字符串的行为是 **暂停 + 修复提示**，永不静默
+  重新排程。
+- **「热路径性能。」** 该异议假定展开引擎会是
+  ical.js（异步、懒加载、仅正向）。分支的引擎是
+  **rrule.js（`rrule@2.8.1`，精确钉死）— 同步的** — 位于专用的
+  日粒度、基于 UTC 的 occurrence util（`store/rrule-occurrence.util.ts`）。
+  它运行在现有同步计算器内；选择器路径不引入任何异步依赖。
+  （实现细节在分支上 — roadmap 是当前机制的事实来源。）
 
-The one cost the old reasoning weighed correctly: **`rrule` is a new root
-runtime dependency**, which the project rules normally forbid. The
-maintainer-owned epic accepted it deliberately and treats it like an engine —
-pinned to an exact version, with a differential spec battery as the upgrade
-tripwire (a parser-version drift between devices is a duplicate-task generator,
-see the roadmap's risk model). That trade is decided; do not relitigate it here,
-and do not un-pin the version.
+旧推理正确权衡的那一项成本：**`rrule` 是新的根级
+运行时依赖**，项目规则通常禁止。维护者主导的 epic
+有意接受它，并将其当作引擎对待 —
+钉死到精确版本，并以差分规约电池作为升级绊线
+（设备间解析器版本漂移是重复任务生成器，
+见 roadmap 的风险模型）。该取舍已决定；不要在此重新争论，
+也不要解除版本钉死。
 
-### Honest caveats on the goals (design to them)
+### 对目标的诚实保留（据此设计）
 
-1. **"Smaller data model" is partial.** The pattern sub-model collapses (~14
-   fields → 1 typed `recurrence` field), but `TaskRepeatCfg` stays ~18 fields
-   (task-template + SP-extension + tracking are irreducible). The real win is
-   **invariant-elimination** — a discriminated union makes "the fields disagree"
-   _unrepresentable_, deleting the implicit-precedence bug class (e.g. "Nth-weekday
-   anchor wins over `monthlyLastDay`") and shrinking `data-repair.ts`. Sell that,
-   not byte-count.
-2. **"Covers everything" is true minus one carve-out.** RFC 5545 cannot express
-   "N days **after completion**", so `repeatFromCompletionDate` (SP's
-   differentiator) stays a separate non-RRULE representation. The model is
-   "RRULE-isomorphic + one carve-out", and the engine keeps two modes.
+1. **「更小的数据模型」只是部分成立。** 模式子模型坍缩（约 14
+   字段 → 1 个类型化 `recurrence` 字段），但 `TaskRepeatCfg` 仍约有 18 个字段
+   （任务模板 + SP 扩展 + 跟踪是不可约的）。真正的收益是
+   **不变量消除** — 可判别联合使「字段互相矛盾」
+   _不可表示_，删除隐式优先级 bug 类（例如「第 N 个星期几
+   锚点胜过 `monthlyLastDay`」）并缩小 `data-repair.ts`。推销这一点，
+   而不是字节数。
+2. **「覆盖一切」成立，减去一处例外。** RFC 5545 无法表达
+   「完成 **后** N 天」，因此 `repeatFromCompletionDate`（SP 的
+   差异化能力）保持为独立的非 RRULE 表示。该模型是
+   「RRULE 同构 + 一处例外」，引擎保持两种模式。
 
 ---
 
-## The typed model (superseded — kept as rationale record)
+## 类型化模型（已取代 — 作为理据记录保留）
 
-> Superseded — see the Decision note above. Kept because the invariant
-> analysis below is the best record of the legacy fields' implicit precedence
-> rules.
+> 已取代 — 见上方 Decision 说明。保留是因为下方的不变量
+> 分析是遗留字段隐式优先级规则的最佳记录。
 
-The sketch replaced the flat pattern fields in `TaskRepeatCfgCopy`
-(`task-repeat-cfg.model.ts` — edit `TaskRepeatCfgCopy`, not the `Readonly` alias)
-with one discriminated union plus an end condition. Sketch (final names TBD):
+该草图用一个可判别联合加上结束条件，替换 `TaskRepeatCfgCopy`
+（`task-repeat-cfg.model.ts` — 编辑 `TaskRepeatCfgCopy`，不是 `Readonly` 别名）
+中的扁平模式字段。草图（最终命名待定）：
 
 ```typescript
 type Weekday = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU';
@@ -142,364 +136,358 @@ interface RecurrenceConfigPart {
 }
 ```
 
-- **Discriminant** is `freq` (+ the monthly `on` shape). Illegal combinations
-  (e.g. weekday booleans set on a yearly cfg) become unrepresentable.
-- **No derived fields are persisted.** UI affordances (the weekday checkbox row,
-  the "Ends" control, `quickSetting`) are computed from `recurrence`/`end` at
-  form-open and written back on save — view-model only. This defuses the documented
-  formly "whole-model emit" gotcha (no second representation to drift).
-- `repeatFromCompletionDate` selects the carve-out engine (see below).
+- **判别式** 是 `freq`（+ 按月的 `on` 形态）。非法组合
+  （例如在 yearly cfg 上设置星期几布尔值）变为不可表示。
+- **不持久化派生字段。** UI 便利项（星期几复选框行、
+  「Ends」控件、`quickSetting`）在打开表单时从 `recurrence`/`end` 计算，
+  并在保存时写回 — 仅视图模型。这化解了已文档化的
+  formly「整模型 emit」陷阱（没有第二份表示可漂移）。
+- `repeatFromCompletionDate` 选择例外引擎（见下）。
 
 ---
 
-## Corrected current state (what already ships)
+## 纠正后的当前状态（已上线内容）
 
-Verified in `src/app/features/task-repeat-cfg/`:
+在 `src/app/features/task-repeat-cfg/` 中核实：
 
-| Capability                                                 | Status         | Where                                                                             |
+| 能力                                                       | 状态           | 位置                                                                              |
 | ---------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| Daily / Weekly / Monthly / Yearly + `repeatEvery` interval | ✅             | `get-next-repeat-occurrence.util.ts`                                              |
-| Weekday selection (weekly)                                 | ✅             | 7 booleans, `task-repeat-cfg.model.ts`                                            |
-| **Nth weekday of month** ("2nd Tue", "last Fri")           | ✅ #6040       | `monthlyWeekOfMonth` + `monthlyWeekday`; `get-nth-weekday-of-month.util.ts`       |
-| **Last day of month**                                      | ✅ #7726       | `monthlyLastDay`; month-end clamp in `get-next-repeat-occurrence.util.ts:125-140` |
-| First day of month                                         | ✅             | quick-setting `MONTHLY_FIRST_DAY`                                                 |
-| Skip occurrence (EXDATE)                                   | ✅             | `deletedInstanceDates: string[]`                                                  |
-| After-completion recurrence                                | ✅ (SP-unique) | `repeatFromCompletionDate` + `getEffectiveRepeatStartDate`                        |
-| Wait-for-completion (no pile-up)                           | ✅             | `waitForCompletion`                                                               |
-| Skip overdue instances                                     | ✅             | `skipOverdue`                                                                     |
-| Pause / resume                                             | ✅             | `isPaused`                                                                        |
-| Subtask templates (+ inherit / auto-update flags)          | ✅             | `subTaskTemplates`, `shouldInheritSubtasks`, `disableAutoUpdateSubtasks`          |
-| DST-safe calc                                              | ✅             | local-noon anchoring throughout                                                   |
-| Deterministic multi-device IDs                             | ✅             | `rpt_${repeatCfgId}_${dueDay}`, `get-repeatable-task-id.util.ts`                  |
-| Human-readable description                                 | ✅             | `get-task-repeat-info-text.util.ts`                                               |
-| "Next due" preview + history heatmap                       | ✅             | `repeat-cfg-preview/`, `repeat-task-heatmap/`                                     |
+| Daily / Weekly / Monthly / Yearly + `repeatEvery` 间隔     | ✅             | `get-next-repeat-occurrence.util.ts`                                              |
+| 星期几选择（weekly）                                       | ✅             | 7 个布尔值，`task-repeat-cfg.model.ts`                                            |
+| **月内第 N 个星期几**（「第 2 个周二」「最后一个周五」）   | ✅ #6040       | `monthlyWeekOfMonth` + `monthlyWeekday`；`get-nth-weekday-of-month.util.ts`       |
+| **月末最后一天**                                           | ✅ #7726       | `monthlyLastDay`；`get-next-repeat-occurrence.util.ts:125-140` 中的月末钳制       |
+| 月初第一天                                                 | ✅             | quick-setting `MONTHLY_FIRST_DAY`                                                 |
+| 跳过某次 occurrence（EXDATE）                              | ✅             | `deletedInstanceDates: string[]`                                                  |
+| 完成后重复                                                 | ✅（SP 独有）  | `repeatFromCompletionDate` + `getEffectiveRepeatStartDate`                        |
+| 等待完成（不堆叠）                                         | ✅             | `waitForCompletion`                                                               |
+| 跳过逾期实例                                               | ✅             | `skipOverdue`                                                                     |
+| 暂停 / 恢复                                                | ✅             | `isPaused`                                                                        |
+| 子任务模板（+ 继承 / 自动更新标志）                        | ✅             | `subTaskTemplates`、`shouldInheritSubtasks`、`disableAutoUpdateSubtasks`          |
+| DST 安全计算                                               | ✅             | 全程本地正午锚定                                                                  |
+| 确定性多设备 ID                                            | ✅             | `rpt_${repeatCfgId}_${dueDay}`，`get-repeatable-task-id.util.ts`                  |
+| 人类可读描述                                               | ✅             | `get-task-repeat-info-text.util.ts`                                               |
+| 「下次到期」预览 + 历史热力图                              | ✅             | `repeat-cfg-preview/`、`repeat-task-heatmap/`                                     |
 
-**Genuinely missing (delivered in Phase 3):** end conditions (`COUNT`/`UNTIL`),
-multiple days per month (`BYMONTHDAY=1,15`), `.ics`/CalDAV RRULE generation
-(Phase 1). Deferred / YAGNI: `RDATE`, `RECURRENCE-ID`, `BYWEEKNO`, `BYYEARDAY`,
-sub-daily, full two-way `.ics` import. `BYSETPOS`: needed only for the
-serializer's month-end clamp idiom (see the Phase-1 mapping table); general
-engine-side expansion stays deferred.
-
----
-
-## Engine decision: keep the synchronous bounded engine
-
-> _Reconciled:_ holds for legacy/flag-off cfgs; flag-on `rrule` cfgs route to
-> the branch's synchronous rrule.js engine (see "Why the raw-string rejection
-> was stale"). ical.js stays boundary-only either way — the paragraph below
-> records why, and still stands.
-
-**The occurrence runtime stays the existing synchronous bounded loops**
-(`get-next-repeat-occurrence.util.ts`, `get-newest-possible-due-date.util.ts`),
-re-pointed to read the new typed `recurrence` field instead of the flat fields.
-ical.js is used **only** to serialize/parse the RRULE string at the export/CalDAV
-boundary — never on the occurrence hot path.
-
-Consequences:
-
-- No async dependency on the lazy-loaded module in sync selectors; no ~76 KB on
-  the boot/projection path.
-- The occurrence logic barely changes (same `FREQ/INTERVAL/BYxxx` math, new input
-  shape), so the deterministic-ID parity risk is small and an **offline
-  golden-master test is sufficient — no production shadow mode required**.
-- New common patterns (multi-day-per-month, end conditions) are small extensions
-  to the bounded engine. Exotic RRULE parts (general `BYSETPOS`, `BYWEEKNO`) are not free;
-  defer them, and if ever needed, expand those rare configs via ical.js _off_ the
-  hot path.
+**真正缺失（在 Phase 3 交付）：** 结束条件（`COUNT`/`UNTIL`）、
+每月多日（`BYMONTHDAY=1,15`）、`.ics`/CalDAV RRULE 生成
+（Phase 1）。推迟 / YAGNI：`RDATE`、`RECURRENCE-ID`、`BYWEEKNO`、`BYYEARDAY`、
+亚日粒度、完整双向 `.ics` 导入。`BYSETPOS`：仅序列化器的月末钳制惯用法需要
+（见 Phase-1 映射表）；通用引擎侧展开仍推迟。
 
 ---
 
-## Phase 1 — Typed model + RRULE serializer + parity harness
+## 引擎决定：保留同步有界引擎
 
-Independently shippable; the serializer unblocks the calendar two-way-sync
-roadmap's "SP doesn't generate RRULE" critical-path item.
+> _已对齐：_ 对遗留/关闭开关的 cfg 成立；打开开关的 `rrule` cfg 路由到
+> 分支的同步 rrule.js 引擎（见「为何『拒绝原始字符串』已过时」）。无论哪种方式，
+> ical.js 都仅用于边界 — 下段记录了原因，且仍然成立。
 
-### 1.1 Add the typed `recurrence`/`end` fields (additive, not yet canonical)
+**Occurrence 运行时保持现有的同步有界循环**
+（`get-next-repeat-occurrence.util.ts`、`get-newest-possible-due-date.util.ts`），
+改为读取新的类型化 `recurrence` 字段而非扁平字段。
+ical.js **仅** 用于在导出/CalDAV 边界序列化/解析 RRULE 字符串 —
+从不进入 occurrence 热路径。
 
-Add the union alongside the existing fields. Because validation uses typia
-`createValidate` (excess-property-tolerant, **not** `createValidateEquals` —
-verified in `validation-fn.ts`), old clients reading the new fields will neither
-reject nor strip them — forward-compatible by construction. Confirm no
-`data-repair.ts` pass deletes them, and add a forward-compat regression spec.
+后果：
 
-### 1.2 Bidirectional serializer (typed ⇄ RRULE string)
+- 同步选择器中无对懒加载模块的异步依赖；启动/投影路径上无约 76 KB。
+- Occurrence 逻辑几乎不变（同样的 `FREQ/INTERVAL/BYxxx` 数学，新的输入
+  形态），因此确定性 ID 对等风险很小，**离线
+  golden-master 测试已足够 — 不需要生产环境影子模式**。
+- 新的常见模式（每月多日、结束条件）是对有界引擎的小扩展。冷门 RRULE 部分
+  （通用 `BYSETPOS`、`BYWEEKNO`）并非免费；推迟它们，若最终需要，
+  则通过 ical.js 在热路径 _之外_ 展开那些罕见配置。
 
-A pure module (e.g. `task-repeat-cfg/rrule/`). `typed → RRULE` is simple string
-assembly (or `ICAL.Recur.fromData({...}).toString()`); `RRULE → typed` (for `.ics`
-import) uses ical.js parsing. Field mapping — must cover everything:
+---
 
-| Typed model                                                                         | RRULE                                                                                                                                 |
+## Phase 1 — 类型化模型 + RRULE 序列化器 + 对等测试架
+
+可独立交付；序列化器打通日历双向同步
+roadmap 中「SP 不生成 RRULE」的关键路径项。
+
+### 1.1 添加类型化 `recurrence`/`end` 字段（加性，尚未成为规范）
+
+在现有字段旁添加该联合。因为校验使用 typia
+`createValidate`（容忍多余属性，**不是** `createValidateEquals` —
+在 `validation-fn.ts` 中核实），读取新字段的旧客户端既不会
+拒绝也不会剥离它们 — 构造上前向兼容。确认没有
+`data-repair.ts` 通道删除它们，并添加前向兼容回归规约。
+
+### 1.2 双向序列化器（类型化 ⇄ RRULE 字符串）
+
+纯模块（例如 `task-repeat-cfg/rrule/`）。`typed → RRULE` 是简单的字符串
+拼装（或 `ICAL.Recur.fromData({...}).toString()`）；`RRULE → typed`（用于 `.ics`
+导入）使用 ical.js 解析。字段映射 — 必须覆盖一切：
+
+| 类型化模型                                                                          | RRULE                                                                                                                                 |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `{freq, interval}`                                                                  | `FREQ=...;INTERVAL=...`                                                                                                               |
-| WEEKLY `byDay`                                                                      | `BYDAY=MO,WE,...` (WKST: see 1.3)                                                                                                     |
-| MONTHLY `on.monthDay`                                                               | `BYMONTHDAY=<n>` (n ≤ 28); 29–31 → clamp idiom `BYMONTHDAY=<n>,-1;BYSETPOS=1` (SP clamps to month-end, plain `BYMONTHDAY` skips)      |
+| WEEKLY `byDay`                                                                      | `BYDAY=MO,WE,...`（WKST：见 1.3）                                                                                                     |
+| MONTHLY `on.monthDay`                                                               | `BYMONTHDAY=<n>`（n ≤ 28）；29–31 → 钳制惯用法 `BYMONTHDAY=<n>,-1;BYSETPOS=1`（SP 钳制到月末，纯 `BYMONTHDAY` 会跳过）                 |
 | MONTHLY `on.lastDay`                                                                | `BYMONTHDAY=-1`                                                                                                                       |
-| MONTHLY `on.{week,day}`                                                             | `BYDAY=<week><DD>` (`-1`=last)                                                                                                        |
-| YEARLY `{month, day}`                                                               | `BYMONTH=<m>;BYMONTHDAY=<d>`; Feb-29 → same clamp idiom (`BYMONTH=2;BYMONTHDAY=29,-1;BYSETPOS=1`, clamps to Feb-28 in non-leap years) |
-| `end.count` / `end.until`                                                           | `COUNT=` / `UNTIL=` (end-of-day UTC)                                                                                                  |
-| `deletedInstanceDates`                                                              | `EXDATE` (export only; the wire field name stays verbatim)                                                                            |
-| `repeatFromCompletionDate`                                                          | **Not expressible** — serializer refuses/flags; such configs are export-incompatible by nature                                        |
-| `startTime`, `remindAt`, `waitForCompletion`, `skipOverdue`, subtask flags, `order` | SP extensions, out of band of RRULE — preserve                                                                                        |
-| `isPaused`                                                                          | No RRULE equivalent — serializer skips or flags a paused cfg (see below)                                                              |
-| `lastTaskCreationDay` / `lastTaskCreation`                                          | Internal creation cursor, out of band of RRULE — never exported, never derived from an imported rule                                  |
+| MONTHLY `on.{week,day}`                                                             | `BYDAY=<week><DD>`（`-1`=最后）                                                                                                       |
+| YEARLY `{month, day}`                                                               | `BYMONTH=<m>;BYMONTHDAY=<d>`；2 月 29 日 → 同样的钳制惯用法（`BYMONTH=2;BYMONTHDAY=29,-1;BYSETPOS=1`，在非闰年钳制到 2 月 28 日）     |
+| `end.count` / `end.until`                                                           | `COUNT=` / `UNTIL=`（日末 UTC）                                                                                                       |
+| `deletedInstanceDates`                                                              | `EXDATE`（仅导出；线字段名保持原样）                                                                                                  |
+| `repeatFromCompletionDate`                                                          | **不可表达** — 序列化器拒绝/标记；此类配置本质上与导出不兼容                                                                          |
+| `startTime`、`remindAt`、`waitForCompletion`、`skipOverdue`、子任务标志、`order`    | SP 扩展，在 RRULE 频带之外 — 保留                                                                                                     |
+| `isPaused`                                                                          | 无 RRULE 等价物 — 序列化器跳过或标记已暂停的 cfg（见下）                                                                              |
+| `lastTaskCreationDay` / `lastTaskCreation`                                          | 内部创建游标，在 RRULE 频带之外 — 永不导出，也永不从导入的规则派生                                                                   |
 
-`isPaused` short-circuits all occurrence generation
-(`store/task-repeat-cfg.selectors.ts:102,142`), so exporting a paused cfg as a
-live RRULE would promise occurrences SP never creates.
+`isPaused` 短路所有 occurrence 生成
+（`store/task-repeat-cfg.selectors.ts:102,142`），因此将已暂停的 cfg 导出为
+活跃 RRULE 会承诺 SP 从不创建的 occurrences。
 
-The three MONTHLY rows are **not independent** — the engine resolves one anchor
-with fixed precedence: nth-weekday (`monthlyWeekOfMonth` + `monthlyWeekday`,
-checked first at `get-next-repeat-occurrence.util.ts:110`) → `monthlyLastDay` →
-startDate's day-of-month. A row-by-row serializer that emits parts for a cfg
-carrying several anchors produces `BYMONTHDAY=-1;BYDAY=2TU` — in RFC 5545 an
-**intersection**, usually the empty set. Serialize exactly one anchor, in that
-precedence order (the epic branch's `legacyTaskRepeatCfgToRRule` switch does
-exactly this).
+三行 MONTHLY **并非独立** — 引擎以固定优先级解析一个锚点：
+第 N 个星期几（`monthlyWeekOfMonth` + `monthlyWeekday`，
+在 `get-next-repeat-occurrence.util.ts:110` 最先检查）→ `monthlyLastDay` →
+startDate 的日-of-month。对携带多个锚点的 cfg 按行序列化会产出
+`BYMONTHDAY=-1;BYDAY=2TU` — 在 RFC 5545 中是
+**交集**，通常为空集。按该优先级顺序精确序列化一个锚点（epic 分支的
+`legacyTaskRepeatCfgToRRule` switch 正是这样做的）。
 
-### 1.3 DTSTART / date-basis correctness (the part that bites)
+### 1.3 DTSTART / 日期基准正确性（容易踩坑的部分）
 
-- **DTSTART is local-noon of the anchor day, time component stripped.** The legacy
-  engine never uses `startTime` for date math — it anchors at `setHours(12,…)`
-  (`get-next-repeat-occurrence.util.ts:43-45`). A non-noon DTSTART makes ical.js emit
-  occurrences at a different instant that can roll to a different **calendar day**
-  across a day/DST boundary → broken parity and shifted IDs. `startTime` stays a
-  post-expansion task-template field, not part of DTSTART date math.
-- **EXDATE by day-string**, not instant equality: filter generated occurrences by
-  `getDbDateStr(occurrence)` against `exDates`.
-- **`UNTIL` is inclusive end-of-day.**
-- **`WKST` = weekday of the effective startDate** — or emit no `WKST` and
-  re-anchor DTSTART instead, as the epic branch does (`getAlignedStartDate`).
-  **Not** user `firstDayOfWeek`: that setting is display-only
-  (`src/app/core/date-time-format/custom-date-adapter.ts:19`). The engine counts
-  rolling 7-day blocks from the startDate's weekday
-  (`getDiffInWeeks(startDate, d) % repeatEvery`,
-  `get-next-repeat-occurrence.util.ts:88,95-96`), so a calendar-week `WKST`
-  shifts bi-weekly (`INTERVAL=2`) occurrences. Counterexample: startDate Wed
-  2026-01-07, `INTERVAL=2`, `BYDAY=MO,FR` — SP fires Mon 01-12; `WKST=MO` fires
-  Mon 01-19.
+- **DTSTART 是锚点日的本地正午，去掉时间分量。** 遗留
+  引擎从不将 `startTime` 用于日期数学 — 它锚定在 `setHours(12,…)`
+  （`get-next-repeat-occurrence.util.ts:43-45`）。非正午的 DTSTART 会使 ical.js 发出
+  不同瞬时的 occurrences，可能在日/DST 边界上滚到不同的 **日历日**
+  → 破坏对等并偏移 ID。`startTime` 保持为
+  展开后的任务模板字段，不参与 DTSTART 日期数学。
+- **EXDATE 按日字符串**，而非瞬时相等：用
+  `getDbDateStr(occurrence)` 对照 `exDates` 过滤生成的 occurrences。
+- **`UNTIL` 是包容性的日末。**
+- **`WKST` = 有效 startDate 的星期几** — 或者不发出 `WKST` 并
+  改为重新锚定 DTSTART，如 epic 分支所做（`getAlignedStartDate`）。
+  **不是** 用户的 `firstDayOfWeek`：该设置仅用于显示
+  （`src/app/core/date-time-format/custom-date-adapter.ts:19`）。引擎从
+  startDate 的星期几起按滚动 7 日块计数
+  （`getDiffInWeeks(startDate, d) % repeatEvery`，
+  `get-next-repeat-occurrence.util.ts:88,95-96`），因此日历周的 `WKST`
+  会偏移双周（`INTERVAL=2`）occurrences。反例：startDate 为周三
+  2026-01-07，`INTERVAL=2`，`BYDAY=MO,FR` — SP 触发周一 01-12；`WKST=MO` 触发
+  周一 01-19。
 
-### 1.4 Occurrence-parity golden master (the gate)
+### 1.4 Occurrence 对等 golden master（门禁）
 
-Differential harness: the engine reading the **typed** field yields
-**byte-identical occurrence dates** to today's engine reading the flat fields, for
-every config shape (daily, weekly multi-day, `repeatEvery>1`, monthly-by-date,
-monthly-nth-weekday, monthly-last-day, yearly, Feb-29), over a multi-year window,
-in **both** CI timezones, across DST boundaries. Cap occurrences-per-shape so the
-test can't blow up if a sub-daily freq is added later. Completion-based configs are
-**out of scope** for the harness (different engine). Migration is gated on 100%
-parity. Serializer round-trips (`typed → RRULE → typed`) are property-tested.
+差分测试架：读取 **类型化** 字段的引擎产出
+与今日读取扁平字段的引擎 **字节级相同的 occurrence 日期**，覆盖
+每一种配置形态（daily、weekly 多日、`repeatEvery>1`、按日期的 monthly、
+monthly 第 N 个星期几、monthly 最后一天、yearly、2 月 29 日），跨越多年窗口，
+在 **两个** CI 时区中，跨越 DST 边界。限制每种形态的 occurrence 数量，以免日后
+加入亚日 freq 时测试爆炸。基于完成的配置
+**不在** 测试架范围内（不同引擎）。迁移以 100% 对等为门禁。序列化器往返
+（`typed → RRULE → typed`）做属性测试。
 
 ---
 
-## Phase 2 — Versioned migration (via the op-log schema system)
+## Phase 2 — 版本化迁移（经 op-log schema 系统）
 
-> Corrected mechanism. **Not** `pfapi-config.js` — that file is
-> `@deprecated LEGACY CODE` (its `CROSS_MODEL_VERSION` is a stale `4.4` and it
-> `require`s a `./migrate/cross-model-migrations` path that no longer exists).
+> 纠正后的机制。**不是** `pfapi-config.js` — 该文件是
+> `@deprecated LEGACY CODE`（其 `CROSS_MODEL_VERSION` 是过时的 `4.4`，且它
+> `require` 一个已不存在的 `./migrate/cross-model-migrations` 路径）。
 
-Migrate via the live op-log schema system:
+经活跃的 op-log schema 系统迁移：
 
-- Add a `vN → vN+1` entry to `packages/shared-schema/src/migrations/` (registry
-  `index.ts`), supplying **both** `migrateState` (snapshot) and `migrateOperation`
-  (in-flight ops), and bump `CURRENT_SCHEMA_VERSION`
-  (`packages/shared-schema/src/schema-version.ts`). Applied by
+- 向 `packages/shared-schema/src/migrations/` 添加 `vN → vN+1` 条目（注册表
+  `index.ts`），同时提供 **`migrateState`（快照）** 与 **`migrateOperation`**
+  （飞行中 ops），并提升 `CURRENT_SCHEMA_VERSION`
+  （`packages/shared-schema/src/schema-version.ts`）。由
   `src/app/op-log/persistence/schema-migration.service.ts` /
-  `remote-ops-processing.service.ts`. The conversion itself is pure O(1)
-  string/struct assembly per config — cheap even for many configs; the migration
-  must **not** expand occurrences per config.
-- **Cross-version story (resolve the old-client contradiction).** _Corrected
-  2026-08 — see #9664._ An earlier revision of this bullet named
-  **`MIN_SUPPORTED_SCHEMA_VERSION`** as a "force-update gate" that would push
-  pre-typed clients through the `VERSION_UNSUPPORTED` flow. That is backwards.
-  It is a lower bound applied to data _this_ client reads
-  (`remote-ops-processing.service.ts:177`, `operation-log-sync.service.ts:2318`,
-  `verify-decrypted-op-integrity.ts:139`, `migrate.ts:49,115`); senders stamp
-  `CURRENT_SCHEMA_VERSION` only, and no server-side client-version gate exists.
-  Raising it would wedge the **updated** client — the block halts the cycle
-  before upload (`sync-wrapper.service.ts:595-606`), the cursor is not advanced,
-  and the `VERSION_UNSUPPORTED` snack deliberately carries no remedy
-  (`remote-ops-processing.service.ts:540-546`, "updating THIS device cannot
-  help"). It never prompts the old device. **There is no version gate here.**
+  `remote-ops-processing.service.ts` 应用。转换本身是每个配置纯 O(1)
+  的字符串/结构拼装 — 即使配置很多也很便宜；迁移
+  **不得** 按配置展开 occurrences。
+- **跨版本故事（解决旧客户端矛盾）。** _已于
+  2026-08 纠正 — 见 #9664。_ 本要点的更早修订将
+  **`MIN_SUPPORTED_SCHEMA_VERSION`** 命名为会把预类型化客户端推入
+  `VERSION_UNSUPPORTED` 流程的「强制更新门禁」。那是反向的。
+  它是应用于 _本_ 客户端读取的数据的下界
+  （`remote-ops-processing.service.ts:177`、`operation-log-sync.service.ts:2318`、
+  `verify-decrypted-op-integrity.ts:139`、`migrate.ts:49,115`）；发送方仅盖章
+  `CURRENT_SCHEMA_VERSION`，不存在服务端客户端版本门禁。
+  抬高它会卡住 **已更新** 的客户端 — 阻塞在上传前停住周期
+  （`sync-wrapper.service.ts:595-606`），游标不前进，
+  且 `VERSION_UNSUPPORTED` snack 故意不带补救措施
+  （`remote-ops-processing.service.ts:540-546`，「更新本设备
+  无济于事」）。它从不提示旧设备。**此处没有版本门禁。**
 
-  Nor does a `CURRENT_SCHEMA_VERSION` bump supply one for the _currently
-  released_ fleet: master is at 4, so a bump lands on 5 — inside the
-  v17.0.0–v18.14.0 tolerated band (`2 + 3`) — and those clients apply the ops
-  **unmigrated**; a bump to 6 blocks them but still advances their cursor,
-  permanently skipping the ops. (Post-v18.14.0 receivers _do_ block safely, so a
-  bump becomes a real fence once that cohort ages out.) See
-  `packages/shared-schema/src/schema-version.ts` and
-  `docs/sync-and-op-log/operation-log-architecture.md` §A.7.11.
+  `CURRENT_SCHEMA_VERSION` 的提升也不为 _当前已发布_
+  机队提供门禁：master 在 4，因此提升落在 5 — 落在
+  v17.0.0–v18.14.0 容忍带（`2 + 3`）内 — 那些客户端会应用 ops
+  **而不迁移**；提升到 6 会阻塞它们但仍前进其游标，
+  永久跳过这些 ops。（v18.14.0 之后的接收方 _会_ 安全阻塞，因此
+  一旦该队列过期，提升才成为真正的围栏。）见
+  `packages/shared-schema/src/schema-version.ts` 与
+  `docs/sync-and-op-log/operation-log-architecture.md` §A.7.11。
 
-- **The mechanism that actually solves this is already built on
-  `feat/rrule-epic`** — do not re-derive it. The legacy schedule fields stay
-  populated alongside the new representation as the wire format for old clients
-  (`util/legacy-cfg-to-rrule.util.ts`), under an **exact-or-null contract**:
-  where the rule is within legacy expressiveness the legacy fields fire on the
-  same days; where it is not (`COUNT`/`UNTIL`, seasonal `BYMONTH`,
-  `BYWEEKNO`/`BYYEARDAY`, multi-day lists, out-of-union ordinals) the
-  `LEGACY_NEVER_FIRES_FALLBACK` sentinel is written instead — an all-false
-  `WEEKLY` cfg, which every released version deterministically never fires. Old
-  clients create **nothing** rather than tasks on wrong days that would sync
-  back. `getAlignedStartDate` handles `startDate`'s double duty as both the
-  monthly/yearly day encoding and the interval anchor. The off-by-default
-  per-device flag (`RRuleFeatureFlagService`, localStorage, never synced) keeps
-  the legacy engine authoritative while the epic is incomplete — that flag, not
-  a schema gate, is what makes half-built phases safe.
-- **Never rename `deletedInstanceDates` on the wire.** Keep the synced field name;
-  `exDates` is the in-memory/typed name and `EXDATE` the export name. Under
-  whole-entity LWW, an old client that wins a conflict re-emits the entity without
-  a renamed field and destroys the skip list fleet-wide; the partial-update
-  shallow-merge path is a second destruction vector. (If keeping the literal
-  property name is preferred, do that — the point is: no rename of the persisted
-  key.)
-
----
-
-## Phase 3 — RRULE-native features
-
-With the typed model canonical, new patterns are typed-union additions + small
-bounded-engine extensions:
-
-- **End conditions.** `end: {type:'count'|'until'}`, enforced as a guard in the
-  occurrence loop (return `null` past the bound). UI "Ends" control derives from
-  `end`, persists nothing extra. Labels via `T`/`TranslateService` (`en.json`
-  only).
-- **Multiple days per month** (`BYMONTHDAY=1,15`) etc., as the model/engine grow.
-
-### Phase 3 tests
-
-- No occurrences past `COUNT`/`UNTIL`, each freq, both CI timezones.
-- **Decide & test `COUNT` vs `exDates`:** does a skipped instance consume a count?
-  (ical.js counts pre-EXDATE; SP filters post-generation — pick "10 actual tasks"
-  vs "10 scheduled" deliberately and test it.)
-- `UNTIL` boundary: end day included, next day excluded.
+- **真正解决此问题的机制已在
+  `feat/rrule-epic` 上构建** — 不要重新推导。遗留排程字段保持
+  与新表示一并填充，作为旧客户端的线格式
+  （`util/legacy-cfg-to-rrule.util.ts`），遵循 **exact-or-null 契约**：
+  当规则在遗留可表达性内时，遗留字段在相同日期触发；当不可表达时
+  （`COUNT`/`UNTIL`、季节性 `BYMONTH`、
+  `BYWEEKNO`/`BYYEARDAY`、多日列表、联合外序数）则写入
+  `LEGACY_NEVER_FIRES_FALLBACK` 哨兵 — 一个全 false 的
+  `WEEKLY` cfg，每个已发布版本都会确定性地永不触发。旧
+  客户端创建 **无物**，而不是在错误日期创建会同步回来的任务。
+  `getAlignedStartDate` 处理 `startDate` 的双重职责：既是
+  monthly/yearly 日编码，也是间隔锚点。默认关闭的
+  按设备开关（`RRuleFeatureFlagService`，localStorage，永不同步）在
+  epic 未完成时保持遗留引擎为权威 — 使半成品阶段安全的是该开关，
+  而非 schema 门禁。
+- **永不在线上重命名 `deletedInstanceDates`。** 保持同步字段名；
+  `exDates` 是内存/类型化名称，`EXDATE` 是导出名称。在
+  整实体 LWW 下，赢得冲突的旧客户端会重新发出不含
+  重命名字段的实体，并在全机队销毁跳过列表；部分更新的
+  浅合并路径是第二条销毁向量。（若更倾向保留字面
+  属性名，那样做即可 — 要点是：不重命名持久化键。）
 
 ---
 
-## `repeatFromCompletionDate` carve-out
+## Phase 3 — RRULE 原生功能
 
-Not a separate _engine_ — it runs the same `FREQ/INTERVAL` calc but re-anchors the
-**start date** to `lastTaskCreationDay` each cycle (`getEffectiveRepeatStartDate`).
-So the real risk is feeding a **wrong DTSTART/anchor**, not "wrong engine":
+在类型化模型成为规范后，新模式是类型化联合的添加 + 小的
+有界引擎扩展：
 
-- It has **no stable DTSTART** → not RRULE-expressible; the serializer refuses it
-  (export-incompatible by nature).
-- Model it as the union variant + the `repeatFromCompletionDate` flag; route to the
-  dynamically-anchored calc **before** any fixed-anchor path.
-- Honest code-reduction accounting: only the fixed-schedule plumbing is deleted;
-  the completion path stays.
+- **结束条件。** `end: {type:'count'|'until'}`，在
+  occurrence 循环中作为守卫强制执行（超过边界返回 `null`）。UI「Ends」控件从
+  `end` 派生，不额外持久化。标签经 `T`/`TranslateService`（仅
+  `en.json`）。
+- **每月多日**（`BYMONTHDAY=1,15`）等，随模型/引擎增长。
+
+### Phase 3 测试
+
+- 不超过 `COUNT`/`UNTIL` 的 occurrences，每种 freq，两个 CI 时区。
+- **决定并测试 `COUNT` vs `exDates`：** 被跳过的实例是否消耗一次计数？
+  （ical.js 在 EXDATE 前计数；SP 在生成后过滤 — 有意选择「10 个实际任务」
+  vs「10 个已排程」并测试。）
+- `UNTIL` 边界：结束日包含，次日排除。
 
 ---
 
-## Risk register
+## `repeatFromCompletionDate` 例外
 
-| Risk                                                                    | Severity    | Mitigation                                                                                                                                                                                       |
+不是单独的 _引擎_ — 它运行同样的 `FREQ/INTERVAL` 计算，但每个周期将
+**起始日期** 重新锚定到 `lastTaskCreationDay`（`getEffectiveRepeatStartDate`）。
+因此真正的风险是喂入 **错误的 DTSTART/锚点**，而非「错误引擎」：
+
+- 它 **没有稳定的 DTSTART** → 不可用 RRULE 表达；序列化器拒绝它
+  （本质上与导出不兼容）。
+- 将其建模为联合变体 + `repeatFromCompletionDate` 标志；在任何固定锚点路径
+  **之前** 路由到动态锚定计算。
+- 诚实的代码缩减核算：仅删除固定排程管道；
+  完成路径保留。
+
+---
+
+## 风险登记
+
+| 风险                                                                    | 严重度      | 缓解                                                                                                                                                                                             |
 | ----------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Occurrence dates shift on model swap → re-keyed instances               | **Blocker** | Keep the existing bounded engine; Phase-1 golden master gates migration                                                                                                                          |
-| Cross-version sync: old client can't read typed model                   | **Blocker** | No version gate exists (#9664). Keep legacy fields populated on the wire under the exact-or-null contract; `LEGACY_NEVER_FIRES_FALLBACK` for inexpressible rules; per-device flag gates the epic |
-| Renaming the `deletedInstanceDates` wire key loses skip data            | High        | Do not rename the persisted key; `EXDATE` only at export                                                                                                                                         |
-| `repeatFromCompletionDate` fed a fixed DTSTART → becomes fixed-calendar | High        | Route completion mode before any fixed-anchor path; re-anchor per cycle                                                                                                                          |
-| Wrong migration subsystem (`pfapi-config.js`)                           | High        | Use `packages/shared-schema` migrations + `schema-migration.service.ts`                                                                                                                          |
-| Hot-path regression from async/forward-only ical.js iteration           | High        | ical.js for string parse/serialize only; sync bounded engine stays the runtime                                                                                                                   |
-| DTSTART carries `startTime` → day rolls                                 | High        | DTSTART = local-noon of anchor day; `startTime` applied post-expansion                                                                                                                           |
-| EXDATE never matches (instant vs noon)                                  | Medium      | Filter by `getDbDateStr` day-string                                                                                                                                                              |
-| Bi-weekly shifts (WKST default)                                         | Medium      | startDate-derived WKST, or omit + re-anchor — see 1.3                                                                                                                                            |
-| `UNTIL` drops final day                                                 | Medium      | Inclusive end-of-day                                                                                                                                                                             |
-| ~~Production shadow mode cost~~                                         | n/a         | Not needed — engine unchanged; offline golden master covers parity                                                                                                                               |
-| ~~Bundle size of new dep~~                                              | n/a         | No new dep in the typed-model plan (the epic did add pinned `rrule` — see the Decision note)                                                                                                     |
+| 模型切换时 occurrence 日期偏移 → 实例重新键控                           | **Blocker** | 保留现有有界引擎；Phase-1 golden master 门禁迁移                                                                                  |
+| 跨版本同步：旧客户端无法读取类型化模型                                  | **Blocker** | 不存在版本门禁（#9664）。按 exact-or-null 契约在线上保持遗留字段填充；对不可表达规则使用 `LEGACY_NEVER_FIRES_FALLBACK`；按设备开关门控 epic |
+| 重命名 `deletedInstanceDates` 线键丢失跳过数据                          | High        | 不重命名持久化键；仅在导出时使用 `EXDATE`                                                                                        |
+| `repeatFromCompletionDate` 被喂入固定 DTSTART → 变成固定日历            | High        | 在任何固定锚点路径前路由完成模式；每周期重新锚定                                                                                 |
+| 错误的迁移子系统（`pfapi-config.js`）                                   | High        | 使用 `packages/shared-schema` 迁移 + `schema-migration.service.ts`                                                               |
+| 异步/仅正向 ical.js 迭代导致的热路径回退                                | High        | ical.js 仅用于字符串解析/序列化；同步有界引擎保持为运行时                                                                        |
+| DTSTART 携带 `startTime` → 日滚动                                       | High        | DTSTART = 锚点日本地正午；`startTime` 在展开后应用                                                                               |
+| EXDATE 永不匹配（瞬时 vs 正午）                                         | Medium      | 按 `getDbDateStr` 日字符串过滤                                                                                                   |
+| 双周偏移（WKST 默认）                                                   | Medium      | 由 startDate 派生的 WKST，或省略 + 重新锚定 — 见 1.3                                                                             |
+| `UNTIL` 丢掉最后一天                                                    | Medium      | 包容性日末                                                                                                                       |
+| ~~生产影子模式成本~~                                                    | n/a         | 不需要 — 引擎未变；离线 golden master 覆盖对等                                                                                   |
+| ~~新依赖的包体积~~                                                      | n/a         | 类型化模型计划中无新依赖（epic 确实用钉死的 `rrule` — 见 Decision 说明）                                                         |
 
 ---
 
-## Measurable success criteria (gates)
+## 可度量成功标准（门禁）
 
-1. **Phase-1 parity:** typed-field engine == flat-field engine for the full
-   config-shape corpus over a 5-year window, both CI timezones; harness green in CI.
-2. **Serializer round-trips** `typed → RRULE → typed` for every shape
-   (property-tested), incl. monthly-nth-weekday and last-day.
-3. **No new runtime dependency** (ical.js only, boundary-only). _(Superseded —
-   the epic deliberately added pinned `rrule`; see the Decision note.)_
-4. **No synced field key renamed** (`deletedInstanceDates` stays on the wire).
-5. **Forward-compat:** an old client reading the new fields neither errors nor
-   strips them (regression spec).
-6. After migration, `repeatFromCompletionDate`, `waitForCompletion`, `skipOverdue`,
-   subtask templates, and skip-list behavior are unchanged (regression specs green).
-7. **Phase-3 end conditions** ship with tests passing in both CI timezones; UI
-   end-state is derived, not persisted.
+1. **Phase-1 对等：** 类型化字段引擎 == 扁平字段引擎，覆盖完整
+   配置形态语料库、5 年窗口、两个 CI 时区；测试架在 CI 中绿灯。
+2. **序列化器往返** `typed → RRULE → typed` 覆盖每一种形态
+   （属性测试），含 monthly 第 N 个星期几与最后一天。
+3. **无新运行时依赖**（仅 ical.js，仅边界）。_（已取代 —
+   epic 有意添加了钉死的 `rrule`；见 Decision 说明。）_
+4. **不重命名任何同步字段键**（`deletedInstanceDates` 保留在线上）。
+5. **前向兼容：** 读取新字段的旧客户端既不报错也不
+   剥离它们（回归规约）。
+6. 迁移后，`repeatFromCompletionDate`、`waitForCompletion`、`skipOverdue`、
+   子任务模板与跳过列表行为不变（回归规约绿灯）。
+7. **Phase-3 结束条件** 随两个 CI 时区中通过的测试上线；UI
+   结束状态是派生的，非持久化的。
 
 ---
 
-## Files in play (verified paths)
+## 涉及文件（已核实路径）
 
-| Area                                                                        | File                                                                                                                                                                                                                                                                                                            |
+| 区域                                                                        | 文件                                                                                                                                                                                                                                                                                                            |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model                                                                       | `src/app/features/task-repeat-cfg/task-repeat-cfg.model.ts` (`TaskRepeatCfgCopy`)                                                                                                                                                                                                                               |
-| Occurrence engine (kept, re-pointed to typed field)                         | `store/get-next-repeat-occurrence.util.ts`, `store/get-newest-possible-due-date.util.ts`, `store/get-first-repeat-occurrence.util.ts`, `store/get-nth-weekday-of-month.util.ts`, `store/get-effective-repeat-start-date.util.ts`, `store/get-effective-last-task-creation-day.util.ts`                          |
-| Deterministic ID (must stay stable)                                         | `get-repeatable-task-id.util.ts`                                                                                                                                                                                                                                                                                |
-| Selectors / projection                                                      | `store/task-repeat-cfg.selectors.ts`                                                                                                                                                                                                                                                                            |
-| Service / creation                                                          | `task-repeat-cfg.service.ts`                                                                                                                                                                                                                                                                                    |
-| Quick settings / dialog UI                                                  | `dialog-edit-task-repeat-cfg/` (form const, quick-setting updates, build options)                                                                                                                                                                                                                               |
-| Human-readable text                                                         | `src/app/features/tasks/task-detail-panel/get-task-repeat-info-text.util.ts`                                                                                                                                                                                                                                    |
-| RRULE serialize/parse (boundary only)                                       | `src/app/features/schedule/ical/ical-lazy-loader.ts` (reuse loader)                                                                                                                                                                                                                                             |
-| Migration (corrected)                                                       | `packages/shared-schema/src/migrations/` (+ `index.ts`), `packages/shared-schema/src/schema-version.ts` (`CURRENT_SCHEMA_VERSION` — note `MIN_SUPPORTED_SCHEMA_VERSION` is _not_ a cross-version gate, #9664), `src/app/op-log/persistence/schema-migration.service.ts`                                         |
-| Old-client wire compatibility (already built on `feat/rrule-epic`)          | `src/app/features/task-repeat-cfg/util/legacy-cfg-to-rrule.util.ts` (`legacyTaskRepeatCfgToRRule`, `rruleToLegacyTaskRepeatCfg`, `LEGACY_NEVER_FIRES_FALLBACK`, `getAlignedStartDate`), `src/app/features/config/rrule-feature-flag.service.ts`                                                                 |
-| Validation / repair                                                         | `src/app/op-log/validation/` (`createValidate`, `data-repair.ts`)                                                                                                                                                                                                                                               |
-| Calendar write boundary (note: predates #6040/#7726/`deletedInstanceDates`) | [ARCHITECTURE-DECISIONS.md #9 — calendar writes live in plugins](../../ARCHITECTURE-DECISIONS.md#9-calendar-writes-live-in-plugins-behind-per-provider-opt-in). CalDAV VEVENT expansion shipped as the `caldav-calendar-provider` plugin; per-occurrence edits (`RECURRENCE-ID`/`EXDATE`) are still open, #8148 |
+| 模型                                                                        | `src/app/features/task-repeat-cfg/task-repeat-cfg.model.ts`（`TaskRepeatCfgCopy`）                                                                                                                                                                                                                              |
+| Occurrence 引擎（保留，改指向类型化字段）                                   | `store/get-next-repeat-occurrence.util.ts`、`store/get-newest-possible-due-date.util.ts`、`store/get-first-repeat-occurrence.util.ts`、`store/get-nth-weekday-of-month.util.ts`、`store/get-effective-repeat-start-date.util.ts`、`store/get-effective-last-task-creation-day.util.ts`                          |
+| 确定性 ID（必须保持稳定）                                                   | `get-repeatable-task-id.util.ts`                                                                                                                                                                                                                                                                                |
+| 选择器 / 投影                                                               | `store/task-repeat-cfg.selectors.ts`                                                                                                                                                                                                                                                                            |
+| 服务 / 创建                                                                  | `task-repeat-cfg.service.ts`                                                                                                                                                                                                                                                                                    |
+| 快速设置 / 对话框 UI                                                        | `dialog-edit-task-repeat-cfg/`（表单常量、quick-setting 更新、构建选项）                                                                                                                                                                                                                                        |
+| 人类可读文本                                                                | `src/app/features/tasks/task-detail-panel/get-task-repeat-info-text.util.ts`                                                                                                                                                                                                                                    |
+| RRULE 序列化/解析（仅边界）                                                 | `src/app/features/schedule/ical/ical-lazy-loader.ts`（复用加载器）                                                                                                                                                                                                                                              |
+| 迁移（已纠正）                                                              | `packages/shared-schema/src/migrations/`（+ `index.ts`）、`packages/shared-schema/src/schema-version.ts`（`CURRENT_SCHEMA_VERSION` — 注意 `MIN_SUPPORTED_SCHEMA_VERSION` _不是_ 跨版本门禁，#9664）、`src/app/op-log/persistence/schema-migration.service.ts`                                         |
+| 旧客户端线兼容（已在 `feat/rrule-epic` 上构建）                             | `src/app/features/task-repeat-cfg/util/legacy-cfg-to-rrule.util.ts`（`legacyTaskRepeatCfgToRRule`、`rruleToLegacyTaskRepeatCfg`、`LEGACY_NEVER_FIRES_FALLBACK`、`getAlignedStartDate`）、`src/app/features/config/rrule-feature-flag.service.ts`                                                                 |
+| 校验 / 修复                                                                 | `src/app/op-log/validation/`（`createValidate`、`data-repair.ts`）                                                                                                                                                                                                                                               |
+| 日历写入边界（注：早于 #6040/#7726/`deletedInstanceDates`）                 | [ARCHITECTURE-DECISIONS.md #9 — calendar writes live in plugins](../../ARCHITECTURE-DECISIONS.md#9-calendar-writes-live-in-plugins-behind-per-provider-opt-in)。CalDAV VEVENT 展开作为 `caldav-calendar-provider` 插件上线；按 occurrence 编辑（`RECURRENCE-ID`/`EXDATE`）仍开放，#8148 |
 
 ---
 
-## Appendix A — Competitor comparison
+## 附录 A — 竞品对比
 
-Reference for "what users expect" (verified SP column as of 2026-06; the
-remaining ❌ are the genuine targets — end conditions). Consolidated from the
-former `recurring-events-gap-analysis.md` / `recurring-events-industry-standards.md`.
+「用户期望什么」的参考（SP 列截至 2026-06 已核实；
+剩余 ❌ 是真正的目标 — 结束条件）。合并自前
+`recurring-events-gap-analysis.md` / `recurring-events-industry-standards.md`。
 
-| Feature              | Google Calendar | Todoist | Things 3 | TickTick | Super Productivity |
+| 功能                 | Google Calendar | Todoist | Things 3 | TickTick | Super Productivity |
 | -------------------- | --------------- | ------- | -------- | -------- | ------------------ |
-| Basic (D/W/M/Y)      | ✅              | ✅      | ✅       | ✅       | ✅                 |
-| Every N interval     | ✅              | ✅      | ✅       | ✅       | ✅                 |
-| Weekday selection    | ✅              | ✅      | ✅       | ✅       | ✅                 |
-| Nth weekday of month | ✅              | ✅      | ✅       | ✅       | ✅ (#6040)         |
-| Last day of month    | ✅              | ✅      | ✅       | ✅       | ✅ (#7726)         |
-| End after N times    | ✅              | ❌      | ❌       | ✅       | ❌ (Phase 3)       |
-| End on date          | ✅              | ❌      | ❌       | ✅       | ❌ (Phase 3)       |
-| After completion     | ❌              | ✅      | ✅       | ✅       | ✅ (carve-out)     |
-| Skip occurrence      | ✅              | ✅      | ✅       | ✅       | ✅                 |
-| Natural language     | ✅              | ✅      | ❌       | ❌       | ✅ (info text)     |
-| iCal export          | ✅              | ✅      | ❌       | ✅       | ❌ (Phase 1)       |
+| 基础（D/W/M/Y）      | ✅              | ✅      | ✅       | ✅       | ✅                 |
+| 每 N 间隔            | ✅              | ✅      | ✅       | ✅       | ✅                 |
+| 星期几选择           | ✅              | ✅      | ✅       | ✅       | ✅                 |
+| 月内第 N 个星期几    | ✅              | ✅      | ✅       | ✅       | ✅（#6040）        |
+| 月末最后一天         | ✅              | ✅      | ✅       | ✅       | ✅（#7726）        |
+| N 次后结束           | ✅              | ❌      | ❌       | ✅       | ❌（Phase 3）      |
+| 在某日期结束         | ✅              | ❌      | ❌       | ✅       | ❌（Phase 3）      |
+| 完成后               | ❌              | ✅      | ✅       | ✅       | ✅（例外）         |
+| 跳过某次 occurrence  | ✅              | ✅      | ✅       | ✅       | ✅                 |
+| 自然语言             | ✅              | ✅      | ❌       | ❌       | ✅（信息文本）     |
+| iCal 导出            | ✅              | ✅      | ❌       | ✅       | ❌（Phase 1）      |
 
 ---
 
-## Appendix B — RFC 5545 RRULE reference
+## 附录 B — RFC 5545 RRULE 参考
 
-The iCalendar spec (RFC 5545) `RRULE` property is the recurrence standard the
-typed model mirrors and the serializer targets.
+iCalendar 规范（RFC 5545）的 `RRULE` 属性是类型化模型所镜像、
+序列化器所面向的重复标准。
 
-**Core components**
+**核心组件**
 
-| Parameter           | Meaning                    | Values                                                                   |
+| 参数                | 含义                       | 取值                                                                     |
 | ------------------- | -------------------------- | ------------------------------------------------------------------------ |
-| **FREQ** (required) | Frequency                  | `YEARLY`, `MONTHLY`, `WEEKLY`, `DAILY`, `HOURLY`, `MINUTELY`, `SECONDLY` |
-| **INTERVAL**        | Spacing between iterations | positive integer (default 1)                                             |
-| **COUNT**           | Number of occurrences      | positive integer                                                         |
-| **UNTIL**           | End date(-time)            | DATE or DATE-TIME                                                        |
-| **WKST**            | Week start day             | `MO`…`SU` (default `MO`)                                                 |
+| **FREQ**（必需）    | 频率                       | `YEARLY`、`MONTHLY`、`WEEKLY`、`DAILY`、`HOURLY`、`MINUTELY`、`SECONDLY` |
+| **INTERVAL**        | 迭代间隔                   | 正整数（默认 1）                                                         |
+| **COUNT**           | occurrence 次数            | 正整数                                                                   |
+| **UNTIL**           | 结束日期（时间）           | DATE 或 DATE-TIME                                                        |
+| **WKST**            | 一周起始日                 | `MO`…`SU`（默认 `MO`）                                                   |
 
-**BYxxx parts**
+**BYxxx 部分**
 
-| Parameter      | Meaning             | Values                                             |
+| 参数           | 含义                | 取值                                               |
 | -------------- | ------------------- | -------------------------------------------------- |
-| **BYDAY**      | Days of week        | `MO`…`SU`, optional ordinal prefix (`2TU`, `-1FR`) |
-| **BYMONTH**    | Months              | 1–12                                               |
-| **BYMONTHDAY** | Days of month       | 1..31 or -31..-1 (negative = from end)             |
-| **BYYEARDAY**  | Days of year        | 1..366 / -366..-1                                  |
-| **BYWEEKNO**   | ISO week numbers    | 1..53 / -53..-1                                    |
-| **BYSETPOS**   | Position within set | 1..366 / -366..-1                                  |
+| **BYDAY**      | 星期几              | `MO`…`SU`，可选序数前缀（`2TU`、`-1FR`）           |
+| **BYMONTH**    | 月份                | 1–12                                               |
+| **BYMONTHDAY** | 月内日              | 1..31 或 -31..-1（负数为从末尾计）                 |
+| **BYYEARDAY**  | 年内日              | 1..366 / -366..-1                                  |
+| **BYWEEKNO**   | ISO 周编号          | 1..53 / -53..-1                                    |
+| **BYSETPOS**   | 集合内位置          | 1..366 / -366..-1                                  |
 
-`BYDAY` ordinal prefix: `1MO`/`+1MO` = first Monday, `-1MO` = last Monday,
-`2TU` = second Tuesday.
+`BYDAY` 序数前缀：`1MO`/`+1MO` = 第一个周一，`-1MO` = 最后一个周一，
+`2TU` = 第二个周二。
 
-**Examples**
+**示例**
 
 ```
 FREQ=DAILY;COUNT=10                         # daily, 10 times
@@ -511,5 +499,5 @@ FREQ=MONTHLY;BYDAY=2TU                       # 2nd Tuesday
 FREQ=MONTHLY;BYDAY=-1FR                      # last Friday
 ```
 
-**Exceptions:** `EXDATE` excludes occurrences (= SP `deletedInstanceDates`);
-`RDATE` adds them (deferred — see "Genuinely missing").
+**例外：** `EXDATE` 排除 occurrences（= SP `deletedInstanceDates`）；
+`RDATE` 添加它们（推迟 — 见「真正缺失」）。

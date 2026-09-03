@@ -1,25 +1,25 @@
 <!-- pyml disable md041 -->
 
-## New Users: Start Here
+## 新用户：从这里开始
 
-Check out [[1.01-First-Steps]] where we will teach you:
+请查看 [[1.01-First-Steps]]，我们将教你：
 
-- how to use Super Productivity in the web app.
-- how to install the desktop or mobile app.
-- how to find other resources once you are done with the basics.
+- 如何在 Web 应用中使用 Super Productivity。
+- 如何安装桌面或移动应用。
+- 完成基础后如何找到其他资源。
 
-Common tasks:
+常见任务：
 
-- [[2.00-How_To]] — How-to guides
-- [[2.02-Restore-Data-From-Backup]] — Back up and restore your data
-- [[2.08-Choose-Sync-Backend]] — Choose a sync backend
-- [[2.21-Manage-Plugins]] — Install and manage plugins safely
+- [[2.00-How_To]] — 操作指南
+- [[2.02-Restore-Data-From-Backup]] — 备份与恢复数据
+- [[2.08-Choose-Sync-Backend]] — 选择同步后端
+- [[2.21-Manage-Plugins]] — 安全地安装与管理插件
 - [[3.00-Reference]]
 
-## Devs and Contributors: Start Here
+## 开发者与贡献者：从这里开始
 
-**Run and build:**
+**运行与构建：**
 
-- [[2.11-Run-the-Development-Server]] (local and Codespaces)
+- [[2.11-Run-the-Development-Server]]（本地与 Codespaces）
 - [[2.13-Run-with-Docker]]
-- [[2.12-Package-the-App]], [[2.14-Build-for-Android]]
+- [[2.12-Package-the-App]]、[[2.14-Build-for-Android]]

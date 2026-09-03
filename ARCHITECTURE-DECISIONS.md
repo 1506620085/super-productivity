@@ -1,640 +1,486 @@
-# Architecture Decision Records
+# 架构决策记录（Architecture Decision Records）
 
-This document tracks significant architectural decisions and patterns in the Super Productivity codebase. When making changes that affect these patterns, reference this document and update it if needed.
+本文档追踪 Super Productivity 代码库中的重要架构决策与模式。当改动影响这些模式时，请引用本文档，并在需要时更新。
 
-It is also the **index** of accepted decisions: a decision recorded somewhere else — because it is long enough to stand alone, or because it is enforced as a contributor rule — must still be listed under [Decisions Recorded Elsewhere](#decisions-recorded-elsewhere).
+它同时也是已采纳决策的**索引**：记录在别处的决策——因其足够长而独立成文，或因其作为贡献者规则被强制执行——仍必须列在 [记录于别处的决策](#记录于别处的决策) 下。
 
-## Active Patterns & Decisions
+## 现行模式与决策
 
-### 1. dueDay/dueWithTime Mutual Exclusivity Pattern
+### 1. dueDay/dueWithTime 互斥模式
 
-**Status**: ✅ Active (since commit `400ca8c1`, 2026-01-29)
+**状态**：✅ 现行（自提交 `400ca8c1`，2026-01-29）
 
-**Decision**: The `task.dueDay` and `task.dueWithTime` fields are mutually exclusive in new data. When setting `dueWithTime`, `dueDay` must be cleared (set to `undefined`). When reading, `dueWithTime` takes priority over `dueDay`.
+**决策**：在新数据中，`task.dueDay` 与 `task.dueWithTime` 字段互斥。设置 `dueWithTime` 时必须清除 `dueDay`（设为 `undefined`）。读取时，`dueWithTime` 优先于 `dueDay`。
 
-**Rationale**:
+**理由**：
 
-- Prevents state inconsistency bugs where both fields had conflicting values
-- Single source of truth for task scheduling
-- Simpler state management
+- 防止两字段取值冲突导致的状态不一致 Bug
+- 任务排期的单一事实来源
+- 更简单的状态管理
 
-**Implementation**:
+**实现**：
 
-- **Writing**: Clear `dueDay` when setting `dueWithTime` (in meta-reducers)
-- **Reading**: Check `dueWithTime` first; only check `dueDay` if `dueWithTime` is not set (in selectors)
-- **Legacy Data**: Old data with both fields works via priority pattern (no migration needed)
+- **写入**：设置 `dueWithTime` 时清除 `dueDay`（在 meta-reducers 中）
+- **读取**：先检查 `dueWithTime`；仅当未设置时再检查 `dueDay`（在 selectors 中）
+- **遗留数据**：同时带有两字段的旧数据通过优先级模式工作（无需迁移）
 
-**Key Files**:
+**关键文件**：
 
-- [`task.model.ts`](src/app/features/tasks/task.model.ts) - Field definitions with JSDoc
-- [`task-shared-scheduling.reducer.ts`](src/app/root-store/meta/task-shared-meta-reducers/task-shared-scheduling.reducer.ts) - Write implementation
-- [`work-context.selectors.ts`](src/app/features/work-context/store/work-context.selectors.ts) - Read pattern
-- [`planner.selectors.ts`](src/app/features/planner/store/planner.selectors.ts) - Read pattern
-- [`task.selectors.ts`](src/app/features/tasks/store/task.selectors.ts) - Read pattern
+- [`task.model.ts`](src/app/features/tasks/task.model.ts) - 带 JSDoc 的字段定义
+- [`task-shared-scheduling.reducer.ts`](src/app/root-store/meta/task-shared-meta-reducers/task-shared-scheduling.reducer.ts) - 写入实现
+- [`work-context.selectors.ts`](src/app/features/work-context/store/work-context.selectors.ts) - 读取模式
+- [`planner.selectors.ts`](src/app/features/planner/store/planner.selectors.ts) - 读取模式
+- [`task.selectors.ts`](src/app/features/tasks/store/task.selectors.ts) - 读取模式
 
-**When to Update This Pattern**:
+**何时更新此模式**：
 
-- Adding new date/time scheduling fields
-- Modifying task scheduling logic
-- Working with task selectors that check due dates
-
----
-
-### 2. TODAY_TAG Virtual Tag Pattern
-
-**Status**: ✅ Active (established pattern)
-
-**Decision**: `TODAY_TAG` (ID: `'TODAY'`) is a **virtual tag** whose membership is determined by `task.dueWithTime` or `task.dueDay`, not by `task.tagIds`. The tag's `taskIds` field stores only the ordering of tasks, not membership.
-
-**Key Invariant**: `TODAY_TAG.id` must NEVER be added to `task.tagIds`
-
-**Rationale**:
-
-- Uniform move operations across all tags (virtual and regular)
-- Single source of truth for "today" membership (date fields, not tagIds)
-- Self-healing ordering (stale entries automatically filtered)
-- Natural integration with planner (which uses date fields)
-
-**Related**: Uses the dueDay/dueWithTime mutual exclusivity pattern (Decision #1)
-
-**Key Files**:
-
-- [`tag.const.ts`](src/app/features/tag/tag.const.ts) - TODAY_TAG definition
-- [`work-context.selectors.ts`](src/app/features/work-context/store/work-context.selectors.ts) - Membership computation
-- [`task-shared-helpers.ts`](src/app/root-store/meta/task-shared-meta-reducers/task-shared-helpers.ts) - Invariant enforcement
-
-**When to Update This Pattern**:
-
-- Adding new virtual tags
-- Modifying tag membership logic
-- Working with today's task list
+- 新增日期/时间排期字段
+- 修改任务排期逻辑
+- 处理检查到期日的任务 selectors
 
 ---
 
-### 3. Sync Package Boundary Direction
+### 2. TODAY_TAG 虚拟标签模式
 
-**Status**: ✅ Active (since May 2026)
+**状态**：✅ 现行（既有模式）
 
-**Decision**: Operation-log sync code is split by dependency direction:
-`src/app` composes host-specific wiring, `@sp/sync-providers` owns bundled
-provider implementations, and `@sp/sync-core` owns framework-agnostic reusable
-sync primitives.
+**决策**：`TODAY_TAG`（ID：`'TODAY'`）是一个**虚拟标签**，其成员关系由 `task.dueWithTime` 或 `task.dueDay` 决定，而非 `task.tagIds`。该标签的 `taskIds` 字段仅存储任务排序，不表示成员关系。
 
-**Rationale**:
+**关键不变量**：`TODAY_TAG.id` 绝不可加入 `task.tagIds`
 
-- Keeps reusable sync algorithms independent of Angular, NgRx, app models, and
-  provider implementations
-- Prevents provider IDs, app action/entity enums, validation schemas, UI, OAuth,
-  and platform bridges from leaking into the core engine package
-- Gives boundary lint a clear rule: packages never import app code, and
-  providers consume only public sync-core exports
+**理由**：
 
-**Implementation**:
+- 在所有标签（虚拟与普通）上统一移动操作
+- 「今天」成员关系的单一事实来源（日期字段，而非 tagIds）
+- 自愈式排序（过期条目自动过滤）
+- 与规划器（使用日期字段）自然集成
 
-- ESLint rejects Angular, NgRx, app, shared-schema, sync-core deep imports, and
-  dynamic imports inside package sources
-- `@sp/sync-core` has no runtime dependencies and owns vector-clock algorithms
-  used by client/server compatibility paths
-- `packages/shared-schema` compatibility-re-exports generic vector-clock
-  algorithms from `@sp/sync-core`; `@sp/sync-core` must not import
-  `@sp/shared-schema`
-- `@sp/sync-providers` depends on public `@sp/sync-core` plus provider runtime
-  helpers, while app factories inject credentials, platform bridges, validators,
-  OAuth routing, and config
+**相关**：使用 dueDay/dueWithTime 互斥模式（决策 #1）
 
-**Documentation**: [`docs/sync-and-op-log/package-boundaries.md`](docs/sync-and-op-log/package-boundaries.md)
+**关键文件**：
 
-**Key Files**:
+- [`tag.const.ts`](src/app/features/tag/tag.const.ts) - TODAY_TAG 定义
+- [`work-context.selectors.ts`](src/app/features/work-context/store/work-context.selectors.ts) - 成员关系计算
+- [`task-shared-helpers.ts`](src/app/root-store/meta/task-shared-meta-reducers/task-shared-helpers.ts) - 不变量强制
 
-- [`packages/sync-core/src/index.ts`](packages/sync-core/src/index.ts) - Core public API
-- [`packages/sync-providers/package.json`](packages/sync-providers/package.json) - Provider public exports
-- [`eslint.config.js`](eslint.config.js) - Package boundary enforcement
-- [`src/app/op-log/sync-providers/sync-providers.factory.ts`](src/app/op-log/sync-providers/sync-providers.factory.ts) - App-side provider composition
+**何时更新此模式**：
 
-**When to Update This Pattern**:
-
-- Moving sync code between app and packages
-- Adding a package export or dependency
-- Adding a provider implementation or plugin-facing provider contract
-- Changing vector-clock ownership or shared-schema compatibility
+- 新增虚拟标签
+- 修改标签成员关系逻辑
+- 处理今日任务列表
 
 ---
 
-### 4. Upload Conflict Safety via the lastSeq Row Lock Under RepeatableRead
+### 3. 同步包边界方向
 
-**Status**: ✅ Active (since May 2026; batch upload engine removed August 2026)
+**状态**：✅ 现行（自 2026 年 5 月）
 
-**Decision**: SuperSync uploads derive conflict-safety from the shared
-`user_sync_state.lastSeq` row write that reserves server sequence numbers, not
-from PostgreSQL RepeatableRead snapshot isolation alone.
+**决策**：Operation-log 同步代码按依赖方向拆分：
+`src/app` 组合宿主特定接线，`@sp/sync-providers` 拥有打包的提供方实现，
+`@sp/sync-core` 拥有与框架无关的可复用同步原语。
 
-**Note — batch upload engine deleted (2026-08, #9508)**: this decision was
-originally written for the batch upload engine (`processOperationBatch`,
-`prefetchLatestEntityOpsForBatch`, the `SUPERSYNC_BATCH_UPLOAD` flag). That
-engine was never enabled in production and was deleted rather than rolled out;
-the serial per-op path (`processOperation`) is the only upload engine. The
-invariant below is engine-neutral and applies unchanged to the serial path.
-The deleted batch code last lived at commit `924ddd7019`. Re-open condition:
-the batch engine processed a 25-op upload in ~10 SQL statements vs ~127 for
-serial — resurrect it (from that commit, re-reviewed) only if per-upload
-latency or transaction lock-hold time becomes a measured production problem.
+**理由**：
 
-**Rationale**:
+- 使可复用同步算法独立于 Angular、NgRx、应用模型与提供方实现
+- 防止提供方 ID、应用 action/实体枚举、校验 schema、UI、OAuth 与平台桥泄漏进核心引擎包
+- 为边界 lint 提供清晰规则：包永不导入应用代码，提供方只消费公共 sync-core 导出
 
-- PostgreSQL RepeatableRead does not provide full serializable snapshot isolation
-- Two concurrent upload transactions can both pass conflict checks when they
-  read the same pre-insert snapshot
-- Reserving sequence numbers through one `user_sync_state.lastSeq` row forces
-  accepted writers for the same user to serialize on that row lock
-- A causal `REPAIR` snapshot must prove that its state includes the current
-  server prefix; the same row serializes that base-cursor check with later writes
-- If two uploads race, the later writer blocks on the row and the transaction
-  retry path handles the serialization failure rather than silently accepting
-  conflicting operations
-- The serial path's post-allocation conflict re-check ("FIX 1.5", removed
-  2026-08; last lived at commit `07511ab45c`) was dead code: under
-  RepeatableRead both conflict checks read one snapshot fixed at the
-  transaction's first statement, and the `lastSeq` increment raises a
-  serialization failure (40001) against any committed concurrent upload
-  before a re-check could run. Lowering the isolation level below
-  REPEATABLE READ would require reinstating a post-allocation re-check.
+**实现**：
 
-**Implementation**:
+- ESLint 拒绝包源码中的 Angular、NgRx、app、shared-schema、sync-core 深层导入以及动态导入
+- `@sp/sync-core` 无运行时依赖，拥有客户端/服务端兼容路径所用的向量钟算法
+- `packages/shared-schema` 为兼容性而从 `@sp/sync-core` 再导出通用向量钟算法；`@sp/sync-core` 不得导入 `@sp/shared-schema`
+- `@sp/sync-providers` 依赖公共 `@sp/sync-core` 与提供方运行时辅助，而应用工厂注入凭证、平台桥、校验器、OAuth 路由与配置
 
-- An upsert ensures the `user_sync_state` row exists (`lastSeq: 0`); each
-  accepted operation then reserves its sequence number with an atomic
-  `update({ lastSeq: { increment: 1 } })` on that row
-  (`operation-upload.service.ts`)
-- The operation insert uses `createMany(..., skipDuplicates: true)`: a lost
-  duplicate-ID race surfaces as `count === 0` and is handled in-transaction
-  (sequence rolled back, op classified as `DUPLICATE_OPERATION`) rather than
-  aborting the whole upload with a unique-constraint error; only a non-ID
-  unique conflict aborts the transaction
-- `REPAIR` uploads persist `repairBaseServerSeq` on the operation row. The HTTP
-  handler rejects an obviously stale base before quota cleanup, and the upload
-  transaction repeats the check under `SELECT ... FOR UPDATE` before insertion
-- Regular uploads carrying `lastKnownServerSeq` use the same per-user row lock
-  to reject an upload behind the latest `SYNC_IMPORT` or `BACKUP_IMPORT` before
-  insertion. The durable replacement marker is reconciled lazily from retained
-  operations for rows created before the marker existed.
-- The marker carries **import** semantics — it forces a stale client to download
-  a replacement whose concurrent ops the client then drops. Only an import
-  advances it. The lazy reconcile falls back to the newest causal `REPAIR` purely
-  as a stand-in for an import row that pruning already deleted; a repair is not a
-  fence in its own right, and the client replays concurrent work on top of one
-  rather than dropping it
-- Markerless legacy repairs are compatibility records, not causal boundaries:
-  they cannot drive download fast-forward, snapshot trust, history pruning, or
-  server-generated restore points; snapshot replay across one fails closed
-- Removing or sharding the `lastSeq` write requires replacing this safety
-  mechanism with an equivalent per-user serialization primitive
+**文档**：[`docs/sync-and-op-log/package-boundaries.md`](docs/sync-and-op-log/package-boundaries.md)
 
-**Documentation**:
-[`packages/super-sync-server/docs/architecture.md`](packages/super-sync-server/docs/architecture.md),
+**关键文件**：
+
+- [`packages/sync-core/src/index.ts`](packages/sync-core/src/index.ts) - 核心公共 API
+- [`packages/sync-providers/package.json`](packages/sync-providers/package.json) - 提供方公共导出
+- [`eslint.config.js`](eslint.config.js) - 包边界强制
+- [`src/app/op-log/sync-providers/sync-providers.factory.ts`](src/app/op-log/sync-providers/sync-providers.factory.ts) - 应用侧提供方组合
+
+**何时更新此模式**：
+
+- 在应用与包之间移动同步代码
+- 新增包导出或依赖
+- 新增提供方实现或面向插件的提供方契约
+- 更改向量钟归属或 shared-schema 兼容性
+
+---
+
+### 4. 通过 RepeatableRead 下的 lastSeq 行锁实现上传冲突安全
+
+**状态**：✅ 现行（自 2026 年 5 月；批量上传引擎于 2026 年 8 月移除）
+
+**决策**：SuperSync 上传的冲突安全来自共享的
+`user_sync_state.lastSeq` 行写入（用于预留服务端序号），而非仅依赖
+PostgreSQL RepeatableRead 快照隔离。
+
+**注——批量上传引擎已删除（2026-08，#9508）**：本决策最初为批量上传引擎
+（`processOperationBatch`、`prefetchLatestEntityOpsForBatch`、
+`SUPERSYNC_BATCH_UPLOAD` 标志）撰写。该引擎从未在生产启用，后被删除而非上线；
+串行逐 op 路径（`processOperation`）是唯一的上传引擎。下方不变量与引擎无关，
+对串行路径同样适用。已删批量代码最后存在于提交 `924ddd7019`。重新开启条件：
+批量引擎处理 25-op 上传约需 ~10 条 SQL，串行约 ~127 条——仅当测得生产上的
+单次上传延迟或事务持锁时间成为问题时，才从该提交复活（并重新评审）。
+
+**理由**：
+
+- PostgreSQL RepeatableRead 不提供完整可串行化快照隔离
+- 两个并发上传事务在读取同一插入前快照时，都可能通过冲突检查
+- 通过一个 `user_sync_state.lastSeq` 行预留序号，迫使同一用户的被接受写入在该行锁上串行
+- 因果性 `REPAIR` 快照必须证明其状态包含当前服务端前缀；同一行将该基础游标检查与后续写入串行化
+- 若两次上传竞态，后写者在该行上阻塞，由事务重试路径处理序列化失败，而非静默接受冲突操作
+- 串行路径分配后的冲突复查（「FIX 1.5」，2026-08 移除；最后存在于提交 `07511ab45c`）是死代码：在 RepeatableRead 下两次冲突检查都读取事务第一条语句固定的同一快照，而 `lastSeq` 自增会在复查能运行之前对任何已提交的并发上传引发序列化失败（40001）。若将隔离级别降到 REPEATABLE READ 以下，则需要恢复分配后复查。
+
+**实现**：
+
+- upsert 确保存在 `user_sync_state` 行（`lastSeq: 0`）；每个被接受的操作随后通过该行上的原子 `update({ lastSeq: { increment: 1 } })` 预留序号（`operation-upload.service.ts`）
+- 操作插入使用 `createMany(..., skipDuplicates: true)`：丢失的重复 ID 竞态表现为 `count === 0`，在事务内处理（序号回滚，op 归类为 `DUPLICATE_OPERATION`），而不是因唯一约束错误中止整个上传；仅非 ID 唯一冲突才会中止事务
+- `REPAIR` 上传将 `repairBaseServerSeq` 持久化到操作行。HTTP 处理器在配额清理前拒绝明显过时的 base，上传事务在插入前于 `SELECT ... FOR UPDATE` 下重复检查
+- 携带 `lastKnownServerSeq` 的常规上传使用同一每用户行锁，在插入前拒绝落后于最新 `SYNC_IMPORT` 或 `BACKUP_IMPORT` 的上传。持久替换标记对标记存在前创建的行，从保留的操作中惰性调和。
+- 该标记携带**导入**语义——它迫使过时客户端下载替换内容，然后客户端丢弃其中的并发 ops。仅导入会推进它。惰性调和回退到最新因果 `REPAIR`，纯粹作为已被裁剪删除的导入行的替身；repair 本身不是围栏，客户端会在其上重放并发工作而非丢弃
+- 无标记的遗留 repair 是兼容记录，不是因果边界：它们不能驱动下载快进、快照信任、历史裁剪或服务端生成的恢复点；跨越其一的快照重放以失败关闭
+- 移除或分片 `lastSeq` 写入需要用等价的每用户串行化原语替换此安全机制
+
+**文档**：
+[`packages/super-sync-server/docs/architecture.md`](packages/super-sync-server/docs/architecture.md)，
 [`docs/sync-and-op-log/sync-architecture.html#transport`](docs/sync-and-op-log/sync-architecture.html#transport)
 
-**Key Files**:
+**关键文件**：
 
-- [`packages/super-sync-server/src/sync/sync.service.ts`](packages/super-sync-server/src/sync/sync.service.ts) - Upload transaction and sequencing primitive
+- [`packages/super-sync-server/src/sync/sync.service.ts`](packages/super-sync-server/src/sync/sync.service.ts) - 上传事务与序号原语
 - [`packages/super-sync-server/prisma/schema.prisma`](packages/super-sync-server/prisma/schema.prisma) - `user_sync_state.last_seq`
-- [`packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts`](packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts) - Real-PostgreSQL race coverage
+- [`packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts`](packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts) - 真实 PostgreSQL 竞态覆盖
 
-**When to Update This Pattern**:
+**何时更新此模式**：
 
-- Changing upload conflict detection
-- Changing server sequence assignment
-- Changing transaction isolation for upload operations
-- Changing repair base-cursor validation or full-state history pruning
-- Changing the state-replacement upload fence
-- Introducing multi-writer or multi-region upload processing
+- 更改上传冲突检测
+- 更改服务端序号分配
+- 更改上传操作的事务隔离级别
+- 更改 repair 基础游标校验或全状态历史裁剪
+- 更改状态替换上传围栏
+- 引入多写者或多区域上传处理
 
 ---
 
-### 5. Project Completion: Decoupled Resolution over Atomic Multi-Entity Op
+### 5. 项目完成：解耦解析，而非原子多实体 Op
 
-**Status**: ✅ Active (since 2026-06-06, branch `feat/completing-projects-48eeb4`)
+**状态**：✅ 现行（自 2026-06-06，分支 `feat/completing-projects-48eeb4`）
 
-**Decision**: "Complete project" is a **plain single-entity `PROJECT` flag flip** (`completeProject`, `OpType.Update`, mirroring `archiveProject` → sets `isDone`/`doneOn`/`isArchived`). The accompanying resolution of unfinished tasks ("move to Inbox" / "mark done") runs **first, as the normal per-task actions** (`moveToOtherProject` / `updateTask isDone`) dispatched in a loop with the Rule&nbsp;#6 bulk-dispatch flush — **not** bundled into a single atomic multi-entity op.
+**决策**：「完成项目」是一次**普通的单实体 `PROJECT` 标志翻转**（`completeProject`，`OpType.Update`，镜像 `archiveProject` → 设置 `isDone`/`doneOn`/`isArchived`）。伴随的未完成任务解析（「移到收件箱」/「标为完成」）**先**以**普通的逐任务 actions**（`moveToOtherProject` / `updateTask isDone`）在循环中 dispatch，并配合规则 #6 的批量 dispatch flush——**不**捆绑进单个原子多实体 op。
 
-**Rationale**: An earlier iteration made completion one atomic `Batch` op (`completeProject`) that marked/moved tasks inside the project-shared meta-reducer. Because that op deliberately routed **around** the normal per-task actions, every system that observes those actions had to be re-taught about `completeProject` separately:
+**理由**：早期迭代将完成做成一个原子 `Batch` op（`completeProject`），在项目共享 meta-reducer 内标记/移动任务。因为该 op 有意**绕过**普通逐任务 actions，所有观察那些 actions 的系统都必须单独再学会 `completeProject`：
 
-- **Conflict detection** needed a whole new `affectedEntities` multi-entity-ref feature threaded through sync-core, the sync server (+ a Prisma migration), shared-schema and the op-log — ~1,565 LOC, of which `completeProject` was the **only** producer.
-- **Native-reminder cancellation**, **issue two-way-sync**, **time-block sync** and **repeat-cfg** effects each needed a dedicated `completeProject` listener to re-derive the task changes the atomic op skipped.
+- **冲突检测**需要整套新的 `affectedEntities` 多实体引用特性贯穿 sync-core、同步服务器（+ Prisma 迁移）、shared-schema 与 op-log——约 1,565 LOC，而 `completeProject` 是**唯一**生产者。
+- **原生提醒取消**、**issue 双向同步**、**时间块同步**与 **repeat-cfg** effects 各自需要专用的 `completeProject` 监听器，以重新推导原子 op 跳过的任务变更。
 
-The atomic op's headline benefit — reversing the whole thing as one unit — was never realized: `reopenProject` only clears the project flags; it does **not** un-move or un-complete the resolved tasks. So the bundle paid a large cross-cutting cost for an undo guarantee it didn't provide. Decoupling makes the existing effects and per-entity conflict detection fire naturally and deletes ~1,750 LOC total (revert + decouple). Trade-off accepted: completion now emits **N+1 ops** (one per resolved task + the flag flip) instead of one, and there is a brief intermediate state — both fine for a rare, user-initiated action whose resolution is not atomically reversible anyway. One behavioral nuance vs. the old atomic op: when unfinished work is **moved to Inbox**, a task that was being actively tracked stays the current task (it was carried forward, not finished — consistent with Inbox's carry-forward intent); the **mark-done** path stops tracking the current task via the existing `autoSetNextTask$` effect. The atomic op cleared the current task in both cases; the decoupled design intentionally keeps it for the carry-forward case.
+原子 op 的头条收益——整件事作为一单位撤销——从未实现：`reopenProject` 只清除项目标志；它**不会**撤销移动或撤销完成已解析任务。因此该捆绑为未兑现的撤销保证付出了巨大的横切成本。解耦使既有效应与按实体冲突检测自然触发，并总共删除约 1,750 LOC（回退 + 解耦）。接受的权衡：完成现在发出 **N+1 个 ops**（每个被解析任务一个 + 标志翻转），并存在短暂中间状态——对于罕见、由用户发起、且解析本身反正无法原子撤销的动作来说都可接受。相对旧原子 op 的一个行为细微差别：当未完成工作**移到收件箱**时，正在被追踪的任务仍保持为当前任务（它被前移而非完成——与收件箱前移意图一致）；**标为完成**路径通过既有 `autoSetNextTask$` effect 停止追踪当前任务。原子 op 在两种情况下都清除当前任务；解耦设计有意在前移场景下保留它。
 
-**Implementation**:
+**实现**：
 
-- **Action/reducer**: `completeProject({ id, doneOn })` in `project.actions.ts`; `on(completeProject)` flag flip in `project.reducer.ts` (guards `INBOX_PROJECT`). `reopenProject` clears the flags only.
-- **Service**: `ProjectService.complete(id, doneOn)` dispatches the flag flip; `moveTasksToInbox()` / `markTasksDone()` loop the normal per-task actions + `setTimeout(0)` flush.
-- **Flow**: `work-context-menu` resolves unfinished work **before** calling `complete()`.
-- **Do NOT** reintroduce a multi-entity `completeProject` op or `affectedEntities` for it without re-justifying the full downstream cost above. Prior atomic implementation is preserved in history at commit `0893a86162`.
+- **Action/reducer**：`completeProject({ id, doneOn })` 在 `project.actions.ts`；`on(completeProject)` 在 `project.reducer.ts` 中翻转标志（守卫 `INBOX_PROJECT`）。`reopenProject` 仅清除标志。
+- **服务**：`ProjectService.complete(id, doneOn)` dispatch 标志翻转；`moveTasksToInbox()` / `markTasksDone()` 循环普通逐任务 actions + `setTimeout(0)` flush。
+- **流程**：`work-context-menu` 在调用 `complete()` **之前**解析未完成工作。
+- **不要**在未重新论证上述全部下游成本的情况下，重新引入多实体 `completeProject` op 或其 `affectedEntities`。先前原子实现保留在提交 `0893a86162` 的历史中。
 
-**Key Files**:
+**关键文件**：
 
-- [`project.actions.ts`](src/app/features/project/store/project.actions.ts), [`project.reducer.ts`](src/app/features/project/store/project.reducer.ts)
+- [`project.actions.ts`](src/app/features/project/store/project.actions.ts)，[`project.reducer.ts`](src/app/features/project/store/project.reducer.ts)
 - [`project.service.ts`](src/app/features/project/project.service.ts) — `complete` / `moveTasksToInbox` / `markTasksDone`
-- [`work-context-menu.component.ts`](src/app/core-ui/work-context-menu/work-context-menu.component.ts) — `completeProject()` flow
+- [`work-context-menu.component.ts`](src/app/core-ui/work-context-menu/work-context-menu.component.ts) — `completeProject()` 流程
 
-**When to Update This Decision**:
+**何时更新此决策**：
 
-- Adding a true bulk meta-reducer action for general use (revisit whether completion should adopt it)
-- Reworking how completion resolves unfinished tasks
-- Any proposal to make completion a single synced op again
+- 新增通用批量 meta-reducer action（重新评估完成是否应采用）
+- 重做完成如何解析未完成任务
+- 任何再次将完成做成单个同步 op 的提案
 
 ---
 
-### 6. Passkeys Stay Pending Until Email Verification
+### 6. Passkey 在邮箱验证前保持待定
 
-**Status**: ✅ Active (since July 2026)
+**状态**：✅ 现行（自 2026 年 7 月）
 
-**Decision**: A passkey submitted during account registration is stored as a
-`PendingPasskeyRegistration` tied to its exact email-verification token. It is
-promoted to the user's active `Passkey` set only when that token is consumed.
+**决策**：账户注册期间提交的 passkey 存为与精确邮箱验证令牌绑定的
+`PendingPasskeyRegistration`。仅当该令牌被消费时，才提升为用户的活跃
+`Passkey` 集合。
 
-**Rationale**:
+**理由**：
 
-- A WebAuthn registration ceremony proves possession of a credential, not
-  ownership of the email address entered alongside it.
-- Storing a submitted credential directly on an unverified user lets an attacker
-  pre-register a victim's address, then have the victim's later magic-link
-  verification activate the attacker's passkey.
-- Keeping separate pending attempts prevents concurrent registrations from
-  replacing or activating one another. The email owner chooses the credential
-  by consuming the link produced by that same registration attempt.
-- Failed email delivery leaves the bounded, expiring pending attempt in place.
-  Deleting the shared unverified user can race a concurrent registration and
-  invalidate a link that was successfully delivered.
+- WebAuthn 注册仪式证明持有凭证，而非伴随输入的邮箱地址的所有权。
+- 若将提交的凭证直接存到未验证用户上，攻击者可预注册受害者地址，然后让受害者稍后的魔法链接验证激活攻击者的 passkey。
+- 分开保存待定尝试可防止并发注册互相替换或激活。邮箱所有者通过消费同一注册尝试产生的链接来选择凭证。
+- 邮件投递失败时，有界且会过期的待定尝试仍保留。删除共享的未验证用户可能与并发注册竞态，并使已成功投递的链接失效。
 
-**Implementation**:
+**实现**：
 
-- Passkey registration stores no active credential and creates one pending row
-  per verification token.
-- Email verification atomically claims the unverified user, replaces active
-  passkeys with the credential bound to that token, and deletes the user's
-  remaining pending attempts.
-- Passkey verification tokens live only on pending registrations; user-row
-  verification tokens belong to magic-link registrations. Consuming a user-row
-  token verifies the email but removes untrusted active and pending passkeys.
-- The migration moves the latest legacy credential for each unverified user to
-  the pending table and removes all active credentials from unverified users.
-- The resend cap bounds pending rows per unverified account; rows also expire
-  with their verification tokens.
+- Passkey 注册不存储活跃凭证，并为每个验证令牌创建一条待定行。
+- 邮箱验证原子地认领未验证用户，用绑定到该令牌的凭证替换活跃 passkeys，并删除该用户其余待定尝试。
+- Passkey 验证令牌仅存在于待定注册上；用户行上的验证令牌属于魔法链接注册。消费用户行令牌会验证邮箱，但会移除不可信的活跃与待定 passkeys。
+- 迁移将每个未验证用户最新的遗留凭证移到待定表，并从未验证用户移除所有活跃凭证。
+- 重发上限限制每个未验证账户的待定行数；行也会随验证令牌过期。
 
-**Key Files**:
+**关键文件**：
 
 - [`auth.ts`](packages/super-sync-server/src/auth.ts)
 - [`passkey.ts`](packages/super-sync-server/src/passkey.ts)
 - [`schema.prisma`](packages/super-sync-server/prisma/schema.prisma)
 
-**When to Update This Pattern**:
+**何时更新此模式**：
 
-- Changing passkey enrollment or email-verification flows
-- Adding another credential type to registration
-- Changing verification-token persistence or cleanup
+- 更改 passkey 注册或邮箱验证流程
+- 向注册添加另一种凭证类型
+- 更改验证令牌持久化或清理
 
 ---
 
-### 7. Versioned Delete-Wins Semantics for Project Deletion
+### 7. 项目删除的版本化 Delete-Wins 语义
 
-**Status**: ✅ Active (since July 2026)
+**状态**：✅ 现行（自 2026 年 7 月）
 
-**Decision**: Project deletions created with schema v4 or newer carry an explicit
-`projectDeleteWins` marker and beat concurrent project updates. Historical,
-unmarked deletions keep timestamp-based LWW semantics.
+**决策**：以 schema v4 或更新创建的项目删除携带显式
+`projectDeleteWins` 标记，并击败并发的项目更新。历史性、无标记的删除保留基于时间戳的 LWW 语义。
 
-This is a deliberate semantic trade-off: a concurrent project rename or field
-edit that is vector-clock CONCURRENT with a marked delete **loses**, regardless
-of which has the newer wall-clock timestamp. Deleting an entity another device is
-editing wins over the edit — the alternative (timestamp LWW) resurrects an empty
-project shell and silently loses its task subtree. The lost edit is only
-recoverable via local undo, not via sync.
+这是刻意的语义权衡：与带标记删除向量钟 CONCURRENT 的并发项目重命名或字段编辑
+**会输**，无论哪边墙钟时间戳更新。删除一个另一设备正在编辑的实体优先于编辑——替代方案（时间戳 LWW）会复活空的项目壳并静默丢失其任务子树。丢失的编辑只能通过本地撤销恢复，不能通过同步。
 
-**Rationale**:
+**理由**：
 
-- `deleteProject` is one user intent whose reducer cascade removes the project,
-  active tasks, notes, sections, repeat configuration, and related archive data.
-  Reversing only the project entity after that operation loses data and violates
-  replay determinism.
-- Capturing every cascaded entity in the delete payload or emitting restoration
-  sidecars makes payload size scale with project size and still cannot restore
-  every side effect safely.
-- Deletion is the only complete, deterministic result already represented by the
-  operation. A concurrent rename or project-field edit must not partially undo it.
-- The schema-v4 barrier makes clients that do not understand this conflict policy
-  stop before applying the operation (they block on the newer-schema gate rather
-  than mis-resolving). The **absence** of the payload marker on historical
-  deletions — never added by the no-op v3→v4 migration — is what preserves their
-  timestamp-LWW semantics; the marker, not the version number, is the real
-  discriminator. The classifier additionally requires the marked delete's
-  plaintext `entityId` to match its authenticated payload `projectId`, so a
-  tampered/replayed delete retargeted onto a live entity cannot win.
+- `deleteProject` 是一次用户意图，其 reducer 级联移除项目、活跃任务、笔记、分区、重复配置及相关归档数据。在该操作之后仅反转项目实体会丢数据并违反重放确定性。
+- 在删除载荷中捕获每个级联实体或发出恢复侧车，会使载荷大小随项目规模增长，且仍无法安全恢复每种副作用。
+- 删除是操作已表示的唯一完整、确定结果。并发重命名或项目字段编辑不得部分撤销它。
+- Schema-v4 屏障使不理解此冲突策略的客户端在应用操作前停止（它们阻塞在更新 schema 门上，而非错误解析）。历史删除上**没有**载荷标记——v3→v4 空操作迁移从未添加——才是保留其时间戳-LWW 语义的原因；真正的判别器是标记，不是版本号。分类器还要求带标记删除的明文 `entityId` 匹配其经认证载荷的 `projectId`，因此被篡改/重放并改指向到存活实体的删除不能获胜。
 
-**Implementation**:
+**实现**：
 
-- New `deleteProject` actions include `projectDeleteWins: true`; replacement
-  delete operations preserve that payload.
-- The shared LWW planner accepts a host-supplied delete-wins classifier. A remote
-  marked delete is applied regardless of timestamps. A local marked delete is
-  replaced with one operation whose vector clock dominates both conflict sides.
-- SuperSync keeps its generic conflict protocol: if the first delete upload is
-  rejected, the existing retry path uploads the causally dominant replacement.
-  File-based providers use the same client planner and marker.
-- Do not add per-task/note restoration operations or project-sized snapshots to
-  compensate a losing marked project delete.
+- 新的 `deleteProject` actions 包含 `projectDeleteWins: true`；替换删除操作保留该载荷。
+- 共享 LWW planner 接受宿主提供的 delete-wins 分类器。远程带标记删除无论时间戳都会应用。本地带标记删除替换为向量钟支配双方冲突的一个操作。
+- SuperSync 保持其通用冲突协议：若首次删除上传被拒绝，既有重试路径上传因果占优的替换。基于文件的提供方使用相同的客户端 planner 与标记。
+- 不要为补偿输掉的带标记项目删除而添加按任务/笔记的恢复操作或项目规模快照。
 
-**Key Files**:
+**关键文件**：
 
-- [`task-shared.actions.ts`](src/app/root-store/meta/task-shared.actions.ts) — the `PROJECT_DELETE_WINS_MARKER` producer
+- [`task-shared.actions.ts`](src/app/root-store/meta/task-shared.actions.ts) — `PROJECT_DELETE_WINS_MARKER` 生产者
 - [`conflict-resolution.ts`](packages/sync-core/src/conflict-resolution.ts)
-- [`conflict-resolution.service.ts`](src/app/op-log/sync/conflict-resolution.service.ts) — the delete-wins classifier
+- [`conflict-resolution.service.ts`](src/app/op-log/sync/conflict-resolution.service.ts) — delete-wins 分类器
 - [`schema-version.ts`](packages/shared-schema/src/schema-version.ts)
-- [`project-delete-wins-barrier-v3-to-v4.ts`](packages/shared-schema/src/migrations/project-delete-wins-barrier-v3-to-v4.ts) (registered in [`migrations/index.ts`](packages/shared-schema/src/migrations/index.ts))
+- [`project-delete-wins-barrier-v3-to-v4.ts`](packages/shared-schema/src/migrations/project-delete-wins-barrier-v3-to-v4.ts)（注册于 [`migrations/index.ts`](packages/shared-schema/src/migrations/index.ts)）
 
-**When to Update This Pattern**:
+**何时更新此模式**：
 
-- Changing the cascade performed by `deleteProject`
-- Adding another operation with delete-wins conflict semantics
-- Changing schema compatibility or LWW replacement behavior
-
----
-
-### 8. Additive Data-Model Evolution over Schema Bumps
-
-**Status**: ✅ Active (since August 2026)
-
-**Decision**: Persisted and synced data evolves **additively**. Pick the change
-channel by what actually changed (table below). Do not raise
-`CURRENT_SCHEMA_VERSION` unless a change is **both** inexpressible as an additive
-or derived field **and** would be _misapplied_ — not merely ignored — by older
-clients. This is the constructive counterpart to the bump policy (sync rule 10),
-which says when not to bump but not what to do instead.
-
-| What changed                                                   | Channel                                                               | Precedent                                              |
-| -------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------ |
-| Local storage layout (stores, indexes, derived meta)           | `DB_VERSION` ladder — local only, never transmitted                   | `db-upgrade.ts` v7 seeds the full-state-ops meta store |
-| Shape of stored state (new field, legacy key, changed default) | Read-time normalization in the `loadAllData` reducer                  | `migrateFocusModeConfig`, `migrateKeyboardConfig`      |
-| Representation of an existing **synced** field                 | Dual field — new field wins, legacy re-derived from it on every write | `normalizeStartOfNextDayConfig`                        |
-| Semantics of an operation                                      | Payload marker / envelope, inert on older clients                     | `LwwUpdatePayload`; the v4 `projectDeleteWins` marker  |
-
-**Rationale**:
-
-- A bump fences only receivers that ship _after_ it. Released v17.0.0–v18.14.0
-  clients apply ops up to schema 5 unmigrated and, at ≥ 6, block them while still
-  advancing the cursor — permanently skipping them. A bump therefore never buys
-  safety against the clients actually writing today's data.
-- It cannot be reverted once any op carries the new version, and it hard-blocks
-  every lagging post-v18.14.0 client on a frozen cursor.
-- The legacy fleet does not age out on its own: there is **no desktop
-  auto-updater** (the block in `electron/start-app.ts` is commented out) and the
-  update banner's dismissal is persisted. Any policy gated on "wait for the old
-  fleet to shrink" is a permanent no in disguise.
-- Additive fields are safe by construction here: typia uses `createValidate`
-  (excess properties are neither rejected nor stripped) and LWW patch application
-  goes through `updateOne`, a shallow merge that retains unknown keys. **Renames
-  and removals are the dangerous shape** — an old client that wins a conflict
-  re-emits the entity without the field, destroying it fleet-wide — and no bump
-  prevents that, because old clients keep writing regardless.
-
-**Evaluation record (2026-08)**: raising `CURRENT_SCHEMA_VERSION` to 5 was
-considered and **declined**. Neither candidate motivation survived: the
-accumulated optional-field/runtime-default debt needs no migration (that pattern
-_is_ the answer, per sync rule 11), and the typed RRULE recurrence model can ship
-as an additive field while the flat fields stay canonical and re-derived — see
-#9664, which also corrects that plan's inverted cross-version gate. A migration
-with no payload is pure cost.
-
-**Implementation**: no new machinery — each channel above already exists and has
-a shipped precedent.
-
-**Documentation**: [Bump Policy §A.7.11](docs/sync-and-op-log/operation-log-architecture.md#bump-policy--a-bump-does-not-protect-the-released-fleet), [`persisted-model-fields.md`](docs/sync-and-op-log/persisted-model-fields.md), `AGENTS.md` sync rules 10 and 11
-
-**Key Files**:
-
-- [`schema-version.ts`](packages/shared-schema/src/schema-version.ts) — the constant and its bump warning
-- [`normalize-start-of-next-day-config.ts`](src/app/features/config/normalize-start-of-next-day-config.ts) — the dual-field template
-- [`global-config.reducer.ts`](src/app/features/config/store/global-config.reducer.ts) — read-time normalization at `loadAllData`
-- [`db-upgrade.ts`](src/app/op-log/persistence/db-upgrade.ts) / [`db-keys.const.ts`](src/app/op-log/persistence/db-keys.const.ts) — the local-only version ladder
-
-**When to Update This Pattern**:
-
-- A change genuinely requires removing or renaming a synced field
-- `CURRENT_SCHEMA_VERSION` is raised (record what earned it)
-- A desktop auto-updater ships — it changes the fleet assumption this rests on
+- 更改 `deleteProject` 执行的级联
+- 添加另一个具有 delete-wins 冲突语义的操作
+- 更改 schema 兼容性或 LWW 替换行为
 
 ---
 
-### 9. Calendar Writes Live in Plugins, Behind Per-Provider Opt-In
+### 8. 优先加性数据模型演进，而非 Schema 升版
 
-**Status**: ✅ Active (recorded 2026-08; describes the boundary that shipped 2026-03 in `3e2265fa57` / `020fd56504`)
+**状态**：✅ 现行（自 2026 年 8 月）
 
-**Decision**: Super Productivity is never the authority for calendar state. It
-reads calendars to show the day's commitments, and it may write a _mirror_ of a
-scheduled task back — but only through a **plugin issue provider** that opts into
-the `timeBlock` contract, and only when the user has enabled that provider's
-auto-time-blocking setting. Core code contains no calendar write path.
+**决策**：持久化与同步数据**加性**演进。按实际变更选择变更通道（见下表）。除非变更**既**无法表达为加性或派生字段，**又**会被旧客户端_误用_——而不仅仅是忽略——否则不要升高 `CURRENT_SCHEMA_VERSION`。这是 bump 策略（同步规则 10）的建设性对应物：后者说何时不升版，但不说改做什么。
 
-The boundary today:
+| 变更内容                                                         | 通道                                                                    | 先例                                                     |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------- |
+| 本地存储布局（stores、indexes、派生 meta）                       | `DB_VERSION` 阶梯——仅本地，永不传输                                     | `db-upgrade.ts` v7 播种 full-state-ops meta store        |
+| 存储状态的形态（新字段、遗留键、默认值变更）                     | `loadAllData` reducer 中的读时规范化                                    | `migrateFocusModeConfig`、`migrateKeyboardConfig`        |
+| 既有**已同步**字段的表示                                         | 双字段——新字段胜出，每次写入时从新字段重派生遗留字段                    | `normalizeStartOfNextDayConfig`                          |
+| 操作语义                                                         | 载荷标记 / 信封，在旧客户端上惰性                                       | `LwwUpdatePayload`；v4 `projectDeleteWins` 标记          |
 
-| Surface                                                                                            | Writes?                           |
-| -------------------------------------------------------------------------------------------------- | --------------------------------- |
-| Built-in iCal/CalDAV URL feeds (`src/app/features/schedule/ical/`)                                 | No — poll and parse only          |
-| Built-in issue providers (`src/app/features/issue/providers/*`)                                    | No — none implement `timeBlock`   |
-| Plugin providers implementing `timeBlock` (`google-calendar-provider`, `caldav-calendar-provider`) | Yes, when `isAutoTimeBlock` is on |
+**理由**：
 
-**Rationale**:
+- 升版只围住_之后_发布的接收方。已发布的 v17.0.0–v18.14.0 客户端对 schema 5 及以下未迁移地应用 ops，并在 ≥ 6 时丢弃它们却仍推进游标——永久跳过。因此升版从未买到对真正在写今日数据的客户端的安全。
+- 一旦任何 op 携带新版本就无法回退，并硬阻塞每个滞后的 post-v18.14.0 客户端于冻结游标。
+- 遗留机群不会自行老化：桌面**没有自动更新器**（`electron/start-app.ts` 中的相关代码被注释），且更新横幅的关闭会被持久化。任何「等旧机群缩小」的策略实质是永久否定。
+- 加性字段在此构造上安全：typia 使用 `createValidate`（多余属性既不拒绝也不剥离），LWW 补丁应用走 `updateOne`，浅合并保留未知键。**重命名与删除才是危险形态**——赢得冲突的旧客户端会重发缺少该字段的实体，在整个机群摧毁它——而没有任何升版能阻止，因为旧客户端无论如何都会继续写入。
 
-- **A time block is a projection, not a synced entity.** `TimeBlockSyncEffects`
-  pushes task state one way — schedule, reschedule, title, estimate, done, delete
-  — into an event the app itself created. It never reconciles a user's edit of
-  that event back into the task, and it never touches events the app did not
-  create. That keeps the flow one-directional even though it writes, which is what
-  avoids the sync loop a true bidirectional design has to solve.
-- **Off by default, per provider.** `isAutoTimeBlock` is an unchecked box on the
-  provider's config form. Writing into someone's calendar is not something to
-  infer from an integration merely being connected (manifesto: opt-in, quiet by
-  default).
-- **Plugins are the right home.** Every write path needs OAuth, per-vendor event
-  shapes, and vendor-specific throttling. Keeping that in `packages/plugin-dev/`
-  behind the `timeBlock` contract means core carries no vendor API surface, and a
-  broken provider degrades to read-only rather than breaking the app.
-- **What is still excluded.** No reconciliation of external event edits into task
-  state, no adoption of pre-existing calendar events, and no per-occurrence
-  recurring-event editing (`RECURRENCE-ID`/`EXDATE`, #8148). These are the parts
-  that would require answering conflict resolution between vector clocks and
-  ETags, and they remain unbuilt — see #5001 for the open bidirectional request.
+**评估记录（2026-08）**：将 `CURRENT_SCHEMA_VERSION` 升到 5 被考虑并**拒绝**。候选动机均未成立：累积的可选字段/运行时默认债务无需迁移（该模式_就是_答案，见同步规则 11）；类型化 RRULE 重复模型可作为加性字段上线，同时扁平字段保持权威并重派生——见 #9664，它也纠正了该计划颠倒的跨版本门。无载荷的迁移是纯成本。
 
-**Implementation**:
+**实现**：无新机制——上表各通道均已存在并有已上线先例。
 
-- Contract: `timeBlock: { upsertEvent, deleteEvent }` in
+**文档**：[Bump Policy §A.7.11](docs/sync-and-op-log/operation-log-architecture.md#bump-policy--a-bump-does-not-protect-the-released-fleet)，[`persisted-model-fields.md`](docs/sync-and-op-log/persisted-model-fields.md)，`AGENTS.md` 同步规则 10 与 11
+
+**关键文件**：
+
+- [`schema-version.ts`](packages/shared-schema/src/schema-version.ts) — 常量及其升版警告
+- [`normalize-start-of-next-day-config.ts`](src/app/features/config/normalize-start-of-next-day-config.ts) — 双字段模板
+- [`global-config.reducer.ts`](src/app/features/config/store/global-config.reducer.ts) — `loadAllData` 处的读时规范化
+- [`db-upgrade.ts`](src/app/op-log/persistence/db-upgrade.ts) / [`db-keys.const.ts`](src/app/op-log/persistence/db-keys.const.ts) — 仅本地版本阶梯
+
+**何时更新此模式**：
+
+- 变更真正需要删除或重命名已同步字段
+- 升高 `CURRENT_SCHEMA_VERSION`（记录是什么赢得了升版）
+- 桌面自动更新器上线——会改变本决策所依赖的机群假设
+
+---
+
+### 9. 日历写入位于插件中，且按提供方选择加入
+
+**状态**：✅ 现行（记录于 2026-08；描述的边界于 2026-03 在 `3e2265fa57` / `020fd56504` 上线）
+
+**决策**：Super Productivity 永远不是日历状态的权威。它读取日历以展示当日安排，并可写回已排期任务的_镜像_——但仅通过选择加入 `timeBlock` 契约的**插件 issue 提供方**，且仅当用户启用了该提供方的自动时间块设置时。核心代码不含日历写入路径。
+
+今日边界：
+
+| 表面                                                                                            | 写入？                              |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 内置 iCal/CalDAV URL 订阅（`src/app/features/schedule/ical/`）                                  | 否——仅轮询与解析                    |
+| 内置 issue 提供方（`src/app/features/issue/providers/*`）                                       | 否——无一实现 `timeBlock`            |
+| 实现 `timeBlock` 的插件提供方（`google-calendar-provider`、`caldav-calendar-provider`）         | 是，当 `isAutoTimeBlock` 开启时     |
+
+**理由**：
+
+- **时间块是投影，不是同步实体。** `TimeBlockSyncEffects` 单向推送任务状态——排期、改期、标题、预估、完成、删除——到应用自己创建的事件。它从不把用户对该事件的编辑调和回任务，也从不触碰应用未创建的事件。即便有写入，流仍保持单向，从而避免真双向设计必须解决的同步环。
+- **默认关闭，按提供方。** `isAutoTimeBlock` 是提供方配置表单上未勾选的框。写入某人的日历不应仅因集成已连接就推断（宣言：选择加入，默认安静）。
+- **插件是正确归属。** 每条写入路径都需要 OAuth、按厂商的事件形态与厂商特定限流。放在 `packages/plugin-dev/` 并置于 `timeBlock` 契约之后，意味着核心不携带厂商 API 表面，坏掉的提供方降级为只读而非弄坏应用。
+- **仍排除的内容。** 不把外部事件编辑调和回任务状态，不收养预先存在的日历事件，也不做按出现次的重复事件编辑（`RECURRENCE-ID`/`EXDATE`，#8148）。这些部分需要回答向量钟与 ETag 之间的冲突解析，仍未构建——见 #5001 的开放双向请求。
+
+**实现**：
+
+- 契约：`timeBlock: { upsertEvent, deleteEvent }` 于
   [`packages/plugin-api/src/issue-provider-types.ts`](packages/plugin-api/src/issue-provider-types.ts)
-- Driver: [`time-block-sync.effects.ts`](src/app/features/calendar-integration/time-block/time-block-sync.effects.ts),
-  registered in [`feature-stores.module.ts`](src/app/root-store/feature-stores.module.ts)
-- Manual per-event actions (reschedule, delete): [`calendar-event-actions.service.ts`](src/app/features/calendar-integration/calendar-event-actions.service.ts)
-- Events themselves are **not** op-log entities — a converted task is an ordinary
-  task with a derived stable id
-  ([`generate-calendar-task-id.ts`](src/app/features/calendar-integration/generate-calendar-task-id.ts)).
-  Provider _configuration_ does sync (`ISSUE_PROVIDER` in
-  [`entity-registry.ts`](src/app/op-log/core/entity-registry.ts)).
+- 驱动：[`time-block-sync.effects.ts`](src/app/features/calendar-integration/time-block/time-block-sync.effects.ts)，
+  注册于 [`feature-stores.module.ts`](src/app/root-store/feature-stores.module.ts)
+- 手动按事件操作（改期、删除）：[`calendar-event-actions.service.ts`](src/app/features/calendar-integration/calendar-event-actions.service.ts)
+- 事件本身**不是** op-log 实体——转换后的任务是带派生稳定 id 的普通任务
+  （[`generate-calendar-task-id.ts`](src/app/features/calendar-integration/generate-calendar-task-id.ts)）。
+  提供方_配置_会同步（`ISSUE_PROVIDER` 于
+  [`entity-registry.ts`](src/app/op-log/core/entity-registry.ts)）。
 
-**When to Update This Pattern**:
+**何时更新此模式**：
 
-- A core (non-plugin) calendar write path is proposed — that crosses the boundary
-  this record draws
-- Reconciling external event edits back into task state is proposed (#5001) — that
-  needs the ETag-vs-vector-clock conflict story written down first
-- Per-occurrence recurring edits land (#8148)
+- 提出核心（非插件）日历写入路径——那越过本记录划定的边界
+- 提出把外部事件编辑调和回任务状态（#5001）——需先写下 ETag vs 向量钟冲突故事
+- 按出现次的重复编辑落地（#8148）
 
 ---
 
-### 10. Vector Clocks over Server-Side Entity Versioning
+### 10. 向量钟优先于服务端实体版本化
 
-**Status**: ✅ Active (recorded 2026-08; the alternative design is `git show 07511ab45c:docs/long-term-plans/server-side-entity-versioning.md`)
+**状态**：✅ 现行（记录于 2026-08；替代设计见 `git show 07511ab45c:docs/long-term-plans/server-side-entity-versioning.md`）
 
-**Decision**: Conflict detection stays on **vector clocks**, pruned to
-`MAX_VECTOR_CLOCK_SIZE = 20`. Server-side per-entity version counters (optimistic
-concurrency control, the shape every centralized API uses) were designed in full
-and are **not being built**. The design was never rejected on its merits by a
-maintainer decision — it is recorded here as declined-by-default, because nothing
-has yet justified its cost.
+**决策**：冲突检测保持在**向量钟**上，裁剪至
+`MAX_VECTOR_CLOCK_SIZE = 20`。服务端按实体版本计数器（乐观并发控制，每个中心化 API 使用的形态）已完整设计，但**不会构建**。该设计从未因维护者对其优点的否决而被拒绝——在此记录为默认拒绝，因为尚无任何东西证明其成本值得。
 
-**Rationale**:
+**理由**：
 
-- **The problem it solves is not observed.** Pruning only discards causal
-  information once 21+ distinct client IDs have touched a clock. For a personal
-  deep-work tool that is not a realistic fleet, and the one edge case that did bite
-  — an import client mispruning against its own ops — is already handled by a
-  same-client check.
-- **It would make the server the source of truth, not just the referee.** The
-  SuperSync server already detects conflicts (`detectConflict` in
-  `packages/super-sync-server/src/sync/conflict.ts`), but it does so by comparing
-  clocks the _clients_ authored — the causal history stays client-owned. Entity
-  versioning moves that authority into the server. File-based providers (WebDAV,
-  Dropbox, local file) have no server to run it, so the vector-clock path must
-  survive regardless, and we would maintain **two** conflict systems instead of
-  one.
-- **The migration is the expensive half.** It needs a new server table, a wire
-  protocol change, a backfill for every existing entity, and a mixed-fleet window
-  where old (clock-only) and new (version-carrying) clients edit the same entity.
-  The design did address this — each step was independently deployable and
-  backward compatible — but "correct on paper, across eight steps, in the
-  subsystem where mistakes silently destroy user data" is precisely the cost being
-  weighed, and there is no failure it currently buys us out of.
-- **Encryption boundary.** The design assumed entity versions are non-sensitive
-  and would ride outside E2EE. Plausible, but it adds another plaintext channel to
-  reason about and was never re-derived against the current threat model — see
-  [`supersync-encryption-architecture.md`](docs/sync-and-op-log/supersync-encryption-architecture.md).
+- **它要解决的问题未被观察到。** 裁剪仅在 21+ 个不同客户端 ID 触及同一时钟时丢弃因果信息。对个人深度工作工具而言这不是现实机群，而确实咬过的一个边界——导入客户端相对自身 ops 错误裁剪——已由同客户端检查处理。
+- **它会使服务器成为事实来源，而不只是裁判。** SuperSync 服务器已检测冲突（`packages/super-sync-server/src/sync/conflict.ts` 中的 `detectConflict`），但通过比较_客户端_撰写的时钟——因果历史仍属客户端。实体版本化把该权威移入服务器。基于文件的提供方（WebDAV、Dropbox、本地文件）没有可运行它的服务器，因此向量钟路径无论如何必须存活，我们将维护**两套**冲突系统而非一套。
+- **迁移是昂贵的一半。** 需要新服务器表、线协议变更、每个既有实体的回填，以及旧（仅时钟）与新（携带版本）客户端编辑同一实体的混合机群窗口。设计确实处理了这点——每步可独立部署且向后兼容——但「纸面上正确、跨八步、在出错会静默摧毁用户数据的子系统里」正是被权衡的成本，且目前没有任何它能救我们出的失败。
+- **加密边界。** 设计假定实体版本不敏感且会落在 E2EE 之外。合理，但增加了另一条需推理的明文通道，且从未对照当前威胁模型重新推导——见
+  [`supersync-encryption-architecture.md`](docs/sync-and-op-log/supersync-encryption-architecture.md)。
 
-**Implementation**: unchanged — see
-[`docs/sync-and-op-log/vector-clocks.md`](docs/sync-and-op-log/vector-clocks.md).
-The server prunes after conflict detection, before storage.
+**实现**：未变——见
+[`docs/sync-and-op-log/vector-clocks.md`](docs/sync-and-op-log/vector-clocks.md)。
+服务器在冲突检测之后、存储之前裁剪。
 
-**When to Update This Pattern**:
+**何时更新此模式**：
 
-- Real fleets are observed exceeding ~20 distinct client IDs per user, or pruning
-  is traced to an actual user-visible conflict (rule: start from a reproducible
-  problem)
-- SuperSync becomes the only supported backend, removing the "file providers need
-  the clock path regardless" constraint
+- 观察到真实机群每用户超过约 20 个不同客户端 ID，或裁剪被追溯到真实用户可见冲突（规则：从可复现问题出发）
+- SuperSync 成为唯一支持的后端，移除「文件提供方无论如何都需要时钟路径」的约束
 
 ---
 
-## Decisions Recorded Elsewhere
+## 记录于别处的决策
 
-These carry the same authority as the numbered records above. They live outside this file because they are long enough to stand alone, or because they are enforced as contributor/agent rules that must be read before touching the subsystem. Keep this table complete — if you record a decision somewhere else, add a row here.
+这些与上方编号记录具有同等权威。它们在本文件之外，因为足够长而独立成文，或因其作为贡献者/Agent 规则在触碰子系统前必须阅读。保持本表完整——若你在别处记录决策，在此加一行。
 
-| Decision                                                                                                                                                  | Where it lives                                                                                                                                                                                                                                                   |
+| 决策                                                                                                                                                      | 所在位置                                                                                                                                                                                                                                                         |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **SuperSync database encryption at rest** — no project-managed volume encryption; the LUKS and PostgreSQL-TDE attempts are retired as OpenVZ-incompatible | [`docs/supersync-encryption-at-rest-decision.md`](docs/supersync-encryption-at-rest-decision.md)                                                                                                                                                                 |
-| **Schema-version bump policy** — default to NOT bumping `CURRENT_SCHEMA_VERSION`; a bump never protects the released fleet and cannot be reverted         | [`operation-log-architecture.md` §A.7.11 Bump Policy](docs/sync-and-op-log/operation-log-architecture.md#bump-policy--a-bump-does-not-protect-the-released-fleet), [`schema-version.ts`](packages/shared-schema/src/schema-version.ts), `AGENTS.md` sync rule 10 |
-| **Required fields on persisted models** — a new field on a persisted model is optional (`?`) plus a runtime default, never required                       | [`docs/sync-and-op-log/persisted-model-fields.md`](docs/sync-and-op-log/persisted-model-fields.md), `AGENTS.md` sync rule 11                                                                                                                                     |
-| **One user intent = one op** — effects inject `LOCAL_ACTIONS`; a multi-entity change is a meta-reducer, not an effect fan-out                             | [`docs/sync-and-op-log/contributor-sync-model.md`](docs/sync-and-op-log/contributor-sync-model.md), `AGENTS.md` sync rules 1–3 and 6                                                                                                                             |
-| **`src/app` layer boundary** — `core/` and `ui/` must not import `features/`; lint-enforced, with a shrink-only grandfathered list                        | [`src/app/README.md`](src/app/README.md), [`eslint.config.js`](eslint.config.js) (`FEATURE_LAYER_FENCE`)                                                                                                                                                         |
+| **SuperSync 数据库静态加密** — 无项目托管的卷加密；LUKS 与 PostgreSQL-TDE 尝试因与 OpenVZ 不兼容而退役                                                     | [`docs/supersync-encryption-at-rest-decision.md`](docs/supersync-encryption-at-rest-decision.md)                                                                                                                                                                 |
+| **Schema 版本升版策略** — 默认不升 `CURRENT_SCHEMA_VERSION`；升版从不保护已发布机群且不可回退                                                              | [`operation-log-architecture.md` §A.7.11 Bump Policy](docs/sync-and-op-log/operation-log-architecture.md#bump-policy--a-bump-does-not-protect-the-released-fleet)、[`schema-version.ts`](packages/shared-schema/src/schema-version.ts)、`AGENTS.md` 同步规则 10 |
+| **持久化模型上的必填字段** — 持久化模型上的新字段为可选（`?`）加运行时默认，绝不为必填                                                                    | [`docs/sync-and-op-log/persisted-model-fields.md`](docs/sync-and-op-log/persisted-model-fields.md)、`AGENTS.md` 同步规则 11                                                                                                                                     |
+| **一次用户意图 = 一个 op** — effects 注入 `LOCAL_ACTIONS`；多实体变更是 meta-reducer，不是 effect 扇出                                                     | [`docs/sync-and-op-log/contributor-sync-model.md`](docs/sync-and-op-log/contributor-sync-model.md)、`AGENTS.md` 同步规则 1–3 与 6                                                                                                                             |
+| **`src/app` 分层边界** — `core/` 与 `ui/` 不得导入 `features/`；lint 强制，带仅可缩小的祖父化列表                                                         | [`src/app/README.md`](src/app/README.md)、[`eslint.config.js`](eslint.config.js)（`FEATURE_LAYER_FENCE`）                                                                                                                                                         |
 
 ---
 
-## How to Use This Document
+## 如何使用本文档
 
-### When Making Architectural Changes
+### 做架构变更时
 
-1. **Before implementing**: Check if your change affects any active pattern
-2. **During implementation**: Follow the documented patterns
-3. **After implementation**: Update this document if you've:
-   - Changed an existing pattern
-   - Added a new architectural pattern
-   - Made a decision that affects future development
+1. **实现前**：检查你的改动是否影响任何现行模式
+2. **实现中**：遵循已记录的模式
+3. **实现后**：若你已做以下事项，更新本文档：
+   - 更改了既有模式
+   - 新增了架构模式
+   - 做出影响未来开发的决策
 
-### When to Add a New Decision
+### 何时新增决策
 
-Add a new decision record when:
+在以下情况新增决策记录：
 
-- The decision affects multiple files/modules
-- Future developers need to understand "why" not just "what"
-- The pattern needs to be followed consistently across the codebase
-- The decision prevents a specific class of bugs
+- 决策影响多个文件/模块
+- 未来开发者需要理解「为什么」而不只是「是什么」
+- 模式需要在代码库中一致遵循
+- 决策防止某一类特定 Bug
 
-### When a Decision Changes
+### 当决策变更时
 
-**Do not rewrite a record's rationale in place when the answer itself is reversed.** The reasoning history — why the old answer looked right, and what evidence flipped it — is the thing that stops the same idea being re-proposed a year later, and it is invisible in `git blame`. Instead:
+**当答案本身被推翻时，不要就地改写记录的理由。** 推理历史——旧答案为何看起来正确、什么证据翻转了它——正是阻止一年后同一想法被再次提出的东西，且在 `git blame` 中不可见。应改为：
 
-1. Set the old record's status to `❌ Superseded by #N` and **leave it where it is**. Numbering must stay stable: ~30 code comments cite decisions by number.
-2. Strip the superseded record down to **Decision** + **Rationale** — its _Implementation_ and _Key Files_ go stale the moment the code is gone — and add one line stating what new evidence or cost made it wrong.
-3. Write the replacement as a new numbered decision whose rationale names the record it supersedes.
+1. 将旧记录状态设为 `❌ Superseded by #N` 并**留在原处**。编号必须稳定：约 30 处代码注释按编号引用决策。
+2. 将被取代记录精简为 **Decision** + **Rationale**——代码一删，其 _Implementation_ 与 _Key Files_ 立刻过时——并加一行说明何种新证据或成本使其错误。
+3. 将替换写成新的编号决策，其理由点名它所取代的记录。
 
-No record has been superseded yet, so there is no worked example. Decision #5 is the closest model for the _content_ of step 2 — it records a rejected design, what it actually cost (~1,565 LOC of cross-cutting machinery for a single producer), why the headline benefit was never realized, and the commit (`0893a86162`) preserving the prior implementation. It is itself `✅ Active` and does not demonstrate the status/replacement mechanics of steps 1 and 3.
+尚无记录被取代，因此没有完整范例。决策 #5 最接近第 2 步_内容_的模型——它记录了被拒设计、实际成本（约 1,565 LOC 横切机制仅服务单一生产者）、头条收益为何从未实现，以及保留先前实现的提交（`0893a86162`）。它本身是 `✅ Active`，不演示第 1、3 步的状态/替换机制。
 
-This applies only when the answer changes. Fixing wording, adding a key file, or clarifying an existing decision is ordinary editing.
+这仅适用于答案变更。修正措辞、添加关键文件或澄清既有决策属于普通编辑。
 
-### Decision Record Template
+### 决策记录模板
 
 ```markdown
-### N. [Pattern/Decision Name]
+### N. [模式/决策名称]
 
-**Status**: ✅ Active | 🚧 Draft | ⚠️ Deprecated | ❌ Superseded by #N
+**Status**：✅ Active | 🚧 Draft | ⚠️ Deprecated | ❌ Superseded by #N
 
-**Decision**: [One-sentence summary of the decision]
+**Decision**：[一句话总结决策]
 
-**Rationale**:
+**Rationale**：
 
-- [Why was this decision made?]
-- [What problems does it solve?]
+- [为何做出此决策？]
+- [它解决什么问题？]
 
-**Implementation**:
+**Implementation**：
 
-- [How is it implemented?]
-- [Key techniques or patterns used]
+- [如何实现？]
+- [使用的关键技术或模式]
 
-**Documentation**: [Link to detailed docs]
+**Documentation**：[详细文档链接]
 
-**Key Files**: [List of primary files implementing this pattern]
+**Key Files**：[实现此模式的主要文件列表]
 
-**When to Update This Pattern**: [Scenarios when someone should review/update this]
+**When to Update This Pattern**：[应审查/更新此模式的场景]
 ```
 
-### Why One File
+### 为何用一个文件
 
-This log deliberately does **not** use one-file-per-decision (`docs/adr/NNNN-*.md`):
+本日志有意**不**采用一决策一文件（`docs/adr/NNNN-*.md`）：
 
-- The numbered records are one read for a contributor or an agent. Unlike the lint-enforced rules in [`AGENTS.md`](AGENTS.md), a decision record's only teeth are being read — spreading them over 30 files means nobody reads all of them.
-- `docs/` already separates plans, long-term-plans, research, sync-and-op-log and wiki. A further location makes decisions harder to find, not easier.
+- 编号记录是贡献者或 Agent 的一次通读。与 [`AGENTS.md`](AGENTS.md) 中 lint 强制的规则不同，决策记录唯一的效力是被阅读——拆成 30 个文件意味着没人会全部读完。
+- `docs/` 已分开 plans、long-term-plans、research、sync-and-op-log 与 wiki。再多一个位置只会让决策更难找，而不是更容易。
 
-Note this is "one index, many locations", not "one file": [Decisions Recorded Elsewhere](#decisions-recorded-elsewhere) deliberately sanctions authoritative decisions living in their own documents. What stays consolidated is the **entry point**, so that ~30 in-code citations (`// See: ARCHITECTURE-DECISIONS.md Decision #2`) resolve to one place.
+注意这是「一个索引，多个位置」，不是「一个文件」：[记录于别处的决策](#记录于别处的决策) 有意允许权威决策住在各自文档中。保持集中的是**入口**，使约 30 处代码内引用（`// See: ARCHITECTURE-DECISIONS.md Decision #2`）解析到同一处。
 
-Revisit when supersession chains actually accumulate, or when this file passes ~1000 lines. Then split **by subsystem**, not one file per decision, and keep the existing numbering so those citations stay valid.
-
----
-
-## Related Documentation
-
-- [`src/app/README.md`](src/app/README.md) - Layer map: where things live and which dependency directions are lint-enforced
-- [`docs/sync-and-op-log/`](docs/sync-and-op-log/) - Operation log architecture
-- [`docs/long-term-plans/`](docs/long-term-plans/) - Future architectural plans
+当取代链真正累积，或本文件超过约 1000 行时再重新评估。届时按**子系统**拆分，而不是一决策一文件，并保留既有编号以使那些引用仍有效。
 
 ---
 
-## Commit Reference
+## 相关文档
 
-When committing changes related to these patterns, reference this document and the specific decision:
+- [`src/app/README.md`](src/app/README.md) - 分层地图：东西在哪、哪些依赖方向被 lint 强制
+- [`docs/sync-and-op-log/`](docs/sync-and-op-log/) - Operation log 架构
+- [`docs/long-term-plans/`](docs/long-term-plans/) - 未来架构计划
+
+---
+
+## 提交引用
+
+提交与这些模式相关的改动时，引用本文档与具体决策：
 
 ```
 feat(tasks): implement feature X

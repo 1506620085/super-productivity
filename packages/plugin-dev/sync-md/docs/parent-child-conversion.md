@@ -1,50 +1,50 @@
-# Parent-Child Task Conversion
+# 父子任务转换
 
-The sync-md plugin now supports converting tasks between parent and subtask status by changing their indentation in the markdown file.
+sync-md 插件现已支持通过更改 markdown 文件中的缩进，在父任务与子任务状态之间转换。
 
-## How it works
+## 工作原理
 
-### Converting Subtask to Parent Task
+### 将子任务转换为父任务
 
-Simply unindent a subtask in the markdown file to convert it to a parent task:
+只需在 markdown 文件中取消子任务的缩进，即可将其转为父任务：
 
-**Before:**
+**之前：**
 
 ```markdown
 - [ ] Parent Task
   - [ ] This is a subtask
 ```
 
-**After:**
+**之后：**
 
 ```markdown
 - [ ] Parent Task
 - [ ] This is a subtask # Now a parent task
 ```
 
-### Converting Parent Task to Subtask
+### 将父任务转换为子任务
 
-Indent a parent task under another task to convert it to a subtask:
+将父任务缩进到另一任务之下，即可将其转为子任务：
 
-**Before:**
+**之前：**
 
 ```markdown
 - [ ] Task 1
 - [ ] Task 2
 ```
 
-**After:**
+**之后：**
 
 ```markdown
 - [ ] Task 1
   - [ ] Task 2 # Now a subtask of Task 1
 ```
 
-### Moving Subtasks Between Parents
+### 在父任务之间移动子任务
 
-You can also move subtasks from one parent to another:
+也可以将子任务从一个父任务移到另一个：
 
-**Before:**
+**之前：**
 
 ```markdown
 - [ ] Parent 1
@@ -52,7 +52,7 @@ You can also move subtasks from one parent to another:
 - [ ] Parent 2
 ```
 
-**After:**
+**之后：**
 
 ```markdown
 - [ ] Parent 1
@@ -60,20 +60,20 @@ You can also move subtasks from one parent to another:
   - [ ] Subtask # Now under Parent 2
 ```
 
-## Restrictions
+## 限制
 
-Tasks with the following properties **cannot** be converted to subtasks:
+具有以下属性的任务**不能**转换为子任务：
 
-- Tasks with `repeatCfgId` (repeating tasks)
-- Tasks with `issueId` (issue-linked tasks)
+- 带有 `repeatCfgId` 的任务（重复任务）
+- 带有 `issueId` 的任务（关联 issue 的任务）
 
-If you try to indent these tasks, you'll see a warning message and the task will remain as a parent task.
+若尝试缩进这些任务，会看到警告消息，任务将保持为父任务。
 
-**Example:**
+**示例：**
 
 ```markdown
 - [ ] Normal Task
   - [ ] Repeating Task # ⚠️ Won't work - will show warning
 ```
 
-However, these tasks **can** be converted from subtasks to parent tasks without any restrictions.
+不过，这些任务**可以**不受限制地从子任务转换为父任务。

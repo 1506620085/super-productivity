@@ -1,121 +1,121 @@
-# Allgemeine Geschäftsbedingungen (AGB)
+# 一般交易条款（AGB）
 
 **Super Productivity Sync**
-_Stand: 25.04.2026_
+_版本日期：2026-04-25_
 
-## 1. Geltungsbereich und Anbieter
+## 1. 适用范围与提供方
 
-(1) Diese Allgemeinen Geschäftsbedingungen („AGB“) regeln die Nutzung des Dienstes **Super Productivity Sync** („Dienst“), betrieben von **Johannes Millan** („Anbieter“).
+(1) 本一般交易条款（「AGB」）规范由 **Johannes Millan**（「提供方」）运营的服务 **Super Productivity Sync**（「服务」）的使用。
 
-(2) Durch Registrierung oder Nutzung erklärt der Nutzer („Nutzer“) sein Einverständnis mit diesen AGB.
+(2) 通过注册或使用，用户（「用户」）声明同意本 AGB。
 
-(3) Vertragssprache ist Deutsch. Abweichende Bedingungen des Nutzers gelten nicht, es sei denn, der Anbieter stimmt ihrer Geltung ausdrücklich schriftlich zu.
+(3) 合同语言为德语。用户的偏离条件不适用，除非提供方书面明确同意其效力。
 
-## 2. Leistungsgegenstand
+## 2. 服务标的
 
-(1) Der Dienst ermöglicht die cloud-basierte Synchronisation von Daten der Anwendung „Super Productivity“.
+(1) 本服务使应用程序「Super Productivity」的数据能够进行基于云的同步。
 
-(2) Der Dienst wird in der jeweils aktuellen Fassung („as available“) bereitgestellt. Der Anbieter kann den Dienst jederzeit weiterentwickeln, ändern, einschränken oder einstellen. Ein Anspruch auf eine bestimmte technische oder funktionale Ausgestaltung besteht nicht.
+(2) 本服务以其当前可用版本（「as available」）提供。提供方可随时进一步开发、修改、限制或终止本服务。不存在对特定技术或功能配置的请求权。
 
-## 3. Registrierung und Nutzungsvoraussetzungen
+## 3. 注册与使用前提
 
-(1) Die Nutzung setzt volle Geschäftsfähigkeit oder wirksame Stellvertretung voraus.
+(1) 使用要求具备完全行为能力或有效代理。
 
-(2) Der Nutzer verpflichtet sich, bei der Registrierung zutreffende Angaben zu machen und Zugangsdaten sicher aufzubewahren.
+(2) 用户承诺在注册时提供准确信息，并安全保管访问凭证。
 
-(3) Der Nutzer ist für sämtliche Handlungen verantwortlich, die über seinen Account erfolgen, soweit er dies zu vertreten hat.
+(3) 用户对其账户下发生的所有行为负责，以其应承担责任为限。
 
-## 4. Datensicherheit und Verschlüsselung
+## 4. 数据安全与加密
 
-**(1) Standard-Sicherheit (ohne Encryption-at-Rest)**
-Die Übertragung der Daten erfolgt verschlüsselt (SSL/TLS). Die Speicherung erfolgt jedoch standardmäßig **nicht** Ende-zu-Ende verschlüsselt und ohne Zusicherung einer serverseitigen Datenbank-Verschlüsselung („Encryption at Rest“). Der Nutzer nimmt zur Kenntnis, dass der Anbieter und dessen Hosting-Dienstleister technisch theoretisch auf unverschlüsselte Datenbankinhalte zugreifen können, soweit dies zur Wartung oder Fehleranalyse technisch erforderlich ist.
+**(1) 标准安全（无静态加密）**
+数据传输经加密（SSL/TLS）。但存储默认**不**进行端到端加密，且不保证服务器侧数据库加密（「静态加密」）。用户知悉，提供方及其托管服务提供商在技术上理论上可访问未加密的数据库内容，以为维护或错误分析在技术上所必需为限。
 
-**(2) Optionale Ende-zu-Ende-Verschlüsselung (E2EE)**
-Der Nutzer kann optional eine Ende-zu-Ende-Verschlüsselung aktivieren. Dabei gelten folgende Bedingungen:
+**(2) 可选端到端加密（E2EE）**
+用户可选择激活端到端加密。适用以下条件：
 
-- Die Schlüssel werden ausschließlich lokal vom Nutzer generiert und verwaltet.
-- **Warnung:** Der Anbieter hat keinerlei Zugriff auf diese Schlüssel und kann verschlüsselte Daten **nicht** wiederherstellen, entsperren oder zurücksetzen.
-- Verlust des Schlüssels führt zum endgültigen und unwiderruflichen Verlust des Zugriffs auf die betroffenen Daten.
-- Die E2EE-Funktion wird ohne Zusicherung der Fehlerfreiheit, Kompatibilität oder dauerhaften Verfügbarkeit bereitgestellt.
+- 密钥仅由用户在本地生成与管理。
+- **警告：** 提供方对这些密钥完全无权访问，且**不能**恢复、解锁或重置加密数据。
+- 密钥丢失导致对受影响数据的访问永久且不可撤销地丧失。
+- E2EE 功能在不保证无错误、兼容性或永久可用性的情况下提供。
 
-**(3) Datensicherung (Backups)**
-Backups erfolgen durch den Anbieter ausschließlich auf Best-Effort-Basis. Es besteht keine Garantie für Vollständigkeit, Integrität oder Wiederherstellbarkeit. Der Nutzer ist verpflichtet, zumutbare und regelmäßige lokale Sicherungskopien seiner Daten zu erstellen.
+**(3) 数据备份（Backups）**
+备份由提供方仅在尽力而为的基础上执行。不保证完整性、完好性或可恢复性。用户有义务对其数据创建合理且定期的本地备份副本。
 
-## 5. Pflichten des Nutzers
+## 5. 用户义务
 
-(1) Der Nutzer verpflichtet sich:
+(1) 用户承诺：
 
-- den Dienst nicht zu missbrauchen (z. B. Angriffe, übermäßige Belastung, Umgehung von Sicherheitsmechanismen);
-- keine rechtswidrigen Inhalte, Schadsoftware oder Daten Dritter ohne Berechtigung hochzuladen;
-- die Wahl der Sicherheitsstufe (mit/ohne E2EE) eigenverantwortlich anhand der Sensibilität seiner Daten zu treffen.
+- 不滥用本服务（例如攻击、过度负载、绕过安全机制）；
+- 不上传非法内容、恶意软件，或不经授权的第三方数据；
+- 根据其数据的敏感性，自主选择安全级别（有/无 E2EE）。
 
-**(2) Freistellung**
-Verstößt der Nutzer schuldhaft gegen gesetzliche Vorschriften oder diese AGB und wird der Anbieter deshalb von Dritten in Anspruch genommen, stellt der Nutzer den Anbieter von allen damit zusammenhängenden Ansprüchen frei, soweit er dies zu vertreten hat.
+**(2) 免除责任**
+若用户有过错地违反法律规定或本 AGB，并因此导致提供方被第三方追责，用户应就所有相关主张向提供方作出免除，以用户对该违反承担责任为限。
 
-## 6. Verfügbarkeit
+## 6. 可用性
 
-Der Anbieter bemüht sich um hohe Verfügbarkeit, garantiert jedoch keine unterbrechungsfreie Nutzung. Wartungsarbeiten, technische Störungen, Ausfälle bei Hosting-Providern oder höhere Gewalt können zu Einschränkungen führen.
+提供方力求高可用性，但不保证不间断使用。维护工作、技术故障、托管提供商处的中断或不可抗力可能导致限制。
 
-## 7. Haftung
+## 7. 责任
 
-(1) Der Anbieter haftet unbeschränkt bei Vorsatz, grober Fahrlässigkeit sowie bei schuldhafter Verletzung von Leben, Körper oder Gesundheit.
+(1) 提供方在故意、重大过失以及有过错地侵害生命、身体或健康的情况下承担无限责任。
 
-(2) Bei leichter Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (**Kardinalpflichten**). In diesen Fällen ist die Haftung auf den vertragstypischen, vorhersehbaren Schaden begrenzt.
+(2) 在轻微过失情况下，提供方仅对违反本质合同义务（**主要义务**）承担责任。在这些情况下，责任限于合同典型的、可预见的损害。
 
-(3) **Datenverlust:** Die Haftung für Datenverlust ist beschränkt auf den Aufwand, der bei ordnungsgemäßer, zumutbarer und regelmäßiger Datensicherung durch den Nutzer entstanden wäre. Hat der Nutzer keine ausreichenden Backups erstellt, entfällt die Haftung, soweit der Schaden durch Backups vermeidbar gewesen wäre.
+(3) **数据丢失：** 对数据丢失的责任限于在用户进行适当、合理且定期数据备份的前提下恢复所需的努力。若用户未创建充分备份，则在损害本可通过备份避免的范围内排除责任。
 
-(4) **E2EE-Daten:** Für Datenverlust, Datenkorruption oder Unzugänglichkeit, die auf Schlüsselverlust, fehlerhafte Schlüsselverwaltung durch den Nutzer oder Nutzung der optionalen E2EE-Funktion zurückzuführen ist, haftet der Anbieter nicht.
+(4) **E2EE 数据：** 提供方对可归因于密钥丢失、用户错误的密钥管理或使用可选 E2EE 功能的数据丢失、数据损坏或不可访问性不承担责任。
 
-(5) Die vorstehenden Haftungsbeschränkungen gelten auch zugunsten der Erfüllungsgehilfen des Anbieters.
+(5) 上述责任限制亦惠及提供方的履行辅助人。
 
-## 8. Preise und Zahlungsbedingungen
+## 8. 价格与支付条件
 
-(1) Kostenpflichtige Funktionen und deren Preise ergeben sich aus dem jeweiligen Bestellprozess. Alle Preise verstehen sich als Endpreise inklusive der gesetzlichen Mehrwertsteuer, sofern diese anfällt.
+(1) 付费功能及其价格由相应订购流程确定。所有价格为含法定增值税（如适用）的最终价格。
 
-(2) Laufzeit, Abrechnungszeitraum und Kündigungsfrist kostenpflichtiger Tarife ergeben sich aus den im Bestellprozess angegebenen Konditionen.
+(2) 付费套餐的期限、计费周期与通知期由订购流程中所述条件确定。
 
-## 9. Laufzeit und Kündigung
+## 9. 期限与终止
 
-(1) Der Nutzer kann sein Konto jederzeit löschen und den Vertrag damit beenden.
+(1) 用户可随时删除其账户并据此终止合同。
 
-(2) Der Anbieter kann das Vertragsverhältnis jederzeit mit einer Frist von zwei (2) Wochen ordentlich kündigen (bei kostenlosen Diensten) oder bei Vorliegen eines wichtigen Grundes fristlos sperren oder kündigen.
+(2) 提供方可随时以两（2）周通知期正常终止合同关系（针对免费服务），或因重要理由立即封锁或终止。
 
-(3) Bei kostenpflichtigen Diensten gelten die im Bestellprozess angegebenen Kündigungsfristen.
+(3) 对付费服务，适用订购流程中所述的通知期。
 
-(4) **Inaktive Konten:** Konten, bei denen über einen Zeitraum von drei (3) Monaten keinerlei Nutzeraktivität (insbesondere kein Login und keine Synchronisation) erfolgt, gelten als inaktiv. Der Anbieter ist berechtigt, derart inaktive Konten samt der zugehörigen synchronisierten Daten ohne weitere Vorankündigung zu löschen. Der Nutzer ist selbst dafür verantwortlich, regelmäßige lokale Backups seiner Daten vorzuhalten (vgl. Ziffer 4 Abs. 3).
+(4) **不活跃账户：** 在三（3）个月内无任何用户活动（特别是无登录且无同步）的账户视为不活跃。提供方有权在无进一步事先通知的情况下删除此类不活跃账户，包括所有相关的已同步数据。用户自行负责维护其数据的定期本地备份（参见第 4 条第 3 款）。
 
-## 10. Änderungen der AGB
+## 10. AGB 的变更
 
-(1) Der Anbieter kann diese AGB ändern, wenn dies erforderlich ist zur Anpassung an:
+(1) 若有必要适应以下情况，提供方可变更本 AGB：
 
-- technische Weiterentwicklungen,
-- Änderungen rechtlicher Rahmenbedingungen,
-- neue Funktionen, Sicherheitsanforderungen oder Geschäftsmodelle.
+- 技术进一步发展，
+- 法律框架条件的变化，
+- 新功能、安全要求或商业模式。
 
-(2) Änderungen werden dem Nutzer mindestens sechs (6) Wochen vor ihrem Wirksamwerden in Textform mitgeteilt. Die Mitteilung enthält den Hinweis auf:
+(2) 变更将在生效前至少六（6）周以文本形式告知用户。通知将包含对以下事项的提示：
 
-- das Widerspruchsrecht des Nutzers,
-- das Recht, den Vertrag außerordentlich zu kündigen,
-- die Folgen des Schweigens.
+- 用户的异议权，
+- 特别终止合同的权利，
+- 沉默的后果。
 
-(3) Widerspricht der Nutzer nicht innerhalb der Frist, gelten die Änderungen als akzeptiert.
+(3) 若用户未在期限内异议，变更视为被接受。
 
-(4) Widerspricht der Nutzer, kann der Anbieter das Vertragsverhältnis mit einer Frist von zwei (2) Wochen kündigen, sofern ein Festhalten am Vertrag unter den alten Bedingungen unzumutbar ist.
+(4) 若用户异议，提供方可在继续按旧条件履行合同不合理的情况下，以两（2）周通知期终止合同关系。
 
-## 11. Widerrufsrecht für Verbraucher
+## 11. 消费者撤回权
 
-Ist der Nutzer Verbraucher gemäß § 13 BGB und schließt einen kostenpflichtigen Vertrag ab, steht ihm ein gesetzliches Widerrufsrecht zu. Näheres regelt die gesonderte Widerrufsbelehrung.
+若用户为根据《德国民法典》第 13 条意义上的消费者并订立付费合同，其享有法定撤回权。细节由单独的撤回说明规范。
 
-## 12. Datenschutz
+## 12. 数据保护
 
-Die Verarbeitung personenbezogener Daten erfolgt gemäß der Datenschutzerklärung für Super Productivity Sync.
+个人数据的处理依照 Super Productivity Sync 的隐私政策进行。
 
-## 13. Schlussbestimmungen
+## 13. 最终条款
 
-(1) Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts.
+(1) 适用德意志联邦共和国法律，排除《联合国国际货物销售合同公约》。
 
-(2) Ist der Nutzer Kaufmann, juristische Person des öffentlichen Rechts oder öffentlich-rechtliches Sondervermögen, ist **Leipzig** ausschließlicher Gerichtsstand. Für Verbraucher gelten die gesetzlichen Gerichtsstände.
+(2) 若用户为商人、公法法人或公法特别财产，**莱比锡**为专属管辖地。对消费者适用法定管辖地。
 
-(3) **Salvatorische Klausel:** Sollten einzelne Bestimmungen dieser AGB unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Anstelle der unwirksamen Regelung treten die gesetzlichen Vorschriften.
+(3) **可分性条款：** 若本 AGB 的个别条款无效或变为无效，其余条款的效力不受影响。法定规定取代无效条款。
 
-(4) Plattform der EU-Kommission zur Online-Streitbeilegung: [https://ec.europa.eu/consumers/odr/](https://ec.europa.eu/consumers/odr/). Der Anbieter ist nicht verpflichtet und nicht bereit, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+(4) 欧盟委员会在线争议解决平台：[https://ec.europa.eu/consumers/odr/](https://ec.europa.eu/consumers/odr/)。提供方无义务且无意参与消费者仲裁机构前的争议解决程序。

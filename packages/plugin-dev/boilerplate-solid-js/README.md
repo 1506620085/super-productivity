@@ -1,26 +1,26 @@
-# Solid.js Boilerplate Plugin for Super Productivity
+# Super Productivity 的 Solid.js 样板插件
 
-A modern, TypeScript-based boilerplate for creating Super Productivity plugins using Solid.js.
+基于 TypeScript 的现代样板，用于使用 Solid.js 创建 Super Productivity 插件。
 
-## Features
+## 功能
 
-- 🚀 **Solid.js** - Fast, reactive UI framework
-- 📘 **TypeScript** - Full type safety with Super Productivity Plugin API
-- 🎨 **Modern UI** - Clean, responsive design with dark mode support
-- 🔧 **Vite** - Lightning-fast development and build tooling
-- 📦 **Ready to Use** - Complete setup with examples for all plugin features
+- 🚀 **Solid.js** - 快速、响应式的 UI 框架
+- 📘 **TypeScript** - 与 Super Productivity Plugin API 的完整类型安全
+- 🎨 **Modern UI** - 简洁、响应式设计，支持深色模式
+- 🔧 **Vite** - 极速开发与构建工具
+- 📦 **Ready to Use** - 完整配置，涵盖全部插件功能示例
 
-## Getting Started
+## 入门
 
-### Prerequisites
+### 前置条件
 
 - Node.js 16+
-- npm or yarn
+- npm 或 yarn
 - Super Productivity 8.0.0+
 
-### Installation
+### 安装
 
-1. Clone this boilerplate:
+1. 克隆此样板：
 
 ```bash
 cd packages/plugin-dev
@@ -28,68 +28,68 @@ cp -r boilerplate-solid-js my-plugin
 cd my-plugin
 ```
 
-2. Install dependencies:
+2. 安装依赖：
 
 ```bash
 npm install
 ```
 
-3. Update plugin metadata in `src/manifest.json`:
-   - Change `id` to a unique identifier
-   - Update `name`, `description`, and `author`
-   - Modify `permissions` and `hooks` as needed
+3. 更新 `src/manifest.json` 中的插件元数据：
+   - 将 `id` 改为唯一标识符
+   - 更新 `name`、`description` 与 `author`
+   - 按需修改 `permissions` 与 `hooks`
 
-### Development
+### 开发
 
-Run the development server:
+运行开发服务器：
 
 ```bash
 npm run dev
 ```
 
-This starts Vite in watch mode. Your plugin will rebuild automatically when you make changes.
+这会以监视模式启动 Vite。修改后插件会自动重新构建。
 
-### Building
+### 构建
 
-Build the plugin for production:
+构建生产版插件：
 
 ```bash
 npm run build
 ```
 
-This creates optimized files in the `dist/` directory.
+这会在 `dist/` 目录生成优化后的文件。
 
-### Packaging
+### 打包
 
-Create a ZIP file for distribution:
+创建用于分发的 ZIP 文件：
 
 ```bash
 npm run package
 ```
 
-This will:
+这将：
 
-1. Build the plugin
-2. Create a ZIP file containing all necessary files
-3. Place the ZIP in the root directory
+1. 构建插件
+2. 创建包含全部必要文件的 ZIP
+3. 将 ZIP 放在根目录
 
-### Deployment (for Plugins with HTML UI)
+### 部署（适用于带 HTML UI 的插件）
 
-If your plugin has an `index.html` file (for UI components, side panels, etc.), use the deploy command instead:
+若插件有 `index.html`（用于 UI 组件、侧栏等），请改用 deploy 命令：
 
 ```bash
 npm run deploy
 ```
 
-This will:
+这将：
 
-1. Build the plugin
-2. Inline all CSS and JavaScript assets into the HTML file
-3. Create a ZIP file for distribution
+1. 构建插件
+2. 将所有 CSS 与 JavaScript 资源内联到 HTML 文件
+3. 创建用于分发的 ZIP 文件
 
-**Note**: The `deploy` command is necessary for any plugin with HTML UI because Super Productivity loads plugin HTML as data URLs, which cannot access external files. The inline-assets script ensures all assets are embedded directly in the HTML.
+**说明**：任何带 HTML UI 的插件都需要 `deploy` 命令，因为 Super Productivity 以 data URL 加载插件 HTML，无法访问外部文件。inline-assets 脚本确保所有资源直接嵌入 HTML。
 
-## Project Structure
+## 项目结构
 
 ```
 src/
@@ -121,13 +121,13 @@ dist/               # Build output (gitignored)
 └── manifest.json
 ```
 
-## Internationalization (i18n)
+## 国际化（i18n）
 
-This boilerplate includes built-in support for multi-language plugins.
+本样板内置多语言插件支持。
 
-### Translation Files
+### 翻译文件
 
-Translation files are located in the `i18n/` directory and use JSON format with nested keys:
+翻译文件位于 `i18n/` 目录，使用带嵌套键的 JSON 格式：
 
 ```json
 {
@@ -145,11 +145,11 @@ Translation files are located in the `i18n/` directory and use JSON format with 
 }
 ```
 
-**Note**: English (`en.json`) is required and used as a fallback when translations are missing.
+**说明**：英语（`en.json`）为必填，并在缺少译文时作为回退。
 
-### Using Translations in Components
+### 在组件中使用翻译
 
-Use the `useTranslate()` hook in your Solid.js components:
+在 Solid.js 组件中使用 `useTranslate()` hook：
 
 ```typescript
 import { useTranslate } from '../utils/useTranslate';
@@ -167,7 +167,7 @@ function MyComponent() {
 }
 ```
 
-**With parameters** (for interpolation):
+**带参数**（用于插值）：
 
 ```typescript
 createEffect(async () => {
@@ -177,9 +177,9 @@ createEffect(async () => {
 });
 ```
 
-### Adding New Languages
+### 添加新语言
 
-1. Add the language code to `manifest.json`:
+1. 将语言代码加入 `manifest.json`：
 
 ```json
 {
@@ -189,7 +189,7 @@ createEffect(async () => {
 }
 ```
 
-2. Create the translation file (e.g., `i18n/fr.json`):
+2. 创建翻译文件（例如 `i18n/fr.json`）：
 
 ```json
 {
@@ -199,22 +199,22 @@ createEffect(async () => {
 }
 ```
 
-3. Rebuild the plugin: `npm run build`
+3. 重新构建插件：`npm run build`
 
-### Translation Key Format
+### 翻译键格式
 
-- Use hierarchical keys: `APP.TITLE`, `SETTINGS.THEME`
-- Use parameter interpolation: `"message": "Hello {{name}}"`
-- Keep keys descriptive and consistent
-- English is the fallback language
+- 使用层级键：`APP.TITLE`、`SETTINGS.THEME`
+- 使用参数插值：`"message": "Hello {{name}}"`
+- 保持键名描述性且一致
+- 英语是回退语言
 
-For complete i18n documentation, see [Plugin i18n Guide](../PLUGIN_I18N.md).
+完整 i18n 文档见 [插件 i18n 指南](../PLUGIN_I18N.md)。
 
-## Plugin API Usage
+## 插件 API 用法
 
-### Basic Setup
+### 基础设置
 
-The plugin API is exposed through the global `plugin` object in `plugin.ts`:
+插件 API 通过 `plugin.ts` 中的全局 `plugin` 对象暴露：
 
 ```typescript
 import { PluginInterface } from '@super-productivity/plugin-api';
@@ -222,9 +222,9 @@ import { PluginInterface } from '@super-productivity/plugin-api';
 declare const plugin: PluginInterface;
 ```
 
-### Common API Methods
+### 常用 API 方法
 
-#### UI Registration
+#### UI 注册
 
 ```typescript
 // Register header button
@@ -249,7 +249,7 @@ plugin.registerShortcut({
 });
 ```
 
-#### Data Operations
+#### 数据操作
 
 ```typescript
 // Get tasks
@@ -273,7 +273,7 @@ const projects = await plugin.getAllProjects();
 const tags = await plugin.getAllTags();
 ```
 
-#### Event Hooks
+#### 事件 Hooks
 
 ```typescript
 // Task completion
@@ -292,9 +292,9 @@ plugin.on('contextChange', (context) => {
 });
 ```
 
-#### Communication with UI
+#### 与 UI 通信
 
-In `plugin.ts`:
+在 `plugin.ts` 中：
 
 ```typescript
 plugin.onMessage('myCommand', async (data) => {
@@ -303,7 +303,7 @@ plugin.onMessage('myCommand', async (data) => {
 });
 ```
 
-In your Solid.js component:
+在 Solid.js 组件中：
 
 ```typescript
 const sendMessage = async (type: string, payload?: any) => {
@@ -326,70 +326,70 @@ const sendMessage = async (type: string, payload?: any) => {
 const result = await sendMessage('myCommand', { foo: 'bar' });
 ```
 
-## Customization
+## 自定义
 
-### Styling
+### 样式
 
-The boilerplate includes:
+样板包含：
 
-- CSS custom properties for theming
-- Dark mode support
-- Responsive design
-- Minimal, clean styling
+- 用于主题的 CSS 自定义属性
+- 深色模式支持
+- 响应式设计
+- 简洁、干净的样式
 
-Modify `src/app/App.css` to customize the appearance.
+修改 `src/app/App.css` 以自定义外观。
 
-### Adding Features
+### 添加功能
 
-1. **New UI Components**: Add them in `src/app/` as `.tsx` files
-2. **New API Endpoints**: Add handlers in `src/plugin.ts` using `plugin.onMessage()`
-3. **New Hooks**: Register them in `manifest.json` and handle in `plugin.ts`
-4. **Permissions**: Add required permissions to `manifest.json`
+1. **新 UI 组件**：以 `.tsx` 文件加入 `src/app/`
+2. **新 API 端点**：在 `src/plugin.ts` 中用 `plugin.onMessage()` 添加处理器
+3. **新 Hooks**：在 `manifest.json` 中注册，并在 `plugin.ts` 中处理
+4. **权限**：将所需权限加入 `manifest.json`
 
-## Best Practices
+## 最佳实践
 
-1. **Type Safety**: Always use TypeScript types from `@super-productivity/plugin-api`
-2. **Error Handling**: Wrap async operations in try-catch blocks
-3. **Performance**: Use Solid.js signals and effects efficiently
-4. **Security**: Never expose sensitive data or operations
-5. **User Experience**: Provide loading states and error feedback
+1. **类型安全**：始终使用 `@super-productivity/plugin-api` 中的 TypeScript 类型
+2. **错误处理**：用 try-catch 包裹异步操作
+3. **性能**：高效使用 Solid.js 的 signal 与 effect
+4. **安全**：切勿暴露敏感数据或操作
+5. **用户体验**：提供加载状态与错误反馈
 
-## Deployment
+## 部署
 
-1. Build the plugin: `npm run build`
-2. Package it: `npm run package`
-3. Upload the ZIP file to Super Productivity:
-   - Open Super Productivity
-   - Go to Settings → Plugins
-   - Click "Upload Plugin"
-   - Select your ZIP file
+1. 构建插件：`npm run build`
+2. 打包：`npm run package`
+3. 将 ZIP 文件上传到 Super Productivity：
+   - 打开 Super Productivity
+   - 进入 设置 → 插件
+   - 点击「上传插件」
+   - 选择你的 ZIP 文件
 
-## Troubleshooting
+## 故障排除
 
-### Plugin not loading
+### 插件未加载
 
-- Check browser console for errors
-- Verify `manifest.json` is valid JSON
-- Ensure `minSupVersion` matches your Super Productivity version
+- 检查浏览器控制台错误
+- 确认 `manifest.json` 是有效 JSON
+- 确保 `minSupVersion` 与你的 Super Productivity 版本匹配
 
-### API calls failing
+### API 调用失败
 
-- Check if you have required permissions in `manifest.json`
-- Verify Super Productivity is running the correct version
-- Look for error messages in the console
+- 检查 `manifest.json` 中是否有所需权限
+- 确认 Super Productivity 运行的是正确版本
+- 在控制台查找错误信息
 
-### Build errors
+### 构建错误
 
-- Run `npm run typecheck` to check for TypeScript errors
-- Ensure all dependencies are installed
-- Clear `node_modules` and reinstall if needed
+- 运行 `npm run typecheck` 检查 TypeScript 错误
+- 确保所有依赖已安装
+- 必要时清除 `node_modules` 并重新安装
 
-## Resources
+## 资源
 
-- [Super Productivity Plugin API Documentation](https://github.com/super-productivity/super-productivity)
-- [Solid.js Documentation](https://www.solidjs.com/docs/latest)
-- [Vite Documentation](https://vitejs.dev/)
+- [Super Productivity 插件 API 文档](https://github.com/super-productivity/super-productivity)
+- [Solid.js 文档](https://www.solidjs.com/docs/latest)
+- [Vite 文档](https://vitejs.dev/)
 
-## License
+## 许可证
 
-This boilerplate is provided as-is for creating Super Productivity plugins. Feel free to modify and distribute your plugins as you see fit.
+本样板按原样提供，用于创建 Super Productivity 插件。可随意修改并按你认为合适的方式分发你的插件。

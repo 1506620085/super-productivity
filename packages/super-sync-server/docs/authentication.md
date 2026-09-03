@@ -1,152 +1,87 @@
-# Authentication Architecture
+# 认证架构
 
-SuperSync's production authentication paths are passkeys and emailed magic
-links. Successful authentication issues the same long-lived JWT regardless of
-the login method. Password creation exists only in the guarded test routes; it
-is not a production registration or login flow.
+SuperSync 的生产认证路径为通行密钥（passkey）与邮件魔法链接。无论登录方式如何，成功认证都会签发同一长期 JWT。密码创建仅存在于受保护的测试路由；它不是生产注册或登录流程。
 
-The executable authorities are [`api.ts`](../src/api.ts) for routes and rate
-limits, [`auth.ts`](../src/auth.ts) for email tokens and JWT verification, and
-[`passkey.ts`](../src/passkey.ts) for WebAuthn ceremonies and recovery. Keep
-request and response payload details in those files instead of duplicating them
-here.
+可执行权威为：路由与速率限制见 [`api.ts`](../src/api.ts)，邮件 token 与 JWT 校验见 [`auth.ts`](../src/auth.ts)，WebAuthn 仪式与恢复见 [`passkey.ts`](../src/passkey.ts)。请将这些文件中的请求与响应载荷细节保留在原处，勿在此重复。
 
-## Stable Endpoint Purposes
+## 稳定端点用途
 
-All paths below are mounted under `/api`.
+以下路径均挂载在 `/api` 下。
 
-| Method and path                  | Stable purpose                                                                         |
+| 方法与路径                       | 稳定用途                                                                               |
 | -------------------------------- | -------------------------------------------------------------------------------------- |
-| `POST /register/passkey/options` | Start WebAuthn registration and retain a five-minute process-local challenge           |
-| `POST /register/passkey/verify`  | Verify the ceremony and stage the exact credential pending email verification          |
-| `POST /register/magic-link`      | Create an unverified email-only account and send its verification link                 |
-| `POST /verify-email`             | Consume a verification token and activate the corresponding account or pending passkey |
-| `POST /login/passkey/options`    | Start a WebAuthn authentication ceremony                                               |
-| `POST /login/passkey/verify`     | Verify the passkey and issue a JWT                                                     |
-| `POST /login/magic-link`         | Send an existing verified account a one-time login link                                |
-| `POST /login/magic-link/verify`  | Consume the login token and issue a JWT                                                |
-| `POST /recover/passkey`          | Send a verified passkey account a recovery link                                        |
-| `POST /recover/passkey/options`  | Validate the recovery token and start replacement-passkey registration                 |
-| `POST /recover/passkey/complete` | Replace the account's passkeys and invalidate its existing JWTs                        |
-| `POST /replace-token`            | Increment the authenticated user's token version and return the sole replacement JWT   |
+| `POST /register/passkey/options` | 启动 WebAuthn 注册并保留五分钟的进程本地挑战                                           |
+| `POST /register/passkey/verify`  | 校验仪式并将精确凭证暂存，等待邮件验证                                                 |
+| `POST /register/magic-link`      | 创建未验证的仅邮箱账户并发送其验证链接                                                   |
+| `POST /verify-email`             | 消费验证 token 并激活对应账户或待定 passkey                                            |
+| `POST /login/passkey/options`    | 启动 WebAuthn 认证仪式                                                                 |
+| `POST /login/passkey/verify`     | 校验 passkey 并签发 JWT                                                                |
+| `POST /login/magic-link`         | 向已验证账户发送一次性登录链接                                                         |
+| `POST /login/magic-link/verify`  | 消费登录 token 并签发 JWT                                                              |
+| `POST /recover/passkey`          | 向已验证的 passkey 账户发送恢复链接                                                    |
+| `POST /recover/passkey/options`  | 校验恢复 token 并启动替换 passkey 注册                                                 |
+| `POST /recover/passkey/complete` | 替换账户的 passkey 并使其现有 JWT 失效                                                 |
+| `POST /replace-token`            | 递增已认证用户的 token 版本并返回唯一的替换 JWT                                        |
 
-Authentication request schemas and neutral error responses are defined beside
-these routes in [`api.ts`](../src/api.ts).
+认证请求 schema 与中性错误响应在 [`api.ts`](../src/api.ts) 中与这些路由一并定义。
 
-## Account Activation and Login
+## 账户激活与登录
 
-### Passkey Registration
+### Passkey 注册
 
-The server verifies the WebAuthn registration ceremony but does not immediately
-trust the submitted credential. It stores that credential as a
-`PendingPasskeyRegistration`, bound to the exact email-verification token. When
-that token is consumed, the server atomically verifies the user, deletes any
-other pending or active credentials for that account, and promotes only the
-credential bound to that link. This is the active architecture recorded in
-[ADR #6](../../../ARCHITECTURE-DECISIONS.md#6-passkeys-stay-pending-until-email-verification).
+服务器校验 WebAuthn 注册仪式，但不会立即信任提交的凭证。它将该凭证存为
+`PendingPasskeyRegistration`，绑定到精确的邮件验证 token。当该 token 被消费时，服务器原子性地验证用户、删除该账户的其他待定或活跃凭证，并仅提升绑定到该链接的凭证。这是记录于
+[ADR #6](../../../ARCHITECTURE-DECISIONS.md#6-passkeys-stay-pending-until-email-verification) 的现行架构。
 
-### Magic-Link Registration and Login
+### 魔法链接注册与登录
 
-Magic-link registration creates an unverified account with no password or
-passkey. Email verification activates it. A separate 15-minute login token can
-then be requested and exchanged once for a JWT. Registration, login, and
-recovery responses avoid revealing whether an email address already exists.
+魔法链接注册创建无密码、无 passkey 的未验证账户。邮件验证将其激活。随后可请求并一次性兑换单独的 15 分钟登录 token 以换取 JWT。注册、登录与恢复响应避免泄露邮箱地址是否已存在。
 
-### Passkey Login and Recovery
+### Passkey 登录与恢复
 
-Passkey login performs a fresh WebAuthn ceremony and then issues a JWT. Passkey
-recovery uses a one-hour emailed bearer token to start a replacement WebAuthn
-ceremony. Successful completion deletes the old passkeys, stores the new one,
-increments `tokenVersion`, and therefore invalidates the account's earlier
-JWTs.
+Passkey 登录执行全新的 WebAuthn 仪式，然后签发 JWT。Passkey 恢复使用一小时有效的邮件 bearer token 启动替换 WebAuthn 仪式。成功完成后删除旧 passkey、存储新的、递增 `tokenVersion`，从而使其账户先前的 JWT 失效。
 
-WebAuthn challenges live in a five-minute, process-local map and are consumed by
-the corresponding completion request. Multi-instance deployments consequently
-need shared challenge storage or sticky routing for each complete ceremony.
+WebAuthn 挑战存放在五分钟的进程本地映射中，并由对应的完成请求消费。因此多实例部署需要共享挑战存储，或对每次完整仪式使用粘性路由。
 
-## JWT Lifecycle, Verification, and Revocation
+## JWT 生命周期、校验与吊销
 
-JWTs are signed but are not stored as sessions. Every JWT carries `userId`,
-`email`, and `tokenVersion` and expires after 365 days. The authentication
-method matters only before issuance; passkey and magic-link sessions have the
-same scope and lifetime.
+JWT 经签名，但不作为会话存储。每个 JWT 携带 `userId`、`email` 与 `tokenVersion`，并在 365 天后过期。认证方式仅在签发前重要；passkey 与魔法链接会话具有相同作用域与生命周期。
 
-Token verification checks the signature and then confirms that the account
-still exists, is verified, and has the same `tokenVersion`. To avoid a database
-read on every request, those account fields are cached for 30 seconds in a
-bounded, process-local auth cache. Account deletion, verification, token
-replacement, and recovery invalidate the local cache beside their database
-writes.
+Token 校验检查签名，然后确认账户仍然存在、已验证，且具有相同的 `tokenVersion`。为避免每次请求都读数据库，这些账户字段在有界、进程本地的认证缓存中缓存 30 秒。账户删除、验证、token 替换与恢复会在数据库写入旁使本地缓存失效。
 
-This means revocation is immediate on the process that performs the write, but
-not across independent replicas: another process can continue accepting a
-previously cached token until its entry expires, for at most the remaining
-30-second TTL. A multi-instance deployment must add shared invalidation (or a
-stronger centralized verification design) if it requires immediate global
-revocation. Routing all requests for an account consistently can reduce the
-window but does not replace shared invalidation as a general guarantee.
+这意味着吊销在执行写入的进程上是立即的，但跨独立副本不是：另一进程可继续接受先前缓存的 token，直到其条目过期，最多剩余 30 秒 TTL。若多实例部署需要立即的全局吊销，必须增加共享失效（或更强的集中式校验设计）。将账户的所有请求一致路由可缩小窗口，但不能作为共享失效的一般性保证替代。
 
-`POST /api/replace-token` increments `tokenVersion`, invalidating all prior JWTs
-for the account, and returns a new JWT with the new version. Selective
-per-device revocation is not implemented.
+`POST /api/replace-token` 递增 `tokenVersion`，使该账户所有先前 JWT 失效，并返回带新版本的新 JWT。未实现按设备的选择性吊销。
 
-The cache implementation and its single-replica constraint live in
-[`auth-cache.ts`](../src/auth-cache.ts); JWT verification and version writes
-live in [`auth.ts`](../src/auth.ts).
+缓存实现及其单副本约束位于 [`auth-cache.ts`](../src/auth-cache.ts)；JWT 校验与版本写入位于 [`auth.ts`](../src/auth.ts)。
 
-## Email Tokens Are Bearer Secrets
+## 邮件 Token 是 Bearer 密钥
 
-Verification, magic-login, and passkey-recovery tokens are random 32-byte values
-stored as plain strings. They are cryptographically unguessable, time-limited,
-and consumed with guarded database updates so the same token cannot complete
-the flow twice. Current lifetimes are 24 hours for email verification, 15
-minutes for magic login, and one hour for passkey recovery.
+验证、魔法登录与 passkey 恢复 token 是随机 32 字节值，以纯字符串存储。它们在密码学上不可猜测、有时限，并通过受保护的数据库更新消费，使同一 token 不能完成流程两次。当前生命周期为：邮件验证 24 小时、魔法登录 15 分钟、passkey 恢复一小时。
 
-Those limits reduce exposure; they do not make plaintext tokens low-value. A
-magic-login token grants a JWT, and a recovery token can replace the account's
-passkeys. Consuming a passkey-registration verification token activates the
-credential already bound to that token, so an attacker who staged a credential
-they control and then obtains the corresponding email token can gain ongoing
-account access. Database dumps, application logs, and proxy logs containing
-unexpired tokens must therefore be treated as credential exposure.
+这些限制降低暴露面；它们并不使明文 token 低价值。魔法登录 token 可授予 JWT，恢复 token 可替换账户的 passkey。消费 passkey 注册验证 token 会激活已绑定到该 token 的凭证，因此攻击者若暂存了其控制的凭证并随后获得对应邮件 token，即可获得持续账户访问。因此，包含未过期 token 的数据库转储、应用日志与代理日志必须视为凭证泄露。
 
-Plaintext storage is a current known limitation. A stronger design would store
-only token digests and compare the digest of a presented token, preserving
-lookup and one-use semantics without leaving usable bearer values in the
-database.
+明文存储是当前已知限制。更强的设计将仅存储 token 摘要，并比较所提交 token 的摘要，在保留查找与一次性语义的同时，不在数据库中留下可用的 bearer 值。
 
-## WebSocket Token Transport
+## WebSocket Token 传输
 
-Authenticated HTTP endpoints receive the JWT in the bearer authorization
-header. The WebSocket handshake uses the same full-access, 365-day JWT from the
-`token` query parameter; it is not a short-lived or WebSocket-scoped credential.
+已认证的 HTTP 端点在 bearer authorization 头中接收 JWT。WebSocket 握手从 `token` 查询参数使用同一完整访问、365 天的 JWT；它不是短生命周期或仅限 WebSocket 作用域的凭证。
 
-Production deployments must use HTTPS and WSS. Because reverse-proxy access and
-request failure/error logs can record request URIs and headers, every such setup
-must omit sensitive query values and token-bearing `Referer` headers from both
-log paths. Login and recovery pages must emit
-`Referrer-Policy: no-referrer`; otherwise their same-origin script and API
-requests can repeat the credential-bearing page URL in a logged header. The
-[bundled Caddy configuration](../Caddyfile) replaces the complete logged query
-suffix, drops `Referer` from both Caddy log paths, and sets that policy. Custom
-proxy and logging configurations must provide equivalent protection. The
-application error logger independently replaces its complete query suffix, so
-malformed requests cannot bypass the proxy filter through application logs.
+生产部署必须使用 HTTPS 与 WSS。由于反向代理的访问日志与请求失败/错误日志可能记录请求 URI 与头，每套此类配置都必须从两条日志路径中省略敏感查询值及带 token 的 `Referer` 头。登录与恢复页面必须发出
+`Referrer-Policy: no-referrer`；否则其同源脚本与 API 请求可能在已记录头中重复带凭证的页面 URL。[捆绑的 Caddy 配置](../Caddyfile) 会替换完整的已记录查询后缀，从两条 Caddy 日志路径丢弃 `Referer`，并设置该策略。自定义代理与日志配置必须提供等效保护。应用错误日志记录器独立替换其完整查询后缀，因此畸形请求无法通过应用日志绕过代理过滤器。
 
-## Security Properties and Current Limits
+## 安全属性与当前限制
 
-| Concern                      | Current implementation                                                                 |
+| 关注点                       | 当前实现                                                                               |
 | ---------------------------- | -------------------------------------------------------------------------------------- |
-| JWT signing                  | HMAC-SHA256 secret with a minimum length of 32 characters                              |
-| JWT lifetime                 | 365 days for both passkey and magic-link authentication                                |
-| Whole-account revocation     | `tokenVersion` increment, subject to the cross-replica cache window described above    |
-| Passkey verification         | WebAuthn origin, RP ID, challenge, credential signature, and counter checks            |
-| Email enumeration resistance | Neutral registration/login/recovery responses and dummy passkey options                |
-| Email bearer-token entropy   | 32 random bytes                                                                        |
-| WebAuthn challenge storage   | Five-minute process-local map; not multi-instance-safe without affinity/shared storage |
-| Per-device JWT revocation    | Not implemented                                                                        |
-| Refresh-token separation     | Not implemented                                                                        |
+| JWT 签名                     | 至少 32 字符的 HMAC-SHA256 密钥                                                        |
+| JWT 生命周期                 | passkey 与魔法链接认证均为 365 天                                                      |
+| 整账户吊销                   | `tokenVersion` 递增，受上文所述跨副本缓存窗口约束                                      |
+| Passkey 校验                 | WebAuthn 源、RP ID、挑战、凭证签名与计数器检查                                         |
+| 邮箱枚举抗性                 | 中性的注册/登录/恢复响应与虚设 passkey 选项                                            |
+| 邮件 bearer token 熵         | 32 随机字节                                                                            |
+| WebAuthn 挑战存储            | 五分钟进程本地映射；无亲和性/共享存储则非多实例安全                                    |
+| 按设备 JWT 吊销              | 未实现                                                                                 |
+| 刷新 token 分离              | 未实现                                                                                 |
 
-Set `JWT_SECRET` to a strong random value of at least 32 characters. WebAuthn
-deployment identity is controlled by `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and
-`WEBAUTHN_ORIGIN`; production origins must use HTTPS.
+将 `JWT_SECRET` 设为至少 32 字符的强随机值。WebAuthn 部署身份由 `WEBAUTHN_RP_NAME`、`WEBAUTHN_RP_ID` 与 `WEBAUTHN_ORIGIN` 控制；生产源必须使用 HTTPS。

@@ -1,30 +1,24 @@
-# Adding an issue integration
+# 添加 Issue 集成
 
-New external issue and calendar integrations should be **issue-provider plugins**.
-Do not add a new built-in provider to `src/app/features/issue/providers/` unless a
-maintainer has approved a core-only requirement that the plugin API cannot meet.
+新的外部 issue 与日历集成应为 **issue-provider 插件**。
+除非维护者已批准插件 API 无法满足的仅核心需求，否则不要向 `src/app/features/issue/providers/` 添加新的内置提供方。
 
-The public TypeScript definitions are authoritative:
+公共 TypeScript 定义为权威来源：
 
 - [`packages/plugin-api/src/issue-provider-types.ts`](../packages/plugin-api/src/issue-provider-types.ts)
 - [`packages/plugin-api/src/types.ts`](../packages/plugin-api/src/types.ts)
 
-Use a current bundled provider as the implementation reference:
+以当前打包的提供方为实现参考：
 
-- [GitHub](../packages/plugin-dev/github-issue-provider/) for search, comments,
-  backlog import, and field synchronization
-- [Google Calendar](../packages/plugin-dev/google-calendar-provider/) for OAuth,
-  agenda fields, and event write-back
-- [CalDAV](../packages/plugin-dev/caldav-calendar-provider/) for text responses,
-  nonstandard HTTP verbs, and an approved private-network provider
+- [GitHub](../packages/plugin-dev/github-issue-provider/)：搜索、评论、待办导入与字段同步
+- [Google Calendar](../packages/plugin-dev/google-calendar-provider/)：OAuth、议程字段与事件回写
+- [CalDAV](../packages/plugin-dev/caldav-calendar-provider/)：文本响应、非标准 HTTP 动词，以及已批准的私有网络提供方
 
-For general plugin packaging, UI, permissions, and security, read
-[Plugin development](plugin-development.md).
+通用插件打包、UI、权限与安全见 [插件开发](plugin-development.md)。
 
-## 1. Create the plugin package
+## 1. 创建插件包
 
-A repository-owned provider normally lives under
-`packages/plugin-dev/<provider-name>/`:
+仓库拥有的提供方通常位于 `packages/plugin-dev/<provider-name>/`：
 
 ```text
 <provider-name>/
@@ -37,10 +31,9 @@ A repository-owned provider normally lives under
 └── *.spec.ts
 ```
 
-Keep provider API types and mapping logic inside the package. Do not add the
-provider to core issue-provider unions, defaults, forms, or Angular services.
+将提供方 API 类型与映射逻辑保留在包内。不要把提供方加到核心 issue-provider 联合类型、默认值、表单或 Angular 服务中。
 
-Minimal manifest:
+最小 manifest：
 
 ```json
 {
@@ -67,14 +60,11 @@ Minimal manifest:
 }
 ```
 
-Omit `issueProvider.issueProviderKey` for a new provider. The host assigns
-`plugin:<plugin-id>`. That field is reserved for repository-managed plugins that
-migrate an existing built-in key and its persisted configurations.
+新提供方省略 `issueProvider.issueProviderKey`。宿主会分配 `plugin:<plugin-id>`。该字段保留给迁移既有内置键及其持久化配置的仓库托管插件。
 
-## 2. Register the provider
+## 2. 注册提供方
 
-`IssueProviderPluginDefinition` is Promise-based. Implement the exact current
-type rather than copying a method list into the plugin:
+`IssueProviderPluginDefinition` 基于 Promise。实现当前确切类型，而不是把方法列表抄进插件：
 
 ```typescript
 import type {
@@ -135,34 +125,17 @@ PluginAPI.registerIssueProvider({
 });
 ```
 
-The required contract is `configFields`, `getHeaders`, `searchIssues`, `getById`,
-`getIssueLink`, and `issueDisplay`. Optional capabilities include connection
-testing, comments, backlog import, field mappings, create/update/delete, and
-calendar time-block operations. Add only capabilities the provider actually
-supports.
+必填契约为 `configFields`、`getHeaders`、`searchIssues`、`getById`、`getIssueLink` 与 `issueDisplay`。可选能力包括连接测试、评论、待办导入、字段映射、创建/更新/删除，以及日历时间块操作。只添加提供方实际支持的能力。
 
-Use the `PluginHttp` argument for provider requests. It returns Promises, applies
-the provider headers, and limits methods and timeouts. Its initial-URL check
-rejects known metadata hosts, common local hostnames, and literal private IP
-addresses by default. It does not resolve hostnames before the request or
-revalidate redirect targets, and issue-provider requests currently follow
-redirects. Use fixed HTTPS API origins that you trust; do not treat
-`PluginHttp` as a complete SSRF boundary. `allowPrivateNetwork` is only honored
-for trusted bundled plugins and should be enabled only for a self-hosted
-provider that needs it.
+提供方请求使用 `PluginHttp` 参数。它返回 Promise，应用提供方 headers，并限制方法与超时。其初始 URL 检查默认拒绝已知元数据主机、常见本地主机名与字面私有 IP。它不会在请求前解析主机名或重新校验重定向目标，且 issue-provider 请求当前会跟随重定向。使用你信任的固定 HTTPS API 源；不要把 `PluginHttp` 当作完整 SSRF 边界。`allowPrivateNetwork` 仅对受信打包插件生效，且只应在自托管提供方需要时启用。
 
-`manifest.allowedHosts` scopes the separate `PluginAPI.request` method; it does
-not constrain the `PluginHttp` object passed to issue-provider methods. On web
-and desktop, `PluginAPI.request` rejects redirects; native requests can still
-follow them, and hostname resolution is not revalidated on any platform.
+`manifest.allowedHosts` 约束的是单独的 `PluginAPI.request` 方法；不约束传给 issue-provider 方法的 `PluginHttp`。在 Web 与桌面端，`PluginAPI.request` 拒绝重定向；原生请求仍可跟随，且任何平台都不会重新校验主机名解析。
 
-## 3. Handle credentials
+## 3. 处理凭证
 
 ### OAuth
 
-Declare both `"oauth"` and `"http"` permissions and add an `oauthButton` field
-with an `OAuthFlowConfig`. The host starts the platform-appropriate OAuth flow and
-stores the resulting token. Provider methods retrieve it asynchronously:
+同时声明 `"oauth"` 与 `"http"` 权限，并添加带 `OAuthFlowConfig` 的 `oauthButton` 字段。宿主启动适合平台的 OAuth 流程并存储所得 token。提供方方法异步取回：
 
 ```typescript
 declare const PluginAPI: {
@@ -176,16 +149,11 @@ async function getHeaders(): Promise<Record<string, string>> {
 }
 ```
 
-See the Google Calendar provider for desktop, Android, iOS, scope, and PKCE
-configuration. A `clientSecret` embedded in plugin source or configuration is not
-confidential. Include one only when the provider explicitly treats that client as
-public; never commit a confidential OAuth secret.
+桌面、Android、iOS、scope 与 PKCE 配置见 Google Calendar 提供方。嵌入插件源码或配置中的 `clientSecret` 并非机密。仅当提供方明确将该客户端视为公开时才包含；绝不要提交机密 OAuth secret。
 
-### API tokens and passwords
+### API token 与密码
 
-Do not store secrets in synced plugin data or provider configuration merely
-because a field uses `type: "password"`; that only masks the UI. Plugin-managed
-credential setup should use the local, per-plugin secret API:
+不要仅因字段使用 `type: "password"` 就把密钥存进已同步的插件数据或提供方配置；那只是 UI 遮罩。插件管理的凭证设置应使用本地、按插件的 secret API：
 
 ```typescript
 await PluginAPI.setSecret('api-token', token);
@@ -193,41 +161,35 @@ const token = await PluginAPI.getSecret('api-token');
 await PluginAPI.deleteSecret('api-token');
 ```
 
-These values are per-device and excluded from Super Productivity sync, exports,
-and backups. They are currently unencrypted at rest, so this is an isolation
-boundary, not hardware-backed secure storage. Users must enter the secret again
-on each device.
+这些值按设备隔离，且排除在 Super Productivity 同步、导出与备份之外。目前静态未加密，因此这是隔离边界，不是硬件加固安全存储。用户必须在每台设备上重新输入密钥。
 
-Never log tokens, authorization headers, response bodies containing user content,
-or issue titles.
+绝不要记录 token、授权头、含用户内容的响应体或 issue 标题。
 
-## 4. Map data deliberately
+## 4. 有意映射数据
 
-- Normalize remote IDs to strings.
-- Convert timestamps explicitly and test timezone/all-day behavior.
-- Return only the fields needed by `PluginSearchResult` and `PluginIssue`.
-- Define `fieldMappings` only for safe, reversible semantics. Default a mapping
-  to `off` or `pullOnly` when remote write behavior is surprising.
-- Make create/update/delete idempotent where the provider permits it.
-- Handle rate limits, pagination, deleted states, and partial API responses.
-- Keep provider-specific data inside the plugin instead of extending core models.
+- 将远程 ID 规范为字符串。
+- 显式转换时间戳，并测试时区/全天行为。
+- 仅返回 `PluginSearchResult` 与 `PluginIssue` 所需字段。
+- 仅为安全、可逆语义定义 `fieldMappings`。当远程写行为出人意料时，将映射默认设为 `off` 或 `pullOnly`。
+- 在提供方允许处使 create/update/delete 幂等。
+- 处理限速、分页、已删除状态与部分 API 响应。
+- 将提供方特定数据留在插件内，而不是扩展核心模型。
 
-## 5. Bundle and document a repository-owned provider
+## 5. 打包并文档化仓库拥有的提供方
 
-For a bundled provider:
+对打包提供方：
 
-1. Add its build to `packages/plugin-dev/scripts/build-all.js`.
-2. Copy the built output into `src/assets/bundled-plugins/<plugin-id>/`.
-3. Add the asset path to the bundled list in `src/app/plugins/plugin.service.ts`.
-4. Add only English source strings; follow existing plugin i18n packaging.
-5. Update the issue-provider comparison in `docs/wiki/` in the same change.
+1. 将其构建加入 `packages/plugin-dev/scripts/build-all.js`。
+2. 将构建输出复制到 `src/assets/bundled-plugins/<plugin-id>/`。
+3. 将资源路径加到 `src/app/plugins/plugin.service.ts` 的打包列表。
+4. 只添加英文字符串源；遵循既有插件 i18n 打包方式。
+5. 在同一改动中更新 `docs/wiki/` 中的 issue-provider 对比。
 
-Uploaded community plugins do not need core registration and keep their
-`plugin:<plugin-id>` provider key.
+上传的社区插件无需核心注册，并保留其 `plugin:<plugin-id>` 提供方键。
 
-## 6. Verify
+## 6. 验证
 
-At minimum:
+至少：
 
 ```bash
 cd packages/plugin-dev/<provider-name>
@@ -236,25 +198,18 @@ npm test
 npm run build
 ```
 
-If the package has no test script yet, add focused tests for response mapping,
-authentication failures, pagination, dates, and write-back conversions. Then run
-the repository plugin build:
+若包尚无测试脚本，为响应映射、认证失败、分页、日期与回写转换添加聚焦测试。然后运行仓库插件构建：
 
 ```bash
 npm run plugins:build
 ```
 
-Manually verify configuration, connection testing, search/import, polling, and
-any enabled write-back on web, Electron, and each claimed native platform.
+在 Web、Electron 与每个声称的原生平台上手动验证配置、连接测试、搜索/导入、轮询，以及任何已启用的回写。
 
-## Legacy core providers
+## 遗留核心提供方
 
-Existing built-in providers still implement
-[`IssueServiceInterface`](../src/app/features/issue/issue-service-interface.ts),
-whose current methods return Promises. Fixes to an existing built-in provider
-should follow its established folder and tests.
+既有内置提供方仍实现
+[`IssueServiceInterface`](../src/app/features/issue/issue-service-interface.ts)，
+其当前方法返回 Promise。修复既有内置提供方应遵循其既定文件夹与测试。
 
-Adding another core provider creates permanent unions, configuration state,
-forms, migrations, and sync compatibility. Do not follow that path for a new
-integration without an explicit architecture decision explaining why the plugin
-contract is insufficient.
+再添加一个核心提供方会产生永久的联合类型、配置状态、表单、迁移与同步兼容性。没有明确架构决策说明插件契约为何不足时，不要为新集成走那条路。

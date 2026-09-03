@@ -1,53 +1,53 @@
 # super-productivity-android
 
-Android App for Super Productivity (https://super-productivity.com/).
+Super Productivity 的 Android 应用（https://super-productivity.com/）。
 
-I am not an Android developer, so help would be very welcome!!
+我不是 Android 开发者，因此非常欢迎大家帮忙！！
 
-## New Connectivity-Free Mode is Here!
+## 全新无网络依赖模式已上线！
 
-_This feature was added on October 7, 2024. See [Pull Request #57](https://github.com/super-productivity/super-productivity-android/pull/57)._
+_该功能于 2024 年 10 月 7 日加入。参见 [Pull Request #57](https://github.com/super-productivity/super-productivity-android/pull/57)。_
 
-You can now use the core features of the app without an internet connection, offering a smoother and more reliable experience. We've made several key updates to enhance usability:
+你现在可以在无互联网连接的情况下使用应用的核心功能，体验更流畅、更可靠。我们做了多项关键更新以提升易用性：
 
-- **Connectivity-Free Mode Support**: Enjoy uninterrupted access to the app's main features without needing a network connection. You can still sync with WebDAV, Dropbox, or choose to work entirely offline without any network access.
-- **Online-Only Mode (Compatibility Mode)**: For users who prefer or need the traditional experience, the app still supports the original mode, which requires an internet connection for functionality.
-- **CORS Issues Resolved**: Fixed cross-origin resource sharing (CORS) problems, especially for WebDAV sync, ensuring secure and smooth synchronisation with local or hosted resources.
-- **Enhanced Security**: Strengthened data protection to keep your information secure, even when offline.
-- **Seamless Upgrade**: Existing users can continue using the app in Online-Only Mode (Compatibility Mode) without any disruptions, while new users can immediately enjoy the benefits of Connectivity-Free Mode. Future updates will also include a smooth migration plan for everyone.
+- **无网络依赖模式支持**：无需网络即可不间断使用应用的主要功能。你仍可与 WebDAV、Dropbox 同步，或选择完全离线、不访问任何网络。
+- **仅在线模式（兼容模式）**：若你更偏好或需要传统体验，应用仍支持原先模式，该模式需要互联网连接才能正常工作。
+- **CORS 问题已解决**：修复了跨域资源共享（CORS）问题，尤其是 WebDAV 同步，确保与本地或托管资源的安全、流畅同步。
+- **安全性增强**：加强了数据保护，即使在离线状态下也能保障信息安全。
+- **无缝升级**：现有用户可继续在仅在线模式（兼容模式）下使用而不受干扰，新用户则可立即享受无网络依赖模式的优势。后续更新还将为所有人提供平滑迁移方案。
 
-Update now to enjoy these exciting new features and improvements!
+立即更新，体验这些令人兴奋的新功能与改进！
 
-## Launch Modes
+## 启动模式
 
-The app supports two launch modes:
+应用支持两种启动模式：
 
-1. **Connectivity-Free Mode** (Recommended) – Use the app without an internet connection.
-2. **Online-Only Mode (Compatibility Mode)** – Requires an internet connection to connect to production, local development, or self-hosted servers.
+1. **无网络依赖模式**（推荐）——无需互联网即可使用应用。
+2. **仅在线模式（兼容模式）**——需要互联网以连接生产环境、本地开发或自托管服务器。
 
-### Configuring Launch Mode
+### 配置启动模式
 
-To configure the launch mode, adjust the `LAUNCH_MODE` setting in the `app_config.properties` file:
+要配置启动模式，请在 `app_config.properties` 文件中调整 `LAUNCH_MODE` 设置：
 
-- **0**: Default behaviour (read from SharedPreferences)
-- **1**: Force Online-Only Mode (Compatibility Mode)
-- **2**: Force Connectivity-Free Mode (Recommended)
+- **0**：默认行为（从 SharedPreferences 读取）
+- **1**：强制仅在线模式（兼容模式）
+- **2**：强制无网络依赖模式（推荐）
 
-**Recommendation**: Set `LAUNCH_MODE` to `2` for Connectivity-Free Mode.
+**建议**：将 `LAUNCH_MODE` 设为 `2` 以使用无网络依赖模式。
 
-### How to Adjust `LAUNCH_MODE`
+### 如何调整 `LAUNCH_MODE`
 
-1. Locate the `app_config.properties` file in the project's root directory.
-2. Open the file in a text editor.
-3. Find the `LAUNCH_MODE` setting and set it to your desired mode (`0`, `1`, or `2`).
+1. 在项目根目录找到 `app_config.properties` 文件。
+2. 用文本编辑器打开该文件。
+3. 找到 `LAUNCH_MODE` 设置，并将其设为所需模式（`0`、`1` 或 `2`）。
 
 ```properties
 LAUNCH_MODE=2
 ```
 
-**Important**: The `app_config.properties` file is intended for local modifications only. **DO NOT COMMIT** this file unless you are sure of what you are doing.
+**重要**：`app_config.properties` 文件仅供本地修改。**请勿提交**该文件，除非你清楚自己在做什么。
 
-### Detailed Configuration Guides
+### 详细配置指南
 
-- **[Connectivity-Free Mode Documentation (Recommended)](./README_OFFLINE.md)**: Step-by-step guide to setting up and building the app in Connectivity-Free Mode.
-- **[Online-Only Mode (Compatibility) Documentation](./README_ONLINE.md)**: Step-by-step guide to setting up and building the app in Online-Only Mode.
+- **[无网络依赖模式文档（推荐）](./README_OFFLINE.md)**：在无网络依赖模式下设置并构建应用的逐步指南。
+- **[仅在线模式（兼容）文档](./README_ONLINE.md)**：在仅在线模式下设置并构建应用的逐步指南。

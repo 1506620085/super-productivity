@@ -1,497 +1,488 @@
-# Sync Simplification Plan
+# 同步简化计划
 
-**Status:** Re-aligned to `origin/master` 7ef7e69e96 on 2026-07-16. The 2026-07-15 re-align (baseline 6fefd741c5) covered 15 commits of sync fixes landing in/around every task surface — #9023 (REPAIR concurrency guard) and #9040 (immutable split snapshots) in Task 2's adapter, #9028 (WS local-win re-upload) in Task 4's shell, #9045 (decrypt-path footprint auth + journal privacy), #9048 (notes/sections/repeat-cfg cascade recovery) and #9035 (clientId LWW tiebreak) in Task 6's territory, #9026 (non-interactive in-lock repair) in the critical section. Master has since advanced 3 further commits, of which exactly one touches a task surface: **#9054** (authenticated LWW project-move footprint, GHSA-8pxh-mgc7-gp3g) lands in `conflict-resolution.service.ts` and is folded into contract 14 and §4's fence list below. The other two are out of scope (#9052 orphan-task navigation heal, #9056 locale date names). Claims below verified against `origin/master`; #9044 was dialog-layer only and did not touch the file adapter. **Revised 2026-07-17:** Task 6 rescoped — the disjoint-field merge is load-bearing against whole-entity LWW data loss (#9095, producer unfrozen in #9101) and is now excluded from the rollback; the rollback covers the conflict journal and review UI only. Journal removal ≠ merge removal.
+**状态：** 已于 2026-07-16 相对 `origin/master` 7ef7e69e96 重新对齐。2026-07-15 的重新对齐（基线 6fefd741c5）覆盖了落在/围绕每个任务面的 15 个同步修复提交——#9023（REPAIR 并发守卫）与 #9040（不可变拆分快照）在任务 2 的适配器中，#9028（WS 本地胜出重新上传）在任务 4 的外壳中，#9045（解密路径足迹认证 + 日志隐私），#9048（notes/sections/repeat-cfg 级联恢复）与 #9035（clientId LWW 平局决胜）在任务 6 的领地中，#9026（锁内非交互修复）在临界区中。Master 此后又前进了 3 个提交，其中恰好一个触及任务面：**#9054**（已认证的 LWW 项目移动足迹，GHSA-8pxh-mgc7-gp3g）落在 `conflict-resolution.service.ts`，并并入下方契约 14 与 §4 的围栏列表。另外两个超出范围（#9052 孤儿任务导航修复，#9056 区域设置日期名称）。下方声明已对照 `origin/master` 验证；#9044 仅涉及对话框层，未触及文件适配器。**2026-07-17 修订：** 任务 6 重新定范围——不相交字段合并对防止整实体 LWW 数据丢失具有承重作用（#9095，生产者在 #9101 中解冻），现已排除出回滚；回滚仅覆盖冲突日志与审查 UI。移除日志 ≠ 移除合并。
 
-**Date:** 2026-07-16
+**日期：** 2026-07-16
 
-**Baseline commit:** 7ef7e69e96 (previous audit baselines: 6fefd741c5, 7e273a0e5c)
+**基线提交：** 7ef7e69e96（先前审计基线：6fefd741c5，7e273a0e5c）
 
-**Scope:** Conflict-review behavior, file-provider target state, and duplicate SuperSync trigger pipelines
+**范围：** 冲突审查行为、文件提供方目标状态，以及重复的 SuperSync 触发管道
 
-## 1. Outcome
+## 1. 结果
 
-Delete sync lifecycle policy only where a smaller path preserves persisted-data compatibility, provider eligibility, and notification delivery.
+仅在更小路径能保留持久数据兼容性、提供方资格与通知投递时，删除同步生命周期策略。
 
-The smallest safe order is:
+最小安全顺序是：
 
-1. audit builds that received the conflict-review feature and freeze the schema-v3/v4 compatibility boundary;
-2. fix file-provider state crossing remote-target changes;
-3. add one background full-sync scheduler that cooperates with every existing full-sync owner;
-4. route SuperSync WebSocket and eligible local-operation triggers through it;
-5. delete the duplicated partial download/upload pipelines only after focused behavior and request-cost gates pass;
-6. remove only the conflict-review producers and UI that the deployment/persisted-data audit proves disposable;
-7. correct current sync documentation after behavior settles.
+1. 审计收到冲突审查功能的构建，并冻结 schema-v3/v4 兼容边界；
+2. 修复跨远程目标变更的文件提供方状态；
+3. 添加一个与每个现有全量同步所有者协作的后台全量同步调度器；
+4. 将 SuperSync WebSocket 与合格的本地操作触发器路由到它；
+5. 仅在针对性行为与请求成本门控通过后，删除重复的部分下载/上传管道；
+6. 仅移除部署/持久数据审计证明可丢弃的冲突审查生产者与 UI；
+7. 在行为稳定后更正当前同步文档。
 
-> ## ⚠️ Release premise expired — re-derive before acting (2026-08-28)
+> ## ⚠️ 发布前提已过期 — 行动前重新推导（2026-08-28）
 >
-> This plan was written while `962c5bbeb1` (PR #8874, conflict review) was
-> unreleased. It is now in **eight** stable tags — v18.15.0, v18.15.1, v18.16.0,
-> v18.17.0, v18.18.0, v18.19.0, v18.20.0, v18.20.1 (`git tag --contains`,
-> 2026-08-28). Every "not in a release" / "no stable tag contains it" statement
-> below is therefore **false**, including §1's timing constraint and §2's
-> conflict-journal verdict. Real users on eight shipped versions have written
-> journal rows. Task 1 must be redone against current tags before any
-> conflict-feature deletion; treat the rest of the document as unverified until
-> re-aligned.
+> 本计划撰写时 `962c5bbeb1`（PR #8874，冲突审查）尚未发布。它现已包含在
+> **八个**稳定标签中 — v18.15.0、v18.15.1、v18.16.0、v18.17.0、v18.18.0、
+> v18.19.0、v18.20.0、v18.20.1（`git tag --contains`，2026-08-28）。因此下方每条
+> 「不在发布中」/「无稳定标签包含它」的声明均为 **假**，包括 §1 的时间约束与
+> §2 的冲突日志裁决。八个已发布版本上的真实用户已写入日志行。在任何冲突功能
+> 删除之前，任务 1 必须对照当前标签重做；在重新对齐之前，将其余文档视为未验证。
 
-**Timing constraint (stale, see banner):** the conflict-review feature (962c5bbeb1, merged 2026-07-11) was unreleased when this was written, and releases ship every one to two weeks. The journal half of the producer freeze is already in place on master (`disableConflictJournal: true` at the production entry point in `RemoteOpsProcessingService`), so stable releases do not expand the persisted-data obligation. The disjoint-merge half of the original #9061 freeze was deliberately reverted by #9101 and MUST NOT be re-applied: with the merge disabled, concurrent edits to different fields of one entity resolve by whole-entity LWW and the earlier side's edit is silently and permanently lost on every client (#9095 — live in every release up to v18.14.0). The merge producer ships enabled; only the journal stays frozen for stable.
+**时间约束（已过时，见横幅）：** 冲突审查功能（962c5bbeb1，合并于 2026-07-11）在撰写时尚未发布，且发布约每两周一到两次。生产者冻结的日志半边已在 master 就位（`RemoteOpsProcessingService` 生产入口处的 `disableConflictJournal: true`），因此稳定发布不会扩大持久数据义务。原 #9061 冻结的不相交合并半边被 #9101 有意回退，且不得重新应用：合并禁用时，对同一实体不同字段的并发编辑按整实体 LWW 解决，较早一侧的编辑在每个客户端上静默且永久丢失（#9095 — 在直至 v18.14.0 的每个发布中存活）。合并生产者随发布启用；仅日志对稳定版保持冻结。
 
-Atomic browser startup and replacement of flag-and-poll maintenance exclusion remain worthwhile correctness projects, but they are not prerequisites for deleting the two partial SuperSync pipelines. Keeping them separate avoids turning a bounded simplification into a cross-tab/bootstrap and every-import-owner rewrite.
+原子浏览器启动与替换标志轮询维护排除仍是值得的正确性项目，但它们不是删除两条部分 SuperSync 管道的前置条件。将它们分开可避免把有界简化变成跨标签页/引导与每个导入所有者的重写。
 
-## 2. Removal verdict
+## 2. 移除裁决
 
-| Surface                                                                                       | Verdict                                      | Cost-benefit conclusion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 表面                                                                                       | 裁决                                      | 成本收益结论                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Schema v3/v4, v2-to-v3 and v3-to-v4 barriers, IndexedDB version 10, and compatibility readers | **Keep**                                     | Removing them can reject stored operations, misresolve marked project deletion, or silently diverge. Their maintenance cost is tiny relative to data-loss risk.                                                                                                                                                                                                                                                                                                                                            |
-| Disjoint-merge planner/writer                                                                 | **Keep (rescoped 2026-07-17)**               | Removal re-introduces #9095: without the merge, concurrent edits to different fields of one entity resolve by whole-entity LWW and the earlier side's edit is silently lost on every client. The producer was unfrozen in #9101 and ships enabled. Keep both payload readers; preserve the separate schema-v4 project-delete-wins planner/classifier and historical losing-delete recovery.                                                                                                                |
-| Conflict journal writer and review UI/route/banner/badge                                      | **Conditional removal — verdict stale**      | Written on the false premise that no stable tag contained the feature. Eight stable tags do (see banner), so device-local discarded values exist on real user installs, not just edge/internal builds. Re-derive the obligation in Task 1 before removing anything.                                                                                                                                                                                                                                        |
-| Conflict journal database/reader                                                              | **Keep until the data obligation expires**   | It may hold the only copy of discarded values. A temporary read/export path is cheaper than silently stranding supported data.                                                                                                                                                                                                                                                                                                                                                                             |
-| Flip-specific capture/replay handling                                                         | **Nothing to remove**                        | Flip dispatches an ordinary synced entity update. Remove UI references only, never generic update capture/replay.                                                                                                                                                                                                                                                                                                                                                                                          |
-| File-target state leak                                                                        | **Fix now; high value**                      | This is a contained correctness issue that can cause cross-target reads or writes. It is not counted as simplification.                                                                                                                                                                                                                                                                                                                                                                                    |
-| WebSocket partial-download pipeline                                                           | **Remove; allow a thin adapter**             | It duplicates the orchestration shell (session boundary, provider resolution, error-to-status mapping, cursor gate, cycle-guard claim, and — since #9028 — a single local-win re-upload with ERROR/UNKNOWN_OR_CHANGED mapping); apply/conflict already delegate to the shared download core, and it never publishes IN_SYNC. Full sync's own LWW re-upload loop subsumes the re-upload. A small high-watermark/retry/auth adapter may remain when it is safer than inventing a scheduler outcome protocol. |
-| ImmediateUploadService                                                                        | **Conditional removal; likely high benefit** | Normal full sync can replace it under the exact stable SuperSync eligibility policy. File providers must never inherit the trigger.                                                                                                                                                                                                                                                                                                                                                                        |
-| SyncCycleGuardService                                                                         | **Keep in this roadmap**                     | Full sync and force upload still use it. Removal belongs to a later exclusion-boundary project after all references move.                                                                                                                                                                                                                                                                                                                                                                                  |
-| Flag-and-poll maintenance exclusion                                                           | **Worth fixing separately**                  | The same-tab check-then-set race is real, but migrating sync, encryption, imports, restore, profile switch, and undo is a larger correctness project, not a deletion prerequisite.                                                                                                                                                                                                                                                                                                                         |
-| Page-lifetime Web Lock                                                                        | **Worth a separate startup proposal**        | It improves current/current startup but cannot make an old client acquire the lock, adds bootstrap/fallback states, and deletes no sync path.                                                                                                                                                                                                                                                                                                                                                              |
-| Full enforcement/test matrix document                                                         | **Do not add now**                           | It creates another truth surface during active changes. Correct false claims now; consolidate current contracts after implementation.                                                                                                                                                                                                                                                                                                                                                                      |
-| Split-file, tombstone, migration, native-transition, and older-schema readers                 | **Keep**                                     | Retirement conditions are not met; payoff is low and recovery/downgrade risk is high.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Schema v3/v4、v2-to-v3 与 v3-to-v4 屏障、IndexedDB 版本 10，以及兼容读取器 | **保留**                                     | 移除它们可能拒绝已存储操作、错误解析已标记项目删除，或静默发散。相对数据丢失风险，其维护成本极小。                                                                                                                                                                                                                                                                                                                                            |
+| 不相交合并规划器/写入器                                                                 | **保留（2026-07-17 重新定范围）**               | 移除会重新引入 #9095：无合并时，对同一实体不同字段的并发编辑按整实体 LWW 解决，较早一侧的编辑在每个客户端上静默丢失。生产者在 #9101 中解冻并随发布启用。保留两个载荷读取器；保留独立的 schema-v4 项目删除胜出规划器/分类器与历史失败删除恢复。                                                                                                                |
+| 冲突日志写入器与审查 UI/路由/横幅/徽章                                      | **有条件移除 — 裁决已过时**      | 基于无稳定标签包含该功能的错误前提撰写。八个稳定标签确实包含（见横幅），因此设备本地的丢弃值存在于真实用户安装上，而不仅是 edge/内部构建。移除任何内容前在任务 1 中重新推导义务。                                                                                                                                                                                                                                        |
+| 冲突日志数据库/读取器                                                              | **保留直至数据义务到期**   | 它可能持有丢弃值的唯一副本。临时读/导出路径比静默搁浅受支持数据更便宜。                                                                                                                                                                                                                                                                                                                                                                             |
+| Flip 特定捕获/重放处理                                                         | **无可移除**                        | Flip 派发普通同步实体更新。仅移除 UI 引用，切勿移除通用更新捕获/重放。                                                                                                                                                                                                                                                                                                                                                                                          |
+| 文件目标状态泄漏                                                                        | **立即修复；高价值**                      | 这是可导致跨目标读或写的有界正确性问题。不计入简化。                                                                                                                                                                                                                                                                                                                                                                                    |
+| WebSocket 部分下载管道                                                           | **移除；允许薄适配器**             | 它重复编排外壳（会话边界、提供方解析、错误到状态映射、游标门控、周期守卫声明，以及 — 自 #9028 起 — 带 ERROR/UNKNOWN_OR_CHANGED 映射的单次本地胜出重新上传）；应用/冲突已委托给共享下载核心，且从不发布 IN_SYNC。全量同步自身的 LWW 重新上传循环涵盖该重新上传。当比发明调度器结果协议更安全时，可保留小型高水位/重试/认证适配器。 |
+| ImmediateUploadService                                                                        | **有条件移除；可能高收益** | 在精确稳定的 SuperSync 资格策略下，普通全量同步可替换它。文件提供方绝不可继承该触发器。                                                                                                                                                                                                                                                                                                                                                                        |
+| SyncCycleGuardService                                                                         | **在本路线图中保留**                     | 全量同步与强制上传仍使用它。移除属于所有引用迁移后的后续排除边界项目。                                                                                                                                                                                                                                                                                                                                                                                  |
+| 标志与轮询维护排除                                                           | **值得单独修复**                  | 同标签页检查后设置竞态真实存在，但迁移同步、加密、导入、恢复、配置切换与撤销是更大的正确性项目，不是删除前置条件。                                                                                                                                                                                                                                                                                                                         |
+| 页面生命周期 Web Lock                                                                        | **值得单独启动提案**        | 它改善 current/current 启动，但不能让旧客户端获取锁，增加引导/回退状态，且不删除任何同步路径。                                                                                                                                                                                                                                                                                                                                                              |
+| 完整强制/测试矩阵文档                                                         | **现在不要添加**                           | 它在活跃变更期间创建另一真相面。现在更正错误声明；实现后整合当前契约。                                                                                                                                                                                                                                                                                                                                                                      |
+| 拆分文件、墓碑、迁移、原生过渡与更旧 schema 读取器                 | **保留**                                     | 退役条件未满足；收益低且恢复/降级风险高。                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-The previous broad “remove roughly 6,000 lines together” decision is rejected. Schema-v3 replace/patch compatibility, schema-v4 delete-wins behavior, and multi-entity recovery follow-ups now share that area. Compatibility readers and unrelated data-loss fixes must be fenced explicitly. Post-baseline fixes to fence here include #9048 (notes/sections/repeat-cfg cascade recovery), #9035 (deterministic clientId LWW tiebreak in `@sp/sync-core`), #9025 (invalid-LWW-projectId sanitization in the LWW/section reducers), #9045 (decrypt-path project-move footprint authentication + journal privacy fail-safe), and #9054 (authenticated project-move footprint re-derivation inside `conflict-resolution.service.ts` — see contract 14; this one is security-critical and sits directly in Task 6's deletion path).
+先前宽泛的「一起移除约 6,000 行」决定被否决。Schema-v3 replace/patch 兼容性、schema-v4 delete-wins 行为与多实体恢复跟进现共享该区域。兼容读取器与无关数据丢失修复必须显式围栏。需在此围栏的基线后修复包括 #9048（notes/sections/repeat-cfg 级联恢复）、#9035（`@sp/sync-core` 中确定性 clientId LWW 平局决胜）、#9025（LWW/section 归约器中无效 LWW projectId 清理）、#9045（解密路径项目移动足迹认证 + 日志隐私失败安全），以及 #9054（在 `conflict-resolution.service.ts` 内重新推导已认证的项目移动足迹 — 见契约 14；此项对安全至关重要，且直接位于任务 6 的删除路径上）。
 
-## 3. Contracts that every slice preserves
+## 3. 每个切片保留的契约
 
-1. One user intent creates one durable operation. Remote or replayed operations do not re-trigger local effects.
-2. Remote operations are durable before reducer application. Apply status, vector-clock merge, archive completion, and downloaded cursor retain crash-safe ordering.
-3. Resume/visibility suppression opens synchronously before debounce or lock acquisition.
-4. One validation session owns nested download, piggyback, conflict, and apply work. No caller publishes IN_SYNC before classification.
-5. Normal and compensation operations retain full client clocks until server comparison. Approved bounded pruning remains capped at 20 clients.
-6. A receiver stops at the first unsupported, newer, invalid, or migration-failing operation and advances only through the valid prefix.
-7. Schema-v3 replace-mode and patch-mode LWW operations remain distinguishable and replayable. Schema-v4 marked project deletions retain delete-wins semantics; historical unmarked deletions retain timestamp LWW. Both migration barriers and the IndexedDB downgrade barrier remain.
-8. A file snapshot's state cache, archives, vector clock, and snapshot-included operations commit as one baseline. A failed commit leaves the previous baseline intact. The committed ops file's snapshot is written to an immutable, generation-unique file (`snapshotRef.file`, `sync-state__<syncVersion>__<random>.json`) a concurrent compactor cannot clobber; the fixed `sync-state.json`/`.bak` remain a pre-#9040 compat fallback. A confirmed rev mismatch reclaims the orphaned immutable snapshot, but an ambiguous commit failure must not delete it (#9040).
-9. Split-file operations newer than the referenced snapshot (resolved `snapshotRef.file` → `sync-state.json` → `.bak`, #9040) apply normally before the downloaded cursor advances.
-10. Persistent local actions arriving during snapshot hydration are deferred, durably restored on top of the new baseline, replayed into live state, and have archive side effects restored before the remote-apply window closes.
-11. Archive read-modify-write operations and remote/import replacements serialize through the `TASK_ARCHIVE` boundary. (Known residual: `TimeTrackingService` project/tag cleanup runs outside this mutex — #8941; do not treat that gap as resolved.)
-12. Raw rebuild resumes before ordinary sync; reducer-pending work blocks sync.
-13. Import/rebuild retain preflight-before-mutation, backup, atomic replacement, cursor, and crash-resume ordering.
-14. Encryption fails closed. `isPayloadEncrypted` is not a trusted policy input (enforced at the download boundary). On the decrypt path an encrypted LWW op's `entityId` (bound to authenticated `payload.id`) and, when the payload carries `projectMoveSubTaskIds`, its multi-task project-move footprint `entityIds` (bound to `{entityId} ∪ projectMoveSubTaskIds`) are validated against the GCM-authenticated payload and rejected on mismatch (`verify-decrypted-op-integrity.ts`, #9045). Synthetic conflict-resolution LWW ops (carrying `entityIds` without an authenticated `projectMoveSubTaskIds`) are intentionally exempt from that check; that exemption must survive the Task 6 rollback (the disjoint merge itself now stays). The exemption is safe only because no relocation decision ever reads a plaintext envelope (#9054, GHSA-8pxh-mgc7-gp3g): `getTaskProjectMoveEntityIds` (`conflict-resolution.service.ts`) re-derives a footprint from the authenticated `payload.projectMoveFootprint` for LWW ops, and for raw `TASK_SHARED_UPDATE` ops from `actionPayload.projectMoveSubTaskIds` plus a root of `actionPayload.task.id` — never `op.entityId`/`op.entityIds` — so a tampered remote envelope cannot be laundered into the freshly-authenticated merged op. That single choke point serves the disjoint-merge, local-win, and superseded-op callers, and both LWW-TASK reducers consume only `meta.projectMoveFootprint` (via `parseMoveFootprint`), with footprint-less legacy ops falling back to receiving-state repair. **Task 6 must keep this choke point intact and must not reintroduce an `op.entityIds` read** — doing so reopens the vector one merge removed. Ops minted in conflict resolution deliberately write the footprint to both `payload.projectMoveFootprint` and `op.entityIds` (the server needs plaintext ids for its indexed conflict detection and cannot read the ciphertext). The surviving envelope `entityIds` readers (`bulk-archive-filter.util.ts`, `get-op-entity-ids.util.ts`) are suppression-only, not relocation, and remain pending the durable AAD hardening.
-15. File revisions, expected sync versions, and vector-clock baselines remain staged until durable apply and cursor commit. Delete-all ordering across split, tombstone, and backup artifacts remains. Known residual: `_deleteAllData` does not enumerate/remove `STATE_GEN_FILE_PREFIX` immutable snapshots (no `listFiles`; `listFiles`-prune is the documented backstop) — the Task 2 reset helper must account for this remote-file gap.
-16. Pending local writes flush before the conflict frontier is read. Conflict planning/execution remain inside the operation-log critical section. In-lock validation/repair runs non-interactively — no native `confirm()`/`alert()` blocks the `sp_op_log` critical section during background sync (#9026); only the pre-lock, foreground USE_REMOTE recovery opts into interactive dialogs.
-17. SuperSync conflict prefetch and per-user lastSeq reservation stay in one transaction; clean-slate replacement preserves monotonic lastSeq.
-18. Piggybacked operations apply before corresponding local entries are marked synced.
-19. A compatibility reader is deleted only after its explicit support condition is true.
-20. A whole-entity LWW exact-timestamp tie breaks deterministically by larger `clientId` so both devices converge, routing the local tie-win through the existing `localWinOperationKind: 'update'` path (`@sp/sync-core`, #9035). That path (including its delete-recreation branch) stays intact.
+1. 一个用户意图创建一个持久操作。远程或重放的操作不重新触发本地效果。
+2. 远程操作在归约器应用之前持久。应用状态、向量时钟合并、归档完成与已下载游标保留崩溃安全顺序。
+3. 恢复/可见性抑制在防抖或锁获取之前同步打开。
+4. 一个验证会话拥有嵌套下载、捎带、冲突与应用工作。任何调用方不得在分类前发布 IN_SYNC。
+5. 普通与补偿操作在服务器比较前保留完整客户端时钟。已批准的有界剪枝仍上限为 20 个客户端。
+6. 接收方在第一个不支持、更新、无效或迁移失败的操作处停止，仅通过有效前缀前进。
+7. Schema-v3 replace 模式与 patch 模式 LWW 操作保持可区分且可重放。Schema-v4 已标记项目删除保留 delete-wins 语义；历史未标记删除保留时间戳 LWW。两个迁移屏障与 IndexedDB 降级屏障保留。
+8. 文件快照的状态缓存、归档、向量时钟与快照包含的操作作为一条基线提交。失败的提交使先前基线完好。已提交 ops 文件的快照写入不可变、代际唯一的文件（`snapshotRef.file`，`sync-state__<syncVersion>__<random>.json`），并发压缩器无法覆盖；固定的 `sync-state.json`/`.bak` 仍为 #9040 前的兼容回退。确认的 rev 不匹配会回收孤立的不可变快照，但模糊的提交失败不得删除它（#9040）。
+9. 新于所引用快照的拆分文件操作（解析顺序 `snapshotRef.file` → `sync-state.json` → `.bak`，#9040）在下载游标前进前正常应用。
+10. 快照 hydration 期间到达的持久本地动作被推迟，在新基线之上持久恢复，重放到活动状态，并在远程应用窗口关闭前恢复归档副作用。
+11. 归档读改写操作与远程/导入替换通过 `TASK_ARCHIVE` 边界序列化。（已知残余：`TimeTrackingService` 项目/标签清理在此互斥锁外运行 — #8941；勿将该缺口视为已解决。）
+12. 原始重建在普通同步之前恢复；归约器待定工作阻塞同步。
+13. 导入/重建保留变更前预检、备份、原子替换、游标与崩溃恢复顺序。
+14. 加密失败关闭。`isPayloadEncrypted` 不是可信策略输入（在下载边界强制）。在解密路径上，加密 LWW op 的 `entityId`（绑定到已认证的 `payload.id`），以及当载荷携带 `projectMoveSubTaskIds` 时其多任务项目移动足迹 `entityIds`（绑定到 `{entityId} ∪ projectMoveSubTaskIds`），对照 GCM 认证载荷验证，不匹配则拒绝（`verify-decrypted-op-integrity.ts`，#9045）。合成冲突解决 LWW ops（携带 `entityIds` 而无已认证的 `projectMoveSubTaskIds`）有意豁免该检查；该豁免必须在任务 6 回滚后存活（不相交合并本身现保留）。仅当无重定位决策曾读取明文信封时该豁免才安全（#9054，GHSA-8pxh-mgc7-gp3g）：`getTaskProjectMoveEntityIds`（`conflict-resolution.service.ts`）对 LWW ops 从已认证的 `payload.projectMoveFootprint` 重新推导足迹，对原始 `TASK_SHARED_UPDATE` ops 从 `actionPayload.projectMoveSubTaskIds` 加上根 `actionPayload.task.id` — 从不从 `op.entityId`/`op.entityIds` — 因此被篡改的远程信封不能被洗白进新认证的合并 op。该单一咽喉点服务于不相交合并、本地胜出与被取代 op 的调用方，且两个 LWW-TASK 归约器仅消费 `meta.projectMoveFootprint`（经由 `parseMoveFootprint`），无足迹的遗留 ops 回退到接收状态修复。**任务 6 必须保持该咽喉点完好，且不得重新引入对 `op.entityIds` 的读取** — 否则会重新打开合并已移除的向量。在冲突解决中铸造的 ops 有意将足迹写入 `payload.projectMoveFootprint` 与 `op.entityIds` 两者（服务器需要明文 id 用于其索引冲突检测且无法读取密文）。存活的信封 `entityIds` 读取器（`bulk-archive-filter.util.ts`，`get-op-entity-ids.util.ts`）仅为抑制用途而非重定位，仍待持久 AAD 加固。
+15. 文件修订、预期同步版本与向量时钟基线保持暂存，直至持久应用与游标提交。跨拆分、墓碑与备份工件的全部删除顺序保留。已知残余：`_deleteAllData` 不枚举/移除 `STATE_GEN_FILE_PREFIX` 不可变快照（无 `listFiles`；`listFiles` 修剪是已记录的后备）— 任务 2 重置辅助必须考虑此远程文件缺口。
+16. 在读取冲突前沿之前刷新待定本地写入。冲突规划/执行保留在操作日志临界区内。锁内验证/修复非交互运行 — 无原生 `confirm()`/`alert()` 在后台同步期间阻塞 `sp_op_log` 临界区（#9026）；仅预锁、前台 USE_REMOTE 恢复选择交互对话框。
+17. SuperSync 冲突预取与按用户 lastSeq 预留留在一个事务中；干净板替换保留单调 lastSeq。
+18. 捎带操作在对应本地条目标记为已同步之前应用。
+19. 兼容读取器仅在其显式支持条件为真后删除。
+20. 整实体 LWW 精确时间戳平局按更大的 `clientId` 确定性决胜，使两台设备收敛，将本地平局胜出路由通过现有 `localWinOperationKind: 'update'` 路径（`@sp/sync-core`，#9035）。该路径（含其删除重建分支）保持完好。
 
-## 4. Success criteria
+## 4. 成功标准
 
-- [ ] Schema-v3 replace/patch operations and schema-v4 marked/unmarked project deletions retain their distinct semantics through every supported persisted path.
-- [ ] Target-A operations cannot read, upload, delete, back up, or repopulate state for target B, including after restart.
-- [ ] A background request arriving during foreground, initial, background, or maintenance work is retained and drained by exactly one pending owner after initial-sync and request-time provider/configuration eligibility are revalidated.
-- [ ] WebSocket delivery retains a sequence high-watermark, bounded transient retry, cursor-based completion, and terminal authentication behavior.
-- [ ] Persisted local operations request full sync only under the current non-file operation-sync provider policy.
-- [ ] File providers receive no new automatic I/O.
-- [ ] A SuperSync-only request queued before a provider, account, or configuration transition cannot drain against the new target.
-- [ ] File snapshot baseline atomicity, post-snapshot suffix ordering, concurrent-compaction / immutable-snapshot resolution (#9040), hydration-time local edits, and archive serialization retain their focused regression coverage.
-- [ ] The partial WebSocket download pipeline and ImmediateUploadService disappear only after focused replacement tests and the request-cost gate pass.
-- [ ] Conflict-review producers/UI disappear only to the extent authorized by the deployed-build and persisted-data audit.
-- [ ] The conflict-journal producer stays frozen for stable releases until the rollback decision; the disjoint-merge producer stays ENABLED — disabling it re-introduces #9095 data loss (see Task 6).
-- [ ] No public provider protocol, server contract, persistence repository layer, cross-tab lease, or general error taxonomy is introduced.
-- [ ] Each deletion slice removes more production state/policy than its replacement adds.
+- [ ] Schema-v3 replace/patch 操作与 schema-v4 已标记/未标记项目删除通过每个受支持持久路径保留其不同语义。
+- [ ] 目标 A 的操作不能对目标 B 读、上传、删除、备份或重新填充状态，包括重启后。
+- [ ] 在前台、初始、后台或维护工作期间到达的后台请求，在初始同步与请求时提供方/配置资格重新验证后，由恰好一个待定所有者保留并排空。
+- [ ] WebSocket 投递保留序列高水位、有界瞬时重试、基于游标的完成，以及终端认证行为。
+- [ ] 持久本地操作仅在当前非文件操作同步提供方策略下请求全量同步。
+- [ ] 文件提供方不接收新的自动 I/O。
+- [ ] 在提供方、账户或配置转换前排队的仅 SuperSync 请求不能针对新目标排空。
+- [ ] 文件快照基线原子性、快照后后缀顺序、并发压缩 / 不可变快照解析（#9040）、hydration 时本地编辑，以及归档序列化保留其针对性回归覆盖。
+- [ ] 部分 WebSocket 下载管道与 ImmediateUploadService 仅在针对性替换测试与请求成本门控通过后消失。
+- [ ] 冲突审查生产者/UI 仅在已部署构建与持久数据审计授权的范围内消失。
+- [ ] 冲突日志生产者对稳定发布保持冻结直至回滚决策；不相交合并生产者保持启用 — 禁用会重新引入 #9095 数据丢失（见任务 6）。
+- [ ] 不引入公共提供方协议、服务器契约、持久仓库层、跨标签页租约或一般错误分类法。
+- [ ] 每个删除切片移除的生产状态/策略多于其替换所添加的。
 
-Line count is evidence, not the goal. A phase succeeds only when it removes behavioral states and failure paths without removing a required reader or guarantee.
+行数是证据，不是目标。仅当阶段移除行为状态与失败路径而不移除必需读取器或保证时，该阶段才成功。
 
-## 5. Non-goals
+## 5. 非目标
 
-- A new sync-engine package or host-port abstraction.
-- CRDTs, timestamp last-write-wins, or full-state-only sync.
-- New operation strings, schema versions, encryption envelopes, or server exchanges.
-- An acknowledgement-only upload protocol.
-- A universal queue with foreground result waiters or presentation state.
-- More aggressive file-provider auto-sync.
-- A cross-tab lease, owner heartbeat, or generation protocol.
-- Failing closed for core offline import/profile workflows merely because Web Locks are unavailable.
-- Splitting ConflictResolutionService only to reduce file length.
-- Characterization tests that bless a known divergence.
+- 新的同步引擎包或宿主端口抽象。
+- CRDT、时间戳后写覆盖，或仅全状态同步。
+- 新的操作字符串、schema 版本、加密信封或服务器交换。
+- 仅确认的上传协议。
+- 带有前台结果等待者或呈现状态的通用队列。
+- 更激进的文件提供方自动同步。
+- 跨标签页租约、所有者心跳或代际协议。
+- 仅因 Web Locks 不可用就对核心离线导入/配置工作流失败关闭。
+- 仅为减少文件长度而拆分 ConflictResolutionService。
+- 认可已知发散的特征化测试。
 
-If a task requires one of these, stop and write a separate behavior proposal with migration and rollback analysis.
+若任务需要其中之一，停止并撰写带有迁移与回滚分析的单独行为提案。
 
-## 6. Phase 0 — Establish the compatibility and provider boundary
+## 6. Phase 0 — 建立兼容性与提供方边界
 
-### Task 1: Audit deployed builds and persisted conflict data
+### 任务 1：审计已部署构建与持久冲突数据
 
-**Size:** Small audit; blocks conflict-feature deletion
+**规模：** 小型审计；阻塞冲突功能删除
 
-> A first pass of this audit was written on 2026-07-16 and is **void** — it assumed
-> `962c5bbeb1` was unreleased (see the banner at the top of this document). Redo it
-> from scratch, deriving the tag list with `git tag --contains 962c5bbeb1` rather
-> than copying any list from this file or recovering the old pass
-> (`git show 07511ab45c:docs/plans/2026-07-16-conflict-review-cohort-audit.md`).
-> Its one durable output, the `SUP_CONFLICT_JOURNAL_CLEARED_BEFORE` fail-safe,
-> survives below and in `conflict-journal.service.ts`.
+> 该审计的首次通过写于 2026-07-16，现已 **作废** — 它假设 `962c5bbeb1` 未发布（见本文档顶部横幅）。从头重做，用 `git tag --contains 962c5bbeb1` 推导标签列表，而非从本文件复制任何列表或恢复旧通过（`git show 07511ab45c:docs/plans/2026-07-16-conflict-review-cohort-audit.md`）。其一个持久输出，`SUP_CONFLICT_JOURNAL_CLEARED_BEFORE` 失败安全，在下方与 `conflict-journal.service.ts` 中存活。
 
-Record:
+记录：
 
-- every distribution channel containing commits at or after 962c5bbeb1, including master edge artifacts, Android internal builds, and previews;
-- the stable baseline: v18.14.0 ships schema v2 and operation-log DB version 7; current master is schema v4 and DB version 10, with both the v2-to-v3 replace/patch barrier and the v3-to-v4 marked-project-delete barrier unreleased. Unless reverted before the next tag, schema v3 compatibility, schema v4 delete-wins behavior, and the conflict-review feature reach stable together;
-- whether those cohorts are supported/dogfood-only and what persisted-data promise applies;
-- the representations supported cohorts can create: schema-v3 replace/patch operations and schema-v4 marked project deletions in IndexedDB, file providers, backups, or SuperSync, plus historical unmarked deletions and the device-local conflict journal;
-- the retention/export/deletion decision for journal rows containing discarded values, and the associated `SUP_CONFLICT_JOURNAL_CLEARED_BEFORE` localStorage clear-marker the journal reader now writes as a cross-profile privacy fail-safe (#9045) — it must be removed with the store, not stranded.
+- 每个包含 962c5bbeb1 及之后提交的分发渠道，包括 master edge 工件、Android 内部构建与预览；
+- 稳定基线：v18.14.0 发布 schema v2 与操作日志 DB 版本 7；当前 master 为 schema v4 与 DB 版本 10，v2-to-v3 replace/patch 屏障与 v3-to-v4 已标记项目删除屏障均未发布。除非在下一标签前回退，schema v3 兼容性、schema v4 delete-wins 行为与冲突审查功能将一同到达稳定；
+- 这些队列是否受支持/仅 dogfood，以及适用何种持久数据承诺；
+- 受支持队列可创建的表示：IndexedDB、文件提供方、备份或 SuperSync 中的 schema-v3 replace/patch 操作与 schema-v4 已标记项目删除，加上历史未标记删除与设备本地冲突日志；
+- 含丢弃值的日志行的保留/导出/删除决策，以及日志读取器现作为跨配置隐私失败安全写入的关联 `SUP_CONFLICT_JOURNAL_CLEARED_BEFORE` localStorage 清除标记（#9045）— 必须与存储一同移除，不得搁浅。
 
-Only after the cohort audit, add or retain persisted fixtures for representations reachable by supported builds. The audit may authorize removal of writers; it cannot authorize schema downgrade or reader removal while supported stored data remains possible.
+仅在队列审计之后，为受支持构建可达的表示添加或保留持久夹具。审计可授权移除写入器；在仍可能存在受支持已存储数据时，它不能授权 schema 降级或读取器移除。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] The master baseline is schema v4/DB 10, not v3; the audit records that the deployed stable fleet stays v2/DB 7 until the next tag.
-- [ ] The producer-freeze-before-next-release decision (see Outcome) is made explicitly.
-- [ ] Supported and unsupported cohorts are an explicit product decision, not inferred from release tags.
-- [ ] Journal rows have a documented read/export/expiry or deletion policy.
-- [ ] Replace/patch fixtures and marked/unmarked project-delete fixtures cover each persisted path the supported-cohort audit proves reachable.
-- [ ] Ordinary multi-entity recovery, project-delete cascade recovery including notes/sections/task-repeat-cfg recreation and its cross-batch convergence (#9048), exact-timestamp clientId tiebreak convergence (#9035), invalid-LWW-projectId sanitization (#9025), live-versus-hydration, and transaction-rollback coverage is retained.
+- [ ] master 基线为 schema v4/DB 10，而非 v3；审计记录已部署稳定机队在下一标签前保持 v2/DB 7。
+- [ ] 下次发布前生产者冻结决策（见结果）被显式做出。
+- [ ] 受支持与不受支持队列是显式产品决策，而非从发布标签推断。
+- [ ] 日志行有已记录的读/导出/过期或删除策略。
+- [ ] Replace/patch 夹具与已标记/未标记项目删除夹具覆盖受支持队列审计证明可达的每个持久路径。
+- [ ] 普通多实体恢复、项目删除级联恢复（含 notes/sections/task-repeat-cfg 重建及其跨批收敛，#9048）、精确时间戳 clientId 平局决胜收敛（#9035）、无效 LWW projectId 清理（#9025）、live-versus-hydration，以及事务回滚覆盖被保留。
 
-**Stop condition:** Do not begin conflict-feature deletion while a deployed cohort or persisted representation is unknown. Preserve the reader/UI needed to recover supported data.
+**停止条件：** 在已部署队列或持久表示未知时，不要开始冲突功能删除。保留恢复受支持数据所需的读取器/UI。
 
-### Task 2: Isolate file-provider state across target changes
+### 任务 2：跨目标变更隔离文件提供方状态
 
-**Size:** Medium correctness fix
+**规模：** 中等正确性修复
 
-Start with a failing test where target A has I/O in flight, configuration switches to B, and A would otherwise perform a later remote side effect using reloaded B configuration. Also recreate the adapter after the switch/crash to expose stale persisted provider-ID state. Before implementing, inventory every authoritative mutation ingress: ProviderManager saves, direct provider credential writes, OAuth account re-authentication, Electron LocalFile selection, and Android SAF selection. Machine-only access-token refresh for an unchanged account is not a target transition.
+从失败测试开始：目标 A 有进行中的 I/O，配置切换到 B，否则 A 会用重新加载的 B 配置执行稍后的远程副作用。同时在切换/崩溃后重建适配器，以暴露陈旧的持久提供方 ID 状态。实现前，清点每个权威变更入口：ProviderManager 保存、直接提供方凭证写入、OAuth 账户重新认证、Electron LocalFile 选择，以及 Android SAF 选择。对未变更账户的仅机器访问令牌刷新不是目标转换。
 
-Use the smallest conservative design:
+使用最小保守设计：
 
-1. serialize a file sync session and every authoritative target/configuration mutation behind one narrow target-transition boundary;
-2. bind the session to one immutable provider/configuration snapshot;
-3. increment one adapter-wide generation on any user-authoritative file-provider configuration save, account change, or LocalFile folder change;
-4. clear all in-memory and persisted target-scoped revision, cursor, corruption, staged-baseline, and cache state through one helper;
-5. validate the generation before every remote upload, delete, or backup side effect;
-6. force discovery/full read after any user-authoritative configuration save.
+1. 将文件同步会话与每个权威目标/配置变更序列化在一个窄目标转换边界之后；
+2. 将会话绑定到一个不可变的提供方/配置快照；
+3. 在任何用户权威的文件提供方配置保存、账户变更或 LocalFile 文件夹变更时递增一个适配器范围代际；
+4. 通过一个辅助清除所有内存与持久的目标范围修订、游标、损坏、暂存基线与缓存状态；
+5. 在每次远程上传、删除或备份副作用前验证代际；
+6. 在任何用户权威配置保存后强制发现/全量读取。
 
-Accept the extra full read even when the target is unchanged. Do not add stable target identities unless later profiling proves the optimization worthwhile. Never put credentials, keys, or raw secret-bearing URLs in an identity, log, or cache key; SuperSync's target-keyed cursor hashes baseUrl plus access token and must not be copied.
+即使目标未变更也接受额外全量读取。除非后续性能分析证明优化值得，否则不添加稳定目标身份。切勿将凭证、密钥或含原始密钥的 URL 放入身份、日志或缓存键；SuperSync 的目标键控游标对 baseUrl 加访问令牌做哈希，不得复制。
 
-Five verified constraints on the design:
+设计上的五项已验证约束：
 
-- The generation bump must also fire from the Electron LocalFile picker success callback and Android `setupSaf()`: both mutate the target outside ProviderManager, and since #8228 the Electron folder lives main-side rather than in privateCfg.
-- "Any user-authoritative configuration save" includes encryption, compression, and interval toggles; each forces a full-file re-download, and a forced from-zero read with pending local operations can surface the whole-file conflict dialog. Accept and test this consequence; narrow the invalidation to identity-affecting fields only if it proves painful in practice. #9044 already isolated provider encryption settings at the dialog layer (`dialog-sync-cfg.component.ts`: reset on provider change, a `_providerConfigLoadId` stale-load guard, encryption re-derived from the selected provider's privateCfg behind `_waitForCurrentProviderConfig()` at the save boundary). Wire the adapter generation-bump and forced re-read into that same save boundary; do not duplicate `_providerConfigLoadId` or add a third counter.
-- Extract and extend the existing delete-all reset into one helper used by both deletion and target transition. The helper must cover expected and pending expected sync versions, last-seen and pending vector clocks, local sequence/cursor state, last recovered-corrupt revision, last-seen and pending file revisions, both within-cycle caches, and persisted entries. In current code the delete-all block already clears every one of these except the last recovered-corrupt revision (`_lastRecoveredCorruptRev`), so the extraction's value is the shared call site at the target-transition boundary, not a large missing field set — the actual in-memory gap is a single `.delete(providerKey)`. #9023 and #9040 added no new in-memory target-scoped field. (Remote-file gap, separate: #9040's `STATE_GEN_FILE_PREFIX` immutable snapshots are not enumerated by `_deleteAllData` — see contract 15; out of scope for the in-memory helper, but do not regress fixed-name delete ordering.)
-- Since #9023, the REPAIR path adds generation-validated side-effect sites beyond the first upload: the rev-based conditional REPAIR-snapshot write (`_conditionalUploadRepairSnapshot`), the split `getFileRev` pre-check and write, and — critically — the `rebaseStaleRepair` retry loop (`RejectedOpsHandlerService`) that downloads concurrent ops and re-uploads a rebuilt repair after a `REPAIR_STALE` reject. Validate the generation across the whole rebase retry, not just the leading write, so a mid-rebase target switch cannot download from A and re-upload to B. The rev guard (same-target concurrency) and the generation guard (wrong-target) are complementary; clearing `_lastSeenRevs` on transition degrades the conditional write to a safe expect-absent write, not a stale-rev overwrite.
-- `providerConfigChanged$` is one trigger source, not the boundary. OneDrive settings and platform folder pickers currently have direct writes, while automatic token refreshes must remain generation-neutral when the account and target are unchanged.
+- 代际递增也必须从 Electron LocalFile 选择器成功回调与 Android `setupSaf()` 触发：两者在 ProviderManager 外变更目标，且自 #8228 起 Electron 文件夹位于主进程侧而非 privateCfg。
+- 「任何用户权威配置保存」包括加密、压缩与间隔开关；每次强制全文件重新下载，且带有待定本地操作的强制从零读取可弹出全文件冲突对话框。接受并测试此后果；仅当实践中证明痛苦时，才将失效收窄到影响身份的字段。#9044 已在对话框层隔离提供方加密设置（`dialog-sync-cfg.component.ts`：提供方变更时重置、`_providerConfigLoadId` 陈旧加载守卫、在保存边界经由 `_waitForCurrentProviderConfig()` 从所选提供方的 privateCfg 重新推导加密）。将适配器代际递增与强制重读接到同一保存边界；不要复制 `_providerConfigLoadId` 或添加第三个计数器。
+- 提取并扩展现有全部删除重置为一个辅助，供删除与目标转换共用。辅助必须覆盖预期与待定预期同步版本、上次见到与待定向量时钟、本地序列/游标状态、上次恢复的损坏修订、上次见到与待定文件修订、两个周期内缓存，以及持久条目。在当前代码中，全部删除块已清除除上次恢复的损坏修订（`_lastRecoveredCorruptRev`）外的每一项，因此提取的价值是目标转换边界处的共享调用点，而非大量缺失字段集 — 实际内存缺口是单个 `.delete(providerKey)`。#9023 与 #9040 未添加新的内存目标范围字段。（远程文件缺口，单独：#9040 的 `STATE_GEN_FILE_PREFIX` 不可变快照不被 `_deleteAllData` 枚举 — 见契约 15；对内存辅助超出范围，但不要回归固定名称删除顺序。）
+- 自 #9023 起，REPAIR 路径在首次上传之外添加代际验证的副作用站点：基于 rev 的条件 REPAIR 快照写入（`_conditionalUploadRepairSnapshot`）、拆分的 `getFileRev` 预检与写入，以及 — 关键地 — 在 `REPAIR_STALE` 拒绝后下载并发 ops 并重新上传重建修复的 `rebaseStaleRepair` 重试循环（`RejectedOpsHandlerService`）。跨整个 rebase 重试验证代际，而非仅领先写入，以便中途目标切换不能从 A 下载并重新上传到 B。rev 守卫（同目标并发）与代际守卫（错误目标）互补；在转换时清除 `_lastSeenRevs` 将条件写入降级为安全的期望不存在写入，而非陈旧 rev 覆盖。
+- `providerConfigChanged$` 是一个触发源，不是边界。OneDrive 设置与平台文件夹选择器当前有直接写入，而自动令牌刷新在账户与目标未变更时必须保持代际中立。
 
-Cover one normal configuration-driven provider, OneDrive's direct settings write, Electron LocalFile's picker, and Android SAF selection. Also cover an OAuth re-authentication to a different account (Dropbox/OneDrive keep the same provider ID), an unchanged-account token refresh that must not invalidate, staged expected-version/vector-clock/revision promotion, corruption-notice state, and the within-cycle download cache, which can otherwise embed target A's snapshot in a file written to target B. Add a case where the target switches mid-REPAIR-rebase (after `REPAIR_STALE`, within `rebaseStaleRepair`) and assert no upload/download crosses to the new target. The common adapter path should cover other file providers without a full provider-specific matrix.
+覆盖一个普通配置驱动提供方、OneDrive 的直接设置写入、Electron LocalFile 的选择器，以及 Android SAF 选择。同时覆盖到不同账户的 OAuth 重新认证（Dropbox/OneDrive 保持相同提供方 ID）、不得失效的未变更账户令牌刷新、暂存预期版本/向量时钟/修订提升、损坏通知状态，以及周期内下载缓存（否则可将目标 A 的快照嵌入写入目标 B 的文件）。添加目标在 REPAIR rebase 中途切换的用例（`REPAIR_STALE` 之后，在 `rebaseStaleRepair` 内），并断言无上传/下载交叉到新目标。公共适配器路径应覆盖其他文件提供方，无需完整提供方特定矩阵。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] A late A operation performs no upload/delete/backup against B and cannot repopulate B state.
-- [ ] Restart cannot reload A revision/cursor/cache state under B's provider ID.
-- [ ] Normal configuration changes, OneDrive direct settings writes, Electron LocalFile picker changes, and Android SAF changes invalidate authoritatively.
-- [ ] An account switch behind an unchanged provider ID invalidates like a target change.
-- [ ] A machine-only token refresh for the same account does not force a target reset.
-- [ ] The within-cycle cache cannot carry target-A data into a target-B write.
-- [ ] Every user-authoritative configuration save forces safe discovery/full read.
-- [ ] Split migration, conditional-write protection (including #9023's REPAIR rev-based guard and the `REPAIR_STALE`→`rebaseStaleRepair` rebase, and #9040's immutable-snapshot write plus its commit-point GC), tombstones, staged expected-version/vector-clock/revision promotion, backup recovery, and fixed-name delete ordering remain unchanged; the generation guard must not wedge the REPAIR rebase-retry convergence.
+- [ ] 迟到的 A 操作不对 B 执行上传/删除/备份，且不能重新填充 B 状态。
+- [ ] 重启不能在 B 的提供方 ID 下重新加载 A 的修订/游标/缓存状态。
+- [ ] 普通配置变更、OneDrive 直接设置写入、Electron LocalFile 选择器变更与 Android SAF 变更权威地失效。
+- [ ] 在未变更提供方 ID 后的账户切换像目标变更一样失效。
+- [ ] 同一账户的仅机器令牌刷新不强制目标重置。
+- [ ] 周期内缓存不能将目标 A 数据带入目标 B 写入。
+- [ ] 每次用户权威配置保存强制安全发现/全量读取。
+- [ ] 拆分迁移、条件写入保护（含 #9023 的 REPAIR 基于 rev 的守卫与 `REPAIR_STALE`→`rebaseStaleRepair` rebase，以及 #9040 的不可变快照写入及其提交点 GC）、墓碑、暂存预期版本/向量时钟/修订提升、备份恢复与固定名称删除顺序保持不变；代际守卫不得卡住 REPAIR rebase 重试收敛。
 
-**Verification:** Run the focused adapter/provider/configuration tests and npm run checkFile for each modified TypeScript file.
+**验证：** 运行针对性的适配器/提供方/配置测试，并对每个修改的 TypeScript 文件运行 npm run checkFile。
 
-**Stop condition:** If configuration cannot be snapshotted or target mutation cannot wait for the active file session, stop. A post-completion cache check cannot undo data already written to the wrong remote.
+**停止条件：** 若配置无法快照或目标变更不能等待活动文件会话，停止。完成后的缓存检查无法撤销已写入错误远程的数据。
 
-### Phase 0 checkpoint
+### Phase 0 检查点
 
-The supported-data boundary is explicit and target-switch in-flight/restart regressions are green before deletion starts.
+在删除开始前，受支持数据边界明确，且目标切换进行中/重启回归为绿色。
 
-## 7. Phase 1 — Collapse partial SuperSync lifecycles
+## 7. Phase 1 — 折叠部分 SuperSync 生命周期
 
-### Task 3: Add one background full-sync scheduler
+### 任务 3：添加一个后台全量同步调度器
 
-**Size:** Medium
+**规模：** 中等
 
-The scheduler observes all active full-sync runs, including foreground and initial sync; it cannot track only work it starts. `SyncWrapperService.isSyncInProgress$` spans every `sync()` run, including conflict-dialog waits, `isEncryptionOperationInProgress` covers encryption and force upload, and `SyncCycleGuard.isActive` spans the full-sync and side-channel cycle but currently has no release observable. The authoritative busy definition is the union of those three signals. Provider `SYNCING` status remains presentation state and a consistency assertion, not another exclusion authority. It is today still a real exclusion gate for the two side channels — immediate upload and WS download both skip when `isSyncInProgress` is true — but both also claim `SyncCycleGuard`, so demoting the `SYNCING` check to presentation is safe only once cycle-guard activity fully covers that side-channel exclusion (Tasks 4–5 remove those channels, so the demotion lands with them). Expose one observable busy/idle definition rather than polling the signals independently. The scheduler is the sole owner of generic pending/dirty background work; SyncCycleGuard remains authoritative for cycle exclusion.
+调度器观察所有活动的全量同步运行，包括前台与初始同步；它不能仅跟踪自己启动的工作。`SyncWrapperService.isSyncInProgress$` 跨越每次 `sync()` 运行，包括冲突对话框等待，`isEncryptionOperationInProgress` 覆盖加密与强制上传，而 `SyncCycleGuard.isActive` 跨越全量同步与旁路周期但当前无释放可观察量。权威忙碌定义是这三个信号的并集。提供方 `SYNCING` 状态仍是呈现状态与一致性断言，而非另一排除权威。今天它仍是两条旁路通道的真实排除门控 — 即时上传与 WS 下载在 `isSyncInProgress` 为真时都跳过 — 但两者也声明 `SyncCycleGuard`，因此仅在周期守卫活动完全覆盖该旁路排除后，将 `SYNCING` 检查降级为呈现才安全（任务 4–5 移除这些通道，因此降级随它们落地）。暴露一个可观察的忙碌/空闲定义，而非独立轮询信号。调度器是通用待定/脏后台工作的唯一所有者；SyncCycleGuard 对周期排除仍权威。
 
-Its public contract remains fire-and-forget `request()`. Each request captures the active provider ID plus a monotonic, in-tab configuration epoch; the scheduler revalidates them, sync enabled/readiness, and the initial/after-enable gate immediately before I/O. ProviderManager owns the non-secret epoch, incrementing it from the authoritative configuration/target transitions inventoried in Task 2; it is neither persisted nor a cross-tab protocol. A new request replaces the pending epoch with the newest current one while retaining a single dirty bit. A stale request is discarded rather than retargeted. Expose only a narrow internal settled/idle notification so high-watermark owners can re-check durable progress without a public result waiter or failure taxonomy.
+其公共契约仍为即发即弃的 `request()`。每个请求捕获活动提供方 ID 加上单调、标签页内配置纪元；调度器在 I/O 前立即重新验证它们、同步启用/就绪，以及初始/启用后门控。ProviderManager 拥有非密钥纪元，从任务 2 清点的权威配置/目标转换递增它；它既不持久也不是跨标签页协议。新请求用最新当前纪元替换待定纪元，同时保留单个脏位。陈旧请求被丢弃而非重新定向。仅暴露窄内部已结算/空闲通知，以便高水位所有者可重新检查持久进度，而无公共结果等待者或失败分类法。
 
-Use bounded idle/running/dirty state:
+使用有界空闲/运行/脏状态：
 
-| Event                                                           | Transition                                                          |
+| 事件                                                           | 转换                                                          |
 | --------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Eligible current-epoch request while idle and initial gate open | Start one background full sync.                                     |
-| Eligible request while any sync/maintenance is active           | Set dirty; do not make a sync call that would return HANDLED_ERROR. |
-| Request becomes stale before it drains                          | Drop it without I/O; a current trigger may request again.           |
-| Run succeeds and dirty is clear                                 | Return to idle.                                                     |
-| Run succeeds and dirty is set                                   | Clear dirty and run once more.                                      |
-| Run fails with dirty clear                                      | Return to idle; source-specific retry policy may request again.     |
-| Run fails with dirty set                                        | Drain one trailing run, then apply the same rules.                  |
-| Run returns `HANDLED_ERROR`                                     | Treat as a settled failure, release state, then honor dirty once.   |
+| 空闲且初始门控打开时的合格当前纪元请求 | 启动一次后台全量同步。                                     |
+| 任何同步/维护活动时的合格请求           | 设置脏；不发起会返回 HANDLED_ERROR 的同步调用。 |
+| 请求在排空前变为陈旧                          | 无 I/O 丢弃；当前触发器可再次请求。           |
+| 运行成功且脏已清除                                 | 返回空闲。                                                     |
+| 运行成功且脏已设置                                   | 清除脏并再运行一次。                                      |
+| 运行失败且脏已清除                                      | 返回空闲；源特定重试策略可再次请求。     |
+| 运行失败且脏已设置                                        | 排空一次尾随运行，然后应用相同规则。                  |
+| 运行返回 `HANDLED_ERROR`                                     | 视为已结算失败，释放状态，然后兑现脏一次。   |
 
-Triggers during a trailing run may set dirty once again, but there is never more than one generic pending rerun. Revalidate the captured epoch before every leading or trailing run, not only when `request()` is called.
+尾随运行期间的触发器可再次设置脏一次，但从无超过一个通用待定重跑。在每次领先或尾随运行前重新验证捕获的纪元，而非仅在调用 `request()` 时。
 
-Route the existing dynamic background branch in SyncEffects — interval, resume, and visibility triggers after the initial gate — through the scheduler, alongside Tasks 4–5. Initial and after-enable triggers, before-close sync, and explicit foreground sync stay on directly awaited `sync()` calls. A background request received before initial/after-enable completion may mark dirty, but cannot start a shadow initial sync; the awaited initial path opens the gate and the scheduler then drains once. Preserve synchronous resume/visibility suppression at the existing trigger boundary.
+将 SyncEffects 中现有的动态后台分支 — 初始门控后的间隔、恢复与可见性触发器 — 路由到调度器，与任务 4–5 一并。初始与启用后触发器、关闭前同步与显式前台同步保持在直接等待的 `sync()` 调用上。在初始/启用后完成前收到的后台请求可标记脏，但不能启动影子初始同步；被等待的初始路径打开门控，然后调度器排空一次。在现有触发边界保留同步恢复/可见性抑制。
 
-Do not add foreground result waiters, presentation state, a public failure taxonomy, or cross-tab scheduler state. `HANDLED_ERROR` is a non-successful settled attempt, never a truthy success value.
+不添加前台结果等待者、呈现状态、公共失败分类法或跨标签页调度器状态。`HANDLED_ERROR` 是非成功的已结算尝试，绝非真值成功值。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] Requests during foreground, initial, background, or maintenance work drain afterward.
-- [ ] Bursts have at most one pending rerun.
-- [ ] Failure releases state; source-specific retry remains outside the generic scheduler.
-- [ ] Foreground result/error and initial-sync behavior are unchanged.
-- [ ] No background request starts before the awaited initial/after-enable path opens the gate.
-- [ ] Provider disable, provider switch, account switch, or relevant configuration change invalidates an already-queued request before I/O.
-- [ ] Interval/resume/visibility triggers use the scheduler; manual, initial, after-enable, and before-close callers remain directly awaited.
-- [ ] A narrow settled/idle notification lets a source re-check its own durable completion condition without making the scheduler own source state.
-- [ ] There is one generic dirty owner, not one in the scheduler and another in an exclusion service.
-- [ ] One observable busy definition combines wrapper, encryption/force, and cycle-guard activity and emits when SyncCycleGuard releases; provider status is not a fourth lock.
+- [ ] 前台、初始、后台或维护工作期间的请求之后排空。
+- [ ] 突发最多有一个待定重跑。
+- [ ] 失败释放状态；源特定重试留在通用调度器外。
+- [ ] 前台结果/错误与初始同步行为不变。
+- [ ] 无后台请求在被等待的初始/启用后路径打开门控前启动。
+- [ ] 提供方禁用、提供方切换、账户切换或相关配置变更在 I/O 前使已排队请求失效。
+- [ ] 间隔/恢复/可见性触发器使用调度器；手动、初始、启用后与关闭前调用方保持直接等待。
+- [ ] 窄已结算/空闲通知让源重新检查自身持久完成条件，而不让调度器拥有源状态。
+- [ ] 有一个通用脏所有者，而非调度器中一个、排除服务中另一个。
+- [ ] 一个可观察忙碌定义合并包装器、加密/强制与周期守卫活动，并在 SyncCycleGuard 释放时发出；提供方状态不是第四把锁。
 
-**Verification:** Unit-test idle, burst, external-busy, foreground overlap after download, maintenance overlap, dirty rerun, repeated dirty, failure, release, pre-initial request, initial completion drain, and provider/account/configuration epoch invalidation.
+**验证：** 对空闲、突发、外部忙碌、下载后前台重叠、维护重叠、脏重跑、重复脏、失败、释放、初始前请求、初始完成排空，以及提供方/账户/配置纪元失效做单元测试。
 
-**Stop condition:** If direct foreground/initial runs cannot be observed, route their activity signal through the coordinator or defer Tasks 4–5. Never interpret HANDLED_ERROR as completed work; it is a truthy string, so a naive truthiness check reads it as success.
+**停止条件：** 若不能观察直接前台/初始运行，将其活动信号路由到协调器或推迟任务 4–5。切勿将 HANDLED_ERROR 解释为已完成工作；它是真值字符串，因此天真的真值检查会将其读为成功。
 
-### Task 4: Make WebSocket events notification-only
+### 任务 4：使 WebSocket 事件仅作通知
 
-**Size:** Medium, deletion-heavy
+**规模：** 中等，删除量大
 
-Keep the WebSocket connection/authentication transport and a thin notification adapter. A valid event records the maximum advertised sequence and requests Task 3 full sync.
+保留 WebSocket 连接/认证传输与薄通知适配器。有效事件记录最大通告序列并请求任务 3 全量同步。
 
-The current pipeline already delegates download, conflict, and apply to the shared download core and never publishes IN_SYNC; the deletion target is its duplicated orchestration shell (session boundary, provider resolution, error-to-status mapping, cursor gate, cycle-guard claim). Since #9028 the shell also re-uploads LWW local-win ops with its own ERROR/UNKNOWN_OR_CHANGED terminal mapping (`ws-triggered-download.service.ts`); full sync already covers this more thoroughly via `SyncWrapperService`'s LWW re-upload retry loop, so notification-only WS preserves it and the adapter needs no re-upload bullet — but the deletion audit must count the re-upload as shell code that folds into full sync, not code that is silently dropped. The second IN_SYNC owner is ImmediateUploadService, removed in Task 5. The transport keeps its own reconnect/backoff and terminal auth-close handling; the adapter's suspension must not duplicate it.
+当前管道已将下载、冲突与应用委托给共享下载核心，且从不发布 IN_SYNC；删除目标是其重复的编排外壳（会话边界、提供方解析、错误到状态映射、游标门控、周期守卫声明）。自 #9028 起外壳还以自身 ERROR/UNKNOWN_OR_CHANGED 终端映射重新上传 LWW 本地胜出 ops（`ws-triggered-download.service.ts`）；全量同步已通过 `SyncWrapperService` 的 LWW 重新上传重试循环更彻底地覆盖此，因此仅通知 WS 保留它且适配器无需重新上传条目 — 但删除审计必须将重新上传计为并入全量同步的外壳代码，而非静默丢弃的代码。第二个 IN_SYNC 所有者是 ImmediateUploadService，在任务 5 中移除。传输保留自身重连/退避与终端认证关闭处理；适配器的挂起不得重复它。
 
-The adapter owns only:
+适配器仅拥有：
 
-- burst/event-budget protection;
-- one sequence high-watermark;
-- a subscription to Task 3's narrow settled/idle notification, after which it re-reads the durable cursor;
-- bounded delayed retry whenever the cursor remains below the high-watermark, regardless of whether the preceding full sync reported success or a handled transient failure;
-- suspension when the active provider/configuration epoch changes, credentials become missing/not ready, or the WebSocket transport reports its terminal authentication close.
+- 突发/事件预算保护；
+- 一个序列高水位；
+- 对任务 3 窄已结算/空闲通知的订阅，之后重新读取持久游标；
+- 每当游标仍低于高水位时的有界延迟重试，无论前次全量同步报告成功或已处理瞬时失败；
+- 当活动提供方/配置纪元变更、凭证缺失/未就绪，或 WebSocket 传输报告其终端认证关闭时挂起。
 
-The high-watermark clears only after the durably committed cursor is greater than or equal to it. Generic full-sync success alone is insufficient. This is an intentional behavior correction: today a successful but paginated download drops the watermark without checking the cursor. Do not add a characterization test blessing the current lossy behavior. After the bounded retry budget is exhausted, retain the watermark in a dormant state; a new notification, WebSocket reconnect, or later full-sync settlement wakes one new bounded retry window. Stopping the adapter on provider/configuration transition clears the old target's watermark and invalidates its queued scheduler request.
+高水位仅在持久提交的游标大于或等于它后清除。仅通用全量同步成功不够。这是有意的行为纠正：今天成功但分页的下载在不检查游标的情况下丢弃水位。不要添加认可当前有损行为的特征化测试。有界重试预算耗尽后，以休眠状态保留水位；新通知、WebSocket 重连或稍后全量同步结算唤醒一个新的有界重试窗口。在提供方/配置转换时停止适配器会清除旧目标的水位并使其排队的调度器请求失效。
 
-Delete or shrink WsTriggeredDownloadService. Success means removing its direct download, validation, conflict, apply, local-win re-upload, cursor-commit, provider-status, and cycle-guard pipeline; the final thin adapter or filename may remain if that is the smallest reliable design.
+删除或缩小 WsTriggeredDownloadService。成功意味着移除其直接下载、验证、冲突、应用、本地胜出重新上传、游标提交、提供方状态与周期守卫管道；若那是最小可靠设计，最终薄适配器或文件名可保留。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] An event arriving after an active sync's download phase causes a trailing full sync.
-- [ ] Success with cursor below the advertised sequence retains the high-watermark and schedules a bounded retry.
-- [ ] Cursor at/above the sequence clears it.
-- [ ] Cursor below the sequence after success or handled failure retries within one bounded window.
-- [ ] Exhausted retry retains a dormant watermark and a later notification/reconnect/full-sync settlement can resume it.
-- [ ] Missing credentials, provider/configuration transition, or terminal WebSocket auth close suspends retries and cannot retarget the request.
-- [ ] Validation, conflict, apply, cursor commit, and provider status have one owner: normal full sync.
+- [ ] 在活动同步的下载阶段后到达的事件导致尾随全量同步。
+- [ ] 游标低于通告序列的成功保留高水位并调度有界重试。
+- [ ] 游标处于/高于序列时清除它。
+- [ ] 成功或已处理失败后游标低于序列时在一个有界窗口内重试。
+- [ ] 耗尽的重试保留休眠水位，稍后的通知/重连/全量同步结算可恢复它。
+- [ ] 缺失凭证、提供方/配置转换或终端 WebSocket 认证关闭挂起重试且不能重新定向请求。
+- [ ] 验证、冲突、应用、游标提交与提供方状态有一个所有者：普通全量同步。
 
-**Verification:** Cover busy arrival, cursor-below-watermark after success and handled failure, bounded retry exhaustion/wakeup, provider transition, and auth suspension with unit/integration tests. Add one opt-in live WebSocket E2E covering notification, durable cursor/replay, and restart; existing E2E defaults disable this path.
+**验证：** 用单元/集成测试覆盖忙碌到达、成功与已处理失败后游标低于水位、有界重试耗尽/唤醒、提供方转换与认证挂起。添加一个可选加入的实况 WebSocket E2E，覆盖通知、持久游标/重放与重启；现有 E2E 默认禁用此路径。
 
-**Stop condition:** Keep a thin adapter if deleting it loses pending-event, cursor, retry, or auth semantics. Prefer one reliable path over a smaller lossy path.
+**停止条件：** 若删除会丢失待定事件、游标、重试或认证语义，保留薄适配器。宁可一条可靠路径，也不要更小的有损路径。
 
-### Task 5: Replace eligible immediate upload with full sync
+### 任务 5：用全量同步替换合格的即时上传
 
-**Size:** Medium, deletion-heavy
+**规模：** 中等，删除量大
 
-After the existing persistence debounce, split the current predicate into:
+在现有持久防抖之后，将当前谓词拆为：
 
-- stable eligibility: E2E block flag is false, client is online, and an active operation-sync-capable non-file provider exists;
-- occupancy: the provider manager's active-sync signal plus the encryption-operation flag, which also covers force upload.
+- 稳定资格：E2E 阻止标志为假、客户端在线，且存在活动的、具备操作同步能力的非文件提供方；
+- 占用：提供方管理器的活动同步信号加上加密操作标志，后者也覆盖强制上传。
 
-Stable ineligibility continues to skip. Occupancy becomes a Task 3 dirty request instead of dropping the trigger; this is the intentional behavior correction required to prevent lost local work during an active run. Capture the provider/configuration epoch with the request and revalidate it when the scheduler drains so a SuperSync trigger cannot become file-provider or different-account I/O.
+稳定不合格继续跳过。占用变为任务 3 脏请求而非丢弃触发器；这是防止活动运行期间丢失本地工作所需的有意行为纠正。随请求捕获提供方/配置纪元，并在调度器排空时重新验证，以便 SuperSync 触发器不能变成文件提供方或不同账户 I/O。
 
-Do not let this path perform an untracked initial sync. `ImmediateUploadService` currently reaches the narrower upload path, which blocks a fresh client; replacing it with full sync can also download, show the first-sync conflict flow, and run normal status/error policy. A persisted-operation trigger before initial/after-enable completion may mark the scheduler dirty but waits for the directly awaited initial path to open the gate. This accepts a short startup delay in exchange for preserving initial-sync bookkeeping without retaining a second upload lifecycle.
+不要让此路径执行未跟踪的初始同步。`ImmediateUploadService` 当前到达更窄的上传路径，这会阻塞新客户端；用全量同步替换它也可下载、显示首次同步冲突流，并运行普通状态/错误策略。在初始/启用后完成前的持久操作触发器可标记调度器脏，但等待直接等待的初始路径打开门控。这接受短暂启动延迟，以换取保留初始同步簿记而不保留第二条上传生命周期。
 
-Do not add a manual-only check in this refactor: ImmediateUploadService does not currently have one. A manual-only behavior change needs separate product approval and tests. Provider readiness remains checked before the full sync performs I/O. The two low-level upload calls below the wrapper (encryption password change and the import-conflict coordinator) are not triggers and stay where they are.
+不要在此重构中添加仅手动检查：ImmediateUploadService 当前没有。仅手动行为变更需要单独产品批准与测试。提供方就绪仍在全量同步执行 I/O 前检查。包装器下方的两个低级上传调用（加密密码变更与导入冲突协调器）不是触发器，留在原处。
 
-Delete ImmediateUploadService only after piggyback ordering and the request-cost gate pass. “One extra round trip” is not assumed because full download can paginate.
+仅在捎带顺序与请求成本门控通过后删除 ImmediateUploadService。「一次额外往返」不因全量下载可分页而假定。
 
-**Request-cost gate:**
+**请求成本门控：**
 
-- deterministically count provider requests for idle/no-backlog, local backlog, and one remote-backlog case;
-- compare one debounced burst before and after;
-- record the delta;
-- compare first-sync/fresh-client, authentication, encryption-key-missing, conflict-dialog, and status/snack behavior so the replacement does not introduce duplicate or premature presentation;
-- run broader byte/latency/pagination benchmarks only if the focused bound exposes a material regression.
+- 对空闲/无积压、本地积压与一个远程积压用例确定性计数提供方请求；
+- 比较防抖突发前后；
+- 记录增量；
+- 比较首次同步/新客户端、认证、缺失加密密钥、冲突对话框与状态/snack 行为，使替换不引入重复或过早呈现；
+- 仅当针对性界限暴露实质回归时运行更广的字节/延迟/分页基准。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] Eligible SuperSync local work requests one burst-coalesced full sync.
-- [ ] File-provider tests prove no new automatic I/O.
-- [ ] Work persisted during another run is drained rather than ignored.
-- [ ] Work persisted before or during initial/after-enable sync drains only after that awaited path completes.
-- [ ] A queued request invalidated by provider disable, provider/account switch, or relevant configuration change performs no I/O.
-- [ ] Piggybacked operations apply durably before local entries are marked synced.
-- [ ] Fresh-client, auth, encryption, conflict, status, and snack behavior has an explicit before/after verdict in addition to request counts.
-- [ ] The upload-only production pipeline and references are gone.
+- [ ] 合格的 SuperSync 本地工作请求一次突发合并的全量同步。
+- [ ] 文件提供方测试证明无新自动 I/O。
+- [ ] 在另一次运行期间持久化的工作被排空而非忽略。
+- [ ] 在初始/启用后同步之前或期间持久化的工作仅在该被等待路径完成后排空。
+- [ ] 被提供方禁用、提供方/账户切换或相关配置变更失效的排队请求不执行 I/O。
+- [ ] 捎带操作在本地条目标记为已同步之前持久应用。
+- [ ] 新客户端、认证、加密、冲突、状态与 snack 行为除请求计数外还有显式前后裁决。
+- [ ] 仅上传生产管道与引用消失。
 
-**Verification:** Cover stable eligibility, file-provider exclusion, pre-initial/during-initial/after-enable timing, provider-epoch invalidation, foreground/maintenance overlap, piggyback ordering, behavior outcomes, and request counts with unit/integration tests. Extend the single live notification/restart E2E with one local append if practical. Run the scheduled SuperSync/WebDAV workflow.
+**验证：** 用单元/集成测试覆盖稳定资格、文件提供方排除、初始前/初始中/启用后时机、提供方纪元失效、前台/维护重叠、捎带顺序、行为结果与请求计数。若可行，用一次本地追加扩展单个实况通知/重启 E2E。运行计划的 SuperSync/WebDAV 工作流。
 
-**Stop condition:** Retain ImmediateUploadService if the focused request delta is unacceptable or stable provider eligibility cannot be preserved. Do not rebuild upload-only policy inside the scheduler.
+**停止条件：** 若针对性请求增量不可接受或不能保留稳定提供方资格，保留 ImmediateUploadService。不要在调度器内重建仅上传策略。
 
-### Phase 1 incidental deletions (verified zero or spec-only references)
+### Phase 1 附带删除（已验证零引用或仅 spec 引用）
 
-Bundle these with the matching task; re-verify references at deletion time:
+与匹配任务捆绑；删除时重新验证引用：
 
-- SyncTriggerService's `_onUpdateLocalDataTrigger$` source is now a dead `of(null)` (its former local-data-change semantics are gone), **but the branch it feeds is not dead** and must not be removed as a zero-reference cleanup. `_immediateSyncTrigger$.pipe(startWith(...), switchMap(() => _onUpdateLocalDataTrigger$.pipe(auditTime(syncInterval))))` fires a trailing full sync ~`syncInterval` after activity settles: `of(null) | auditTime(N)` emits one trailing value after N ms, and `switchMap` re-subscribes on every immediate trigger. For SuperSync `useIntervalTimer` is false, so this is the only periodic re-sync. Treat it as behavior: preserve the trailing/settle cadence through the scheduler, or make its removal an explicit, tested cadence change — not an incidental deletion (Task 5).
-- Legacy SyncStatus enum members UpdateLocalAll, Conflict, IncompleteRemoteData, and NotConfigured; the wrapper only returns InSync/UpdateRemote today (Task 3).
-- The deprecated `skipDuringSync` alias of `skipWhileApplyingRemoteOps` (spec-only references).
-- The write-only plain `isDataImportInProgress` field on ImexViewService; the observable stays.
-- After Tasks 4–5 delete the two side-channel error-to-status mapping blocks (WS and immediate-upload, near-identical to each other), extract their shared subset into a helper. The wrapper's block is a superset with many extra branches (CORS, auth, decrypt, timeout, empty-body); extract the shared mapping, do not replace the wrapper block with it.
+- SyncTriggerService 的 `_onUpdateLocalDataTrigger$` 源现为死 `of(null)`（其先前本地数据变更语义已消失），**但其所喂入的分支未死**，不得作为零引用清理移除。`_immediateSyncTrigger$.pipe(startWith(...), switchMap(() => _onUpdateLocalDataTrigger$.pipe(auditTime(syncInterval))))` 在活动平息后约 `syncInterval` 触发一次尾随全量同步：`of(null) | auditTime(N)` 在 N ms 后发出一个尾随值，且 `switchMap` 在每次即时触发时重新订阅。对 SuperSync，`useIntervalTimer` 为假，因此这是唯一的周期性重新同步。将其视为行为：通过调度器保留尾随/平息节奏，或使其移除成为显式、经测试的节奏变更 — 而非附带删除（任务 5）。
+- 遗留 SyncStatus 枚举成员 UpdateLocalAll、Conflict、IncompleteRemoteData 与 NotConfigured；包装器今天仅返回 InSync/UpdateRemote（任务 3）。
+- 已弃用的 `skipWhileApplyingRemoteOps` 别名 `skipDuringSync`（仅 spec 引用）。
+- ImexViewService 上仅写入的普通 `isDataImportInProgress` 字段；可观察量保留。
+- 在任务 4–5 删除两个旁路错误到状态映射块（WS 与即时上传，彼此近乎相同）后，将其共享子集提取为辅助。包装器的块是超集，有许多额外分支（CORS、认证、解密、超时、空正文）；提取共享映射，不要用它替换包装器块。
 
-### Phase 1 checkpoint
+### Phase 1 检查点
 
-- WebSocket and eligible SuperSync local-operation events reach normal full sync without lost work.
-- File providers have no new automatic traffic.
-- Foreground and initial-sync semantics are unchanged.
-- The live notification/restart E2E and scheduled SuperSync/WebDAV jobs pass.
-- The phase deletes substantially more lifecycle policy than it adds.
+- WebSocket 与合格的 SuperSync 本地操作事件到达普通全量同步而无丢失工作。
+- 文件提供方无新自动流量。
+- 前台与初始同步语义不变。
+- 实况通知/重启 E2E 与计划的 SuperSync/WebDAV 作业通过。
+- 该阶段删除的生命周期策略实质上多于其添加的。
 
-## 8. Phase 2 — Remove proven-disposable conflict surfaces
+## 8. Phase 2 — 移除已证明可丢弃的冲突表面
 
-### Task 6: Perform a focused conflict-review rollback
+### 任务 6：执行有针对性的冲突审查回滚
 
-**Size:** Large deletion, gated by Task 1
+**规模：** 大型删除，由任务 1 门控
 
-Remove only what the supported-build/persisted-data decision authorizes:
+仅移除受支持构建/持久数据决策授权的内容：
 
-- conflict journal writing;
-- review route/UI, banner, badge, navigation, and translations;
-- journal persistence only after its read/export/expiry obligation ends.
+- 冲突日志写入；
+- 审查路由/UI、横幅、徽章、导航与翻译；
+- 仅在其读/导出/过期义务结束后的日志持久化。
 
-Preserve:
+保留：
 
-- **the disjoint-field merge itself — planner (`conflict-disjoint-merge.util.ts`), patch-op writing, and the failed-merge fallback. Removing it re-introduces #9095: whole-entity LWW silently and permanently destroys the losing side's concurrent field edits (a rename dies when another device marks the task done). Journal removal ≠ merge removal — this task rolls back the _review/journal_ feature, not the merge;**
-- schema version 3 replace/patch compatibility and its v2-to-v3 migration/barrier;
-- schema version 4 and its v3-to-v4 migration/barrier, `PROJECT_DELETE_WINS_MARKER`, the authenticated project-ID gate (`isProjectDeleteWinsOperation` requiring `op.entityId === payload.projectId` — distinct from the decrypt-path footprint authentication in contract 14), the shared-package (`@sp/sync-core`) delete-wins classification consumed by the client planner (the server does not classify delete-wins — the marker lives inside the E2EE auth tag and is unreadable server-side), local replacement-op construction, and union of cascaded task/note IDs across concurrent marked deletes;
-- IndexedDB version 10 downgrade protection;
-- replace/patch payload types, conversion/replay, and supported persisted fixtures;
-- ordinary single- and multi-entity conflict recovery, including historical unmarked project-delete loser recovery, task/subtask recreation and the winning-project cascade recreation of notes/sections/task-repeat-cfgs (#9048, `_createCascadeRecreationOpsForWinningProject`) plus its concurrent-delete divergence guards, exact project/parent relationship follow-ups, same-batch delete exclusion, and replacement when a recovery row later loses its own conflict;
-- replay-atomic project moves and the marked recreation handling shared by conflict resolution, superseded-operation replacement, LWW meta-reducers, and task/project/section reducers;
-- atomic file-snapshot baseline, post-snapshot suffix, hydration-time local-edit, archive-serialization, live-versus-hydration, and transaction-rollback coverage;
-- the legacy whole-file conflict dialog (DialogSyncConflictComponent under imex/sync), which predates the review feature and stays;
-- unrelated fixes added after 962c5bbeb1.
+- **不相交字段合并本身 — 规划器（`conflict-disjoint-merge.util.ts`）、patch-op 写入，以及失败合并回退。移除会重新引入 #9095：整实体 LWW 静默且永久销毁失败侧的并发字段编辑（当另一设备将任务标记为完成时，重命名死亡）。移除日志 ≠ 移除合并 — 本任务回滚的是_审查/日志_功能，而非合并；**
+- schema 版本 3 replace/patch 兼容性及其 v2-to-v3 迁移/屏障；
+- schema 版本 4 及其 v3-to-v4 迁移/屏障、`PROJECT_DELETE_WINS_MARKER`、已认证项目 ID 门控（`isProjectDeleteWinsOperation` 要求 `op.entityId === payload.projectId` — 与契约 14 中的解密路径足迹认证不同）、客户端规划器消费的共享包（`@sp/sync-core`）delete-wins 分类（服务器不分类 delete-wins — 标记位于 E2EE 认证标签内，服务器侧不可读）、本地替换 op 构造，以及跨并发已标记删除的级联任务/笔记 ID 并集；
+- IndexedDB 版本 10 降级保护；
+- replace/patch 载荷类型、转换/重放与受支持持久夹具；
+- 普通单实体与多实体冲突恢复，包括历史未标记项目删除失败者恢复、任务/子任务重建与获胜项目级联重建 notes/sections/task-repeat-cfgs（#9048，`_createCascadeRecreationOpsForWinningProject`）及其并发删除发散守卫、精确项目/父关系跟进、同批删除排除，以及当恢复行稍后输掉自身冲突时的替换；
+- 重放原子项目移动，以及冲突解决、被取代操作替换、LWW meta 归约器与任务/项目/分区归约器共享的已标记重建处理；
+- 原子文件快照基线、快照后后缀、hydration 时本地编辑、归档序列化、live-versus-hydration 与事务回滚覆盖；
+- 遗留全文件冲突对话框（imex/sync 下的 DialogSyncConflictComponent），它早于审查功能并保留；
+- 962c5bbeb1 之后添加的无关修复。
 
-There is no Flip-specific operation handler to remove. UI deletion must not touch generic entity-update capture/replay.
+没有可移除的 Flip 特定操作处理器。UI 删除不得触及通用实体更新捕获/重放。
 
-Known seams for the deletion diff: inside ConflictResolutionService the merge producer shares the recovery apply batch, checkpoint-exempt op IDs, the atomic mixed-source append, and the failed-merge fallback re-entry with the multi-entity recovery fixes (#8990, #9007). Its whole-entity-win guard now covers both archive wins and schema-v4 marked project deletes (#9009); the disjoint branch itself STAYS (see Preserve) — the deletion here is journal/UI only, and must touch neither the merge branch nor the guard or delete-win plan. Recreation markers and follow-up builders are consumed by superseded-operation recovery and the replay-safe task/project/section reducers (#9001). Two post-baseline additions expand that shared surface: the #9048 cascade-recreation helpers (`_createCascadeRecreationOpsForWinningProject`, `_collectDeletedEntityIds`, `_getCurrentEntitiesOfType`) are recovery code sharing the recreation markers and clock-merge helpers with the delete-win family — not the merge producer; and the whole-entity LWW `localWinOperationKind:'update'` local-win path (with its delete-recreation branch) is now also reached via the #9035 deterministic clientId tiebreak in `@sp/sync-core` — keep it. The verified disjoint branch remains cleanly separable (none of #9045/#9048/#9035/#9025 touched it). Review the diff against those seams specifically. The journal clearAll() hooks in OperationLogSyncService and BackupService stay wired while the reader/store stays and leave only with the store; since #9045 clearAll() also writes the `SUP_CONFLICT_JOURNAL_CLEARED_BEFORE` localStorage privacy marker, so store removal must also drop that key and the marker-writing in both hooks. The corruption-classification WeakSet side channel exists only for journal taxonomy and goes with the writer. Disjoint-merge eligibility is coupled to the recreate-fallback constants; the review-UI translations exist in en.json only.
+删除 diff 的已知接缝：在 ConflictResolutionService 内，合并生产者与多实体恢复修复（#8990，#9007）共享恢复应用批、检查点豁免 op ID、原子混合源追加，以及失败合并回退重入。其整实体胜出守卫现覆盖归档胜出与 schema-v4 已标记项目删除（#9009）；不相交分支本身保留（见保留）— 此处删除仅为日志/UI，且不得触及合并分支或守卫或 delete-win 计划。重建标记与跟进构建器由被取代操作恢复与重放安全的任务/项目/分区归约器消费（#9001）。两个基线后添加项扩大该共享面：#9048 级联重建辅助（`_createCascadeRecreationOpsForWinningProject`、`_collectDeletedEntityIds`、`_getCurrentEntitiesOfType`）是与 delete-win 家族共享重建标记与时钟合并辅助的恢复代码 — 而非合并生产者；以及整实体 LWW `localWinOperationKind:'update'` 本地胜出路径（含其删除重建分支）现也经由 `@sp/sync-core` 中 #9035 确定性 clientId 平局决胜到达 — 保留它。已验证的不相交分支仍干净可分离（#9045/#9048/#9035/#9025 均未触及它）。对照这些接缝专门审查 diff。OperationLogSyncService 与 BackupService 中的日志 clearAll() 钩子在读取器/存储保留期间保持接线，仅随存储离开；自 #9045 起 clearAll() 也写入 `SUP_CONFLICT_JOURNAL_CLEARED_BEFORE` localStorage 隐私标记，因此存储移除也必须丢弃该键与两个钩子中的标记写入。损坏分类 WeakSet 旁路通道仅用于日志分类法，随写入器离开。不相交合并资格与 recreate-fallback 常量耦合；审查 UI 翻译仅存在于 en.json。
 
-If supported users can still have journal rows, first stop new writes and retain a read-only review/export path for the decided support window. Do not orphan or silently delete the only discarded values.
+若受支持用户仍可能有日志行，先停止新写入，并在已决定的支持窗口内保留只读审查/导出路径。不要孤立或静默删除唯一的丢弃值。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] The disjoint-field merge remains active and #9095's rename-vs-done regression spec stays green.
-- [ ] Stored v3 replace/patch operations and v4 marked/unmarked project deletions still download/replay with their original semantics from every supported backend.
-- [ ] No schema downgrade, DB downgrade, or generic update removal appears in the diff.
-- [ ] Marked project delete-wins, historical losing-delete recovery, relationship follow-ups, same-batch delete exclusion, recovery-row replacement, and replay-atomic project-move tests remain green.
-- [ ] File-snapshot atomicity, post-snapshot suffix, concurrent-compaction / immutable-snapshot resolution (#9040), hydration-time local edits, and archive-serialization tests remain green.
-- [ ] Removed UI/writers have zero production references.
-- [ ] Journal DB deletion, if any, matches the approved data policy.
-- [ ] The diff is reviewed against 962c5bbeb1 and current master so later fixes are not swept away.
+- [ ] 不相交字段合并保持活动，且 #9095 的 rename-vs-done 回归 spec 保持绿色。
+- [ ] 已存储的 v3 replace/patch 操作与 v4 已标记/未标记项目删除仍从每个受支持后端以原始语义下载/重放。
+- [ ] diff 中不出现 schema 降级、DB 降级或通用更新移除。
+- [ ] 已标记项目 delete-wins、历史失败删除恢复、关系跟进、同批删除排除、恢复行替换与重放原子项目移动测试保持绿色。
+- [ ] 文件快照原子性、快照后后缀、并发压缩 / 不可变快照解析（#9040）、hydration 时本地编辑与归档序列化测试保持绿色。
+- [ ] 已移除 UI/写入器有零生产引用。
+- [ ] 若有日志 DB 删除，则匹配已批准数据策略。
+- [ ] 对照 962c5bbeb1 与当前 master 审查 diff，以免扫掉稍后修复。
 
-**Verification:** Run focused conflict, capture/replay, persistence integration, migration, supported provider/server fixtures, the full unit suite, required checkFile commands, and a deletion-focused diff audit.
+**验证：** 运行针对性冲突、捕获/重放、持久集成、迁移、受支持提供方/服务器夹具、完整单元套件、必需 checkFile 命令，以及以删除为重点的 diff 审计。
 
-**Stop condition:** If a symbol is both a feature producer and compatibility reader, split the roles and keep the reader. If that cannot be done cleanly, keep the path rather than risk unreadable data.
+**停止条件：** 若符号既是功能生产者又是兼容读取器，拆分角色并保留读取器。若无法干净完成，保留路径而非冒不可读数据风险。
 
-## 9. Phase 3 — Consolidate documentation
+## 9. Phase 3 — 整合文档
 
-### Task 7: Correct current documentation without a competing truth source
+### 任务 7：在不创建竞争真相源的情况下更正当前文档
 
-**Size:** Small to medium
+**规模：** 小到中等
 
-Correct known false current-state claims, including the current schema version (v4), the v2-to-v3 and v3-to-v4 barriers, project-delete-wins versus historical timestamp-LWW semantics, the deterministic clientId LWW tiebreak (#9035), the whole-entity-win disjoint-merge guard, atomic file-snapshot hydration and immutable per-compaction snapshots (#9040), decrypt-path metadata/footprint authentication (#9045), and the ALL_ACTIONS capture exception. After Tasks 3–6 settle, publish a short invariant index only if it replaces duplicated prose or clearly marks older architecture documents historical.
+更正已知错误的当前状态声明，包括当前 schema 版本（v4）、v2-to-v3 与 v3-to-v4 屏障、项目 delete-wins 相对历史时间戳 LWW 语义、确定性 clientId LWW 平局决胜（#9035）、整实体胜出不相交合并守卫、原子文件快照 hydration 与每次压缩的不可变快照（#9040）、解密路径元数据/足迹认证（#9045），以及 ALL_ACTIONS 捕获例外。在任务 3–6 稳定后，仅当短不变式索引替换重复散文或清晰将更旧架构文档标记为历史时才发布它。
 
-Do not add a mandatory enforcement/test matrix merely to satisfy this plan. Link focused enforcement/tests where they clarify a non-obvious invariant, and keep proposed behavior out of current-contract documentation.
+不要仅为满足本计划添加强制强制/测试矩阵。在澄清非显而易见不变式时链接针对性强制/测试，并将提议行为排除出当前契约文档。
 
-**Acceptance criteria:**
+**验收标准：**
 
-- [ ] Current-status documentation identifies schema v4; schema v1-v3 references remain only where they are explicitly historical or describe compatibility/migration behavior.
-- [ ] Conflict-review behavior matches the final Task 6 decision.
-- [ ] Project-delete-wins, historical losing-delete recovery (including #9048 cascade), clientId LWW tiebreak (#9035), file-snapshot atomicity and immutable per-compaction snapshots (#9040), hydration-time local edits, and archive serialization match current code.
-- [ ] README, contributor guidance, operation rules, and architecture status do not contradict one another.
-- [ ] There is one clearly identified current contract surface, not another coverage ledger.
+- [ ] 当前状态文档标识 schema v4；schema v1-v3 引用仅在明确历史或描述兼容/迁移行为处保留。
+- [ ] 冲突审查行为匹配最终任务 6 决策。
+- [ ] 项目 delete-wins、历史失败删除恢复（含 #9048 级联）、clientId LWW 平局决胜（#9035）、文件快照原子性与每次压缩的不可变快照（#9040）、hydration 时本地编辑与归档序列化匹配当前代码。
+- [ ] README、贡献者指南、操作规则与架构状态不相互矛盾。
+- [ ] 有一个清晰标识的当前契约面，而非另一覆盖账本。
 
-**Stop condition:** If a new document would mostly duplicate maintained guidance, update and link the existing guidance instead.
+**停止条件：** 若新文档大多重复已维护指南，则更新并链接现有指南。
 
-## 10. Separate correctness proposals
+## 10. 单独的正确性提案
 
-These issues are real, but coupling them to the deletion roadmap worsens reviewability and rollback.
+这些问题真实存在，但将它们耦合到删除路线图会恶化可审查性与回滚。
 
-### A. Atomic current/current browser startup
+### A. 原子 current/current 浏览器启动
 
-A separate proposal should:
+单独提案应：
 
-- acquire a page-lifetime Web Lock before DataInitService construction, hydration, or SUP_OPS open;
-- prove the losing current tab never hydrates or captures;
-- test simultaneous startup, owner close/crash, and later startup;
-- retain early BroadcastChannel compatibility for old clients without claiming an old/current atomic guarantee;
-- define supported behavior when Web Locks are unavailable.
+- 在 DataInitService 构造、hydration 或 SUP_OPS 打开之前获取页面生命周期 Web Lock；
+- 证明失败的当前标签页从不 hydration 或捕获；
+- 测试同时启动、所有者关闭/崩溃与稍后启动；
+- 为旧客户端保留早期 BroadcastChannel 兼容，而不声称旧/当前原子保证；
+- 定义 Web Locks 不可用时的受支持行为。
 
-This improves current/current ownership but does not make an old client participate. No sync simplification may claim mixed-version safety from this lock alone.
+这改善 current/current 所有权，但不使旧客户端参与。任何同步简化都不得仅从此锁声称混合版本安全。
 
-### B. Race-free sync and destructive-maintenance exclusion
+### B. 无竞态同步与破坏性维护排除
 
-First introduce a behavior-neutral coordinator backed by current flag/guard behavior. Route owner families through it in small commits while the old implementation remains the sole authority:
+首先引入由当前标志/守卫行为支撑的行为中立协调器。在旧实现仍为唯一权威时，以小提交将所有者族路由到它：
 
-- normal and force sync;
-- encryption enable/disable/password change;
-- JSON import and local-backup restore;
-- SuperSync restore;
-- profile switching before its first mutation;
-- undo/recovery replacement.
+- 普通与强制同步；
+- 加密启用/禁用/密码变更；
+- JSON 导入与本地备份恢复；
+- SuperSync 恢复；
+- 首次变更前的配置切换；
+- 撤销/恢复替换。
 
-Only after no owner bypasses the coordinator should its internals switch to one exclusive boundary. Preserve foreground try-now semantics, at least the current 90-second maintenance wait, and already-owned internal helpers for nested force/conflict paths. JSON replacement and encryption/server-reset handling stay in one acquisition. Optimistic capture keeps its short operation-log lock. Work that holds `sp_op_log` (in-lock validation/repair included) must stay non-blocking — #9026 removed the last blocking native dialog from that path; the coordinator migration must not reintroduce one. Note that `sp_op_log` is a distinct, lower-level lock from this proposal's 90-second maintenance-exclusion wait.
+仅在无所有者绕过协调器后，其内部才应切换到一个独占边界。保留前台立即尝试语义、至少当前 90 秒维护等待，以及嵌套强制/冲突路径的已有内部辅助。JSON 替换与加密/服务器重置处理留在一次获取中。乐观捕获保留其短操作日志锁。持有 `sp_op_log` 的工作（含锁内验证/修复）必须保持非阻塞 — #9026 从该路径移除了最后的阻塞原生对话框；协调器迁移不得重新引入。注意 `sp_op_log` 是与本提案 90 秒维护排除等待不同的、更低层的锁。
 
-When Web Locks exist, test two current clients even if startup detection races. For mixed old/current and unsupported browsers, state the remaining limitation; do not disable core offline workflows or claim a guarantee that the old client cannot honor.
+当 Web Locks 存在时，即使启动检测竞态也测试两个当前客户端。对混合旧/当前与不受支持浏览器，说明剩余限制；不要禁用核心离线工作流或声称旧客户端无法兑现的保证。
 
-SyncCycleGuardService can be deleted only after this project owns every cycle entry and production references are zero.
+仅在此项目拥有每个周期入口且生产引用为零后，才能删除 SyncCycleGuardService。
 
-## 11. Deferred compatibility work
+## 11. 延后的兼容工作
 
-No compatibility deletion is authorized merely by completing this plan.
+完成本计划本身不授权任何兼容删除。
 
-| Surface                                                                                              | Keep now    | Reconsider only when                                                                                                                                        |
+| 表面                                                                                              | 现在保留    | 仅当以下情况时重新考虑                                                                                                                                        |
 | ---------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Schema-v3 replace/patch readers and v2-to-v3 barrier                                                 | Yes         | No supported client, provider, backup, or server row can contain the form and downgrade policy changes explicitly.                                          |
-| Schema-v4 marked-delete semantics and v3-to-v4 barrier                                               | Yes         | No supported current or historical operation depends on marked delete-wins versus unmarked timestamp LWW, and the compatibility policy changes explicitly.  |
-| Historical project-delete and relationship recovery                                                  | Yes         | Persisted unmarked deletes and recovery/replacement rows are unreachable under an explicit support policy and replay fixtures prove the successor behavior. |
-| Atomic snapshot baseline, immutable per-compaction snapshots, and hydration-time local-edit recovery | Yes         | A replacement persistence design proves the same crash, cursor, suffix, immutable-snapshot, local-edit, and archive guarantees.                             |
-| Split-file read/write/migration                                                                      | Yes         | Minimum supported clients read the successor and rollback no longer needs split writes.                                                                     |
-| Single-file/tombstone readers                                                                        | Yes         | A support/version policy and fixture audit prove they are unreachable.                                                                                      |
-| Native persistence transition paths                                                                  | Yes         | SQLite rollout and downgrade decisions are complete and recovery fixtures pass.                                                                             |
-| Conflict journal reader/store                                                                        | Conditional | Task 1's supported-data retention/export obligation has ended.                                                                                              |
-| SyncCycleGuardService                                                                                | Yes         | Separate proposal B owns every entry point and references are zero.                                                                                         |
+| Schema-v3 replace/patch 读取器与 v2-to-v3 屏障                                                 | 是         | 无受支持客户端、提供方、备份或服务器行可包含该形式，且降级策略显式变更。                                          |
+| Schema-v4 已标记删除语义与 v3-to-v4 屏障                                               | 是         | 无受支持当前或历史操作依赖已标记 delete-wins 相对未标记时间戳 LWW，且兼容策略显式变更。  |
+| 历史项目删除与关系恢复                                                  | 是         | 持久未标记删除与恢复/替换行在显式支持策略下不可达，且重放夹具证明后继行为。 |
+| 原子快照基线、每次压缩的不可变快照，以及 hydration 时本地编辑恢复 | 是         | 替换持久设计证明相同的崩溃、游标、后缀、不可变快照、本地编辑与归档保证。                             |
+| 拆分文件读/写/迁移                                                                      | 是         | 最低受支持客户端读取后继，且回滚不再需要拆分写入。                                                                     |
+| 单文件/墓碑读取器                                                                        | 是         | 支持/版本策略与夹具审计证明它们不可达。                                                                                      |
+| 原生持久过渡路径                                                                  | 是         | SQLite 推出与降级决策完成且恢复夹具通过。                                                                             |
+| 冲突日志读取器/存储                                                                        | 有条件 | 任务 1 的受支持数据保留/导出义务已结束。                                                                                              |
+| SyncCycleGuardService                                                                                | 是         | 单独提案 B 拥有每个入口点且引用为零。                                                                                         |
 
-## 12. Reassessment and approval
+## 12. 重新评估与批准
 
-After each phase collect:
+每个阶段后收集：
 
-- production lifecycle owners and lines deleted versus added;
-- remaining owners of validation, conflict, cursor, provider status, retry, and pending work;
-- focused, full-suite, live-trigger, and scheduled E2E failures;
-- deterministic provider request deltas;
-- persisted-format/downgrade fixture results for schema-v3 replace/patch and schema-v4 marked/unmarked project deletions;
-- file-snapshot atomicity, post-snapshot suffix, concurrent-compaction / immutable-snapshot resolution, hydration-time local-edit, and archive-serialization results;
-- stale-request invalidation across provider, account, and configuration transitions;
-- consumer counts for SyncSessionValidationService and SyncCycleGuardService (Tasks 4–5 each remove consumers, strengthening proposal B);
-- known cross-tab limitations.
+- 生产生命周期所有者与删除相对添加的行数；
+- 验证、冲突、游标、提供方状态、重试与待定工作的剩余所有者；
+- 针对性、全套件、实况触发与计划 E2E 失败；
+- 确定性提供方请求增量；
+- schema-v3 replace/patch 与 schema-v4 已标记/未标记项目删除的持久格式/降级夹具结果；
+- 文件快照原子性、快照后后缀、并发压缩 / 不可变快照解析、hydration 时本地编辑与归档序列化结果；
+- 跨提供方、账户与配置转换的陈旧请求失效；
+- SyncSessionValidationService 与 SyncCycleGuardService 的消费者计数（任务 4–5 各移除消费者，加强提案 B）；
+- 已知跨标签页限制。
 
-### Expected footprint (evidence, not a target)
+### 预期足迹（证据，非目标）
 
-Measured against baseline `6fefd741c5`, to anchor the "removes more than it adds" gate — not a goal to optimize toward:
+相对基线 `6fefd741c5` 测量，以锚定「移除多于添加」门控 — 而非要优化的目标：
 
-| Tranche                                      | Gross production lines removed (approx.)                              | Added                              |
+| 批次                                      | 毛生产行移除（约）                              | 添加                              |
 | -------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------- |
-| Task 4 — WsTriggeredDownloadService (330)    | ~240 (thin adapter retained)                                          | ~40 watermark/retry adapter        |
-| Task 5 — ImmediateUploadService (394)        | ~370                                                                  | ~30 predicate→request wiring       |
-| Task 6 — disjoint-merge planner+in-service   | 0 — KEPT (rescoped 2026-07-17; removal re-introduces #9095)           | 0                                  |
-| Task 6 — conflict-review UI/banner/util/i18n | ~1,020 (page 636 + banner 130 + util 202 + en.json ~50)               | 0                                  |
-| Task 6 — journal writer + emission util      | ~300 now; +~610 (store 426 + model 185) when the data obligation ends | 0                                  |
-| Phase-1 incidentals                          | ~50                                                                   | ~0                                 |
-| Task 2 (correctness, not simplification)     | 0                                                                     | ~120–200 isolation/generation code |
-| Task 3 (background scheduler)                | 0                                                                     | ~150–250 new service               |
+| 任务 4 — WsTriggeredDownloadService (330)    | ~240（保留薄适配器）                                          | ~40 水位/重试适配器        |
+| 任务 5 — ImmediateUploadService (394)        | ~370                                                                  | ~30 谓词→请求接线       |
+| 任务 6 — 不相交合并规划器+服务内   | 0 — 保留（2026-07-17 重新定范围；移除会重新引入 #9095）           | 0                                  |
+| 任务 6 — 冲突审查 UI/横幅/util/i18n | ~1,020（页面 636 + 横幅 130 + util 202 + en.json ~50）               | 0                                  |
+| 任务 6 — 日志写入器 + 发射 util      | 现 ~300；数据义务结束时 +~610（存储 426 + 模型 185） | 0                                  |
+| Phase-1 附带                          | ~50                                                                   | ~0                                 |
+| 任务 2（正确性，非简化）     | 0                                                                     | ~120–200 隔离/代际代码 |
+| 任务 3（后台调度器）                | 0                                                                     | ~150–250 新服务               |
 
-Net production reduction is roughly **1,600–2,100 lines** with the journal store retained (down from the pre-rescope 2,350–2,850 — the ~710–780-line disjoint-merge tranche now stays, #9095), rising toward **~2,250–2,750** once its retention/export obligation ends and the store+model go. This is deliberately far below the rejected "~6,000 lines together" figure: the difference is the kept merge, compatibility readers, delete-wins/recovery follow-ups, and thin adapters that stay. Test-file churn is larger still (review specs removed; disjoint-merge specs stay) but is not counted here — it roughly nets out against new scheduler/adapter/isolation specs and is not the success measure. The number a phase must clear is qualitative (contract 19 and §4's last line): it removes behavioral states and failure paths, not just lines.
+净生产减少约为 **1,600–2,100 行**（保留日志存储时；低于重新定范围前的 2,350–2,850 — 约 710–780 行不相交合并批次现保留，#9095），一旦其保留/导出义务结束且存储+模型离开，升向 **~2,250–2,750**。这有意远低于被否决的「一起约 6,000 行」数字：差额是保留的合并、兼容读取器、delete-wins/恢复跟进与保留的薄适配器。测试文件 churn 更大（审查 specs 移除；不相交合并 specs 保留）但不计入此处 — 它大致与新调度器/适配器/隔离 specs 抵消，不是成功度量。阶段必须通过的数字是定性的（契约 19 与 §4 最后一行）：它移除行为状态与失败路径，而不仅是行。
 
-Approve work in reviewable tranches:
+以可审查批次批准工作：
 
-1. deployed-build/persisted-data audit;
-2. file-target isolation fix;
-3. background scheduler;
-4. WebSocket pipeline collapse;
-5. eligible immediate-upload collapse after the request-cost gate;
-6. focused conflict rollback after the data audit;
-7. documentation consolidation.
+1. 已部署构建/持久数据审计；
+2. 文件目标隔离修复；
+3. 后台调度器；
+4. WebSocket 管道折叠；
+5. 请求成本门控后的合格即时上传折叠；
+6. 数据审计后的有针对性冲突回滚；
+7. 文档整合。
 
-Do not combine phases into one pull request. Keep the browser-startup and destructive-maintenance proposals outside these tranches.
+不要将各阶段合并为一个拉取请求。将浏览器启动与破坏性维护提案留在这些批次外。
 
-Suggested commits:
+建议提交：
 
 1. docs(sync): audit conflict data compatibility
 2. fix(sync): isolate state across file target changes
@@ -501,4 +492,4 @@ Suggested commits:
 6. refactor(sync): remove disposable conflict review paths
 7. docs(sync): consolidate current sync contracts
 
-Every implementation commit contains focused tests. Every modified TypeScript or SCSS file passes npm run checkFile <filepath>. Run the scheduled SuperSync/WebDAV workflow for provider or trigger behavior changes.
+每个实现提交包含针对性测试。每个修改的 TypeScript 或 SCSS 文件通过 npm run checkFile <filepath>。对提供方或触发器行为变更运行计划的 SuperSync/WebDAV 工作流。

@@ -1,8 +1,8 @@
-# Plugin Internationalization (i18n) Guide
+# 插件国际化（i18n）指南
 
-This guide explains how to add multi-language support to your Super Productivity plugins.
+本指南说明如何为 Super Productivity 插件添加多语言支持。
 
-## Quick Start
+## 快速开始
 
 ```
 my-plugin/
@@ -14,7 +14,7 @@ my-plugin/
     └── fr.json           # Optional - French
 ```
 
-**manifest.json**:
+**manifest.json**：
 
 ```json
 {
@@ -27,7 +27,7 @@ my-plugin/
 }
 ```
 
-**i18n/en.json**:
+**i18n/en.json**：
 
 ```json
 {
@@ -40,7 +40,7 @@ my-plugin/
 }
 ```
 
-**plugin.js**:
+**plugin.js**：
 
 ```javascript
 // Use translations in your plugin
@@ -49,11 +49,11 @@ const taskMsg = api.translate('TASK_COUNT', { count: 5 });
 const saveBtn = api.translate('BUTTONS.SAVE');
 ```
 
-## Plugin Structure
+## 插件结构
 
-### 1. Manifest Configuration
+### 1. 清单配置
 
-Add the `i18n` section to your `manifest.json`:
+在 `manifest.json` 中加入 `i18n` 部分：
 
 ```json
 {
@@ -67,15 +67,15 @@ Add the `i18n` section to your `manifest.json`:
 }
 ```
 
-**Fields**:
+**字段**：
 
-- `languages` (required): Array of language codes supported by your plugin
-- Must include at least `"en"` (English)
-- Use standard language codes: `en`, `de`, `fr`, `es`, `ja`, `zh`, etc.
+- `languages`（必填）：插件支持的语言代码数组
+- 必须至少包含 `"en"`（英语）
+- 使用标准语言代码：`en`、`de`、`fr`、`es`、`ja`、`zh` 等
 
-### 2. Translation Files
+### 2. 翻译文件
 
-Create an `i18n/` folder in your plugin with JSON files for each language:
+在插件中创建 `i18n/` 文件夹，为每种语言准备 JSON 文件：
 
 ```
 my-plugin/
@@ -86,30 +86,22 @@ my-plugin/
 │   └── es.json    # Spanish
 ```
 
-**File naming**: Use language codes from the manifest (e.g., `en.json`, `de.json`)
+**文件命名**：使用清单中的语言代码（例如 `en.json`、`de.json`）
 
-The `i18n/` folder must sit at the root of the plugin ZIP, next to `manifest.json`.
+`i18n/` 文件夹必须位于插件 ZIP 的根目录，与 `manifest.json` 同级。
 
-**Language codes must match one of Super Productivity's own codes, lowercase**
-(`en`, `de`, `pt-br`, `zh-tw`, …) — `pt-BR` is not the same as `pt-br` and is ignored.
+**语言代码必须与 Super Productivity 自身使用的代码之一匹配，且为小写**
+（`en`、`de`、`pt-br`、`zh-tw` 等）——`pt-BR` 与 `pt-br` 不同，会被忽略。
 
-**Save translation files as UTF-8.** JSON is required to be UTF-8, and a file saved in a
-legacy 8-bit encoding (Latin-1/CP1252 — watch out for umlauts and accents) is rejected
-outright rather than loaded with mangled characters.
+**翻译文件请以 UTF-8 保存。** JSON 必须是 UTF-8；以传统 8 位编码（Latin-1/CP1252——注意变音符号与重音）保存的文件会被直接拒绝，而不是加载成乱码字符。
 
-A declared language is skipped when it ships no matching `i18n/<lang>.json` in the ZIP,
-or when that file is not valid UTF-8 JSON describing an object. Each of those is logged
-individually as a console warning. Unsupported language codes are reported together in one
-`Unsupported language codes: …` warning, truncated to the first few. `translate()` then
-falls back to returning the key, so check the console first when a translation does not
-show up.
+若已声明的语言在 ZIP 中没有对应的 `i18n/<lang>.json`，或该文件不是描述对象的有效 UTF-8 JSON，则会跳过该语言。每种情况都会单独以 console 警告记录。不受支持的语言代码会汇总在一条 `Unsupported language codes: …` 警告中，并截断为前几个。之后 `translate()` 会回退为返回 key 本身，因此翻译未显示时请先检查控制台。
 
-For uploaded plugin ZIPs, all declared translation files combined are limited to 5 MB;
-exceeding that rejects the upload.
+对于上传的插件 ZIP，所有已声明翻译文件合计限制为 5 MB；超出则拒绝上传。
 
-### 3. Translation File Format
+### 3. 翻译文件格式
 
-Use hierarchical JSON structure for organization:
+使用层级化 JSON 结构便于组织：
 
 ```json
 {
@@ -130,27 +122,27 @@ Use hierarchical JSON structure for organization:
 }
 ```
 
-**Best practices**:
+**最佳实践**：
 
-- Use UPPERCASE keys for consistency
-- Group related translations together
-- Keep hierarchy simple (2-3 levels max)
-- Use descriptive key names
+- 使用大写键名以保持一致
+- 将相关翻译分组
+- 保持层级简单（最多 2–3 层）
+- 使用描述性的键名
 
-## API Methods
+## API 方法
 
 ### translate(key, params?)
 
-Translate a key with optional parameter interpolation.
+翻译一个 key，并可选用参数插值。
 
-**Parameters**:
+**参数**：
 
-- `key` (string): Translation key using dot notation
-- `params` (object, optional): Values to interpolate into the translation
+- `key`（string）：使用点号表示法的翻译键
+- `params`（object，可选）：插入到译文中的值
 
-**Returns**: Translated string, or the key itself if translation not found
+**返回值**：翻译后的字符串；若未找到翻译则返回 key 本身
 
-**Examples**:
+**示例**：
 
 ```javascript
 // Simple translation
@@ -176,11 +168,11 @@ const btnLabel = api.translate('BUTTONS.SAVE');
 // → "Save"
 ```
 
-**Fallback behavior**:
+**回退行为**：
 
-1. Try current app language (e.g., German)
-2. Fall back to English if key not found
-3. Return the key itself if not in English either
+1. 尝试当前应用语言（例如德语）
+2. 若找不到 key，回退到英语
+3. 若英语中也没有，返回 key 本身
 
 ```javascript
 // User's language is German (de)
@@ -194,24 +186,24 @@ api.translate('BUTTONS.DELETE'); // → "BUTTONS.DELETE" (not found)
 
 ### formatDate(date, format)
 
-Format a date according to the current locale.
+按当前区域设置格式化日期。
 
-**Parameters**:
+**参数**：
 
-- `date` (Date | string | number): Date to format
-  - Date object
-  - ISO 8601 string (e.g., `"2026-01-16T14:30:00Z"`)
-  - Timestamp (milliseconds since epoch)
-- `format` (string): Predefined format
-  - `"short"` - Short date (1/16/26)
-  - `"medium"` - Medium date (Jan 16, 2026)
-  - `"long"` - Long date (January 16, 2026)
-  - `"time"` - Time only (2:30 PM)
-  - `"datetime"` - Date and time (1/16/26, 2:30 PM)
+- `date`（Date | string | number）：要格式化的日期
+  - Date 对象
+  - ISO 8601 字符串（例如 `"2026-01-16T14:30:00Z"`）
+  - 时间戳（自 epoch 起的毫秒数）
+- `format`（string）：预定义格式
+  - `"short"` - 短日期（1/16/26）
+  - `"medium"` - 中等日期（Jan 16, 2026）
+  - `"long"` - 长日期（January 16, 2026）
+  - `"time"` - 仅时间（2:30 PM）
+  - `"datetime"` - 日期与时间（1/16/26, 2:30 PM）
 
-**Returns**: Formatted date string
+**返回值**：格式化后的日期字符串
 
-**Examples**:
+**示例**：
 
 ```javascript
 const now = new Date();
@@ -242,11 +234,11 @@ api.formatDate(1737039000000, 'medium');
 
 ### getCurrentLanguage()
 
-Get the current app language code.
+获取当前应用语言代码。
 
-**Returns**: Language code (e.g., `"en"`, `"de"`, `"fr"`)
+**返回值**：语言代码（例如 `"en"`、`"de"`、`"fr"`）
 
-**Example**:
+**示例**：
 
 ```javascript
 const lang = api.getCurrentLanguage();
@@ -260,9 +252,9 @@ if (lang === 'ja' || lang === 'zh') {
 }
 ```
 
-## Language Change Hook
+## 语言变更 Hook
 
-Listen for language changes to update your plugin UI:
+监听语言变更以更新插件 UI：
 
 ```javascript
 api.registerHook('languageChange', ({ newLanguage }) => {
@@ -274,11 +266,11 @@ api.registerHook('languageChange', ({ newLanguage }) => {
 });
 ```
 
-**Note**: Plugin translations are automatically reloaded when the language changes. You only need this hook if you have additional UI updates to perform.
+**说明**：语言变更时，插件翻译会自动重新加载。仅当你还有额外的 UI 更新时才需要此 hook。
 
-## Supported Languages
+## 支持的语言
 
-Super Productivity supports these language codes:
+Super Productivity 支持以下语言代码：
 
 | Code    | Language              |
 | ------- | --------------------- |
@@ -310,11 +302,11 @@ Super Productivity supports these language codes:
 | `ro`    | Romanian              |
 | `ro-md` | Romanian (Moldova)    |
 
-## Complete Example
+## 完整示例
 
-Here's a complete plugin with i18n support:
+以下是一个带有 i18n 支持的完整插件：
 
-**Directory structure**:
+**目录结构**：
 
 ```
 task-counter-plugin/
@@ -325,7 +317,7 @@ task-counter-plugin/
     └── de.json
 ```
 
-**manifest.json**:
+**manifest.json**：
 
 ```json
 {
@@ -339,7 +331,7 @@ task-counter-plugin/
 }
 ```
 
-**i18n/en.json**:
+**i18n/en.json**：
 
 ```json
 {
@@ -354,7 +346,7 @@ task-counter-plugin/
 }
 ```
 
-**i18n/de.json**:
+**i18n/de.json**：
 
 ```json
 {
@@ -369,7 +361,7 @@ task-counter-plugin/
 }
 ```
 
-**plugin.js**:
+**plugin.js**：
 
 ```javascript
 (async function () {
@@ -417,11 +409,11 @@ task-counter-plugin/
 })();
 ```
 
-## Best Practices
+## 最佳实践
 
-### 1. Always Include English
+### 1. 始终包含英语
 
-English is the fallback language. Always provide `en.json`:
+英语是回退语言。始终提供 `en.json`：
 
 ```json
 {
@@ -431,11 +423,11 @@ English is the fallback language. Always provide `en.json`:
 }
 ```
 
-### 2. Keep Keys Consistent
+### 2. 保持键一致
 
-Use the same keys across all language files:
+所有语言文件使用相同的键：
 
-**en.json**:
+**en.json**：
 
 ```json
 {
@@ -444,7 +436,7 @@ Use the same keys across all language files:
 }
 ```
 
-**de.json**:
+**de.json**：
 
 ```json
 {
@@ -453,7 +445,7 @@ Use the same keys across all language files:
 }
 ```
 
-### 3. Use Descriptive Keys
+### 3. 使用描述性键名
 
 ```javascript
 // ✓ Good - descriptive
@@ -463,7 +455,7 @@ api.translate('BUTTONS.SAVE_TASK');
 api.translate('BTN1');
 ```
 
-### 4. Group Related Translations
+### 4. 分组相关翻译
 
 ```json
 {
@@ -479,9 +471,9 @@ api.translate('BTN1');
 }
 ```
 
-### 5. Handle Plurals Carefully
+### 5. 谨慎处理复数
 
-Use parameters for dynamic pluralization:
+使用参数实现动态复数：
 
 ```json
 {
@@ -496,9 +488,9 @@ const key = count === 1 ? 'TASK_COUNT_SINGULAR' : 'TASK_COUNT_PLURAL';
 const msg = api.translate(key, { count });
 ```
 
-### 6. Date Formatting
+### 6. 日期格式化
 
-Always use `formatDate()` instead of manual formatting:
+始终使用 `formatDate()`，不要手动格式化：
 
 ```javascript
 // ✓ Good - locale-aware
@@ -508,44 +500,44 @@ const formatted = api.formatDate(task.dueDate, 'short');
 const formatted = `${month}/${day}/${year}`;
 ```
 
-## Troubleshooting
+## 故障排除
 
-### Plugin Shows Keys Instead of Translations
+### 插件显示键名而非译文
 
-**Cause**: Translation files not loaded or keys don't match
+**原因**：翻译文件未加载，或键不匹配
 
-**Solution**:
+**解决**：
 
-1. Check `i18n/` folder exists in your plugin
-2. Verify JSON files are valid
-3. Ensure keys match exactly (case-sensitive)
-4. Check browser console for errors
+1. 检查插件中是否存在 `i18n/` 文件夹
+2. 确认 JSON 文件有效
+3. 确保键完全匹配（区分大小写）
+4. 检查浏览器控制台是否有错误
 
-### Wrong Language Displayed
+### 显示了错误的语言
 
-**Cause**: Language not supported by plugin
+**原因**：插件不支持该语言
 
-**Solution**:
+**解决**：
 
-- Add the language to manifest `i18n.languages`
-- Create the corresponding JSON file
-- Plugin falls back to English for unsupported languages
+- 将该语言加入清单的 `i18n.languages`
+- 创建对应的 JSON 文件
+- 对不支持的语言，插件会回退到英语
 
-### Translations Not Updating
+### 翻译未更新
 
-**Cause**: Plugin code caching translations
+**原因**：插件代码缓存了翻译结果
 
-**Solution**:
+**解决**：
 
-- Call `api.translate()` each time you need the translation
-- Don't cache translation results
-- The API handles caching internally
+- 每次需要译文时都调用 `api.translate()`
+- 不要缓存翻译结果
+- API 会在内部处理缓存
 
-### Parameters Not Interpolating
+### 参数未插值
 
-**Cause**: Wrong placeholder syntax or missing parameter
+**原因**：占位符语法错误，或缺少参数
 
-**Solution**:
+**解决**：
 
 ```javascript
 // ✓ Correct syntax
@@ -559,22 +551,22 @@ api.translate('MESSAGE', { name: 'John' }); // "Hello, John"
 api.translate('MESSAGE', { user: 'John' }); // Won't replace {{name}}
 ```
 
-## Migration from Hard-coded Strings
+## 从硬编码字符串迁移
 
-If you have an existing plugin with hard-coded strings:
+若已有硬编码字符串的插件：
 
-**Before**:
+**之前**：
 
 ```javascript
 api.showSnack({ msg: 'Task saved successfully' });
 const label = 'Save Task';
 ```
 
-**After**:
+**之后**：
 
-1. Create translation files:
+1. 创建翻译文件：
 
-**en.json**:
+**en.json**：
 
 ```json
 {
@@ -587,7 +579,7 @@ const label = 'Save Task';
 }
 ```
 
-2. Update plugin code:
+2. 更新插件代码：
 
 ```javascript
 api.showSnack({
@@ -596,7 +588,7 @@ api.showSnack({
 const label = api.translate('LABELS.SAVE_TASK');
 ```
 
-3. Update manifest:
+3. 更新清单：
 
 ```json
 {
@@ -606,23 +598,23 @@ const label = api.translate('LABELS.SAVE_TASK');
 }
 ```
 
-## Testing i18n
+## 测试 i18n
 
-### 1. Test All Languages
+### 1. 测试所有语言
 
 ```javascript
 // Switch languages in Super Productivity settings
 // Verify your plugin displays correct translations
 ```
 
-### 2. Test Fallbacks
+### 2. 测试回退
 
 ```javascript
 // Remove a key from non-English language
 // Verify it falls back to English
 ```
 
-### 3. Test Parameter Interpolation
+### 3. 测试参数插值
 
 ```javascript
 // Test with various parameter values
@@ -631,7 +623,7 @@ const msg = api.translate('COUNT', { count: 1 });
 const msg = api.translate('COUNT', { count: 100 });
 ```
 
-### 4. Test Date Formats
+### 4. 测试日期格式
 
 ```javascript
 // Test all format options
@@ -641,15 +633,15 @@ formats.forEach((fmt) => {
 });
 ```
 
-## Performance Considerations
+## 性能考量
 
-1. **Translation files are loaded once** at plugin activation
-2. **Translations are cached** in memory
-3. **No performance impact** on frequent `translate()` calls
-4. **Language switching** reuses already-loaded translations
+1. **翻译文件在插件激活时加载一次**
+2. **译文缓存在内存中**
+3. **频繁调用 `translate()` 无性能影响**
+4. **切换语言会复用已加载的翻译**
 
-## See Also
+## 另见
 
-- [Plugin Development Guide](README.md)
-- [Plugin API Reference](../plugin-api/README.md)
-- [Example Plugins](.)
+- [插件开发指南](README.md)
+- [插件 API 参考](../plugin-api/README.md)
+- [示例插件](.)

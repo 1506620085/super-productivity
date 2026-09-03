@@ -1,277 +1,191 @@
-# Legacy plaintext sync-data eradication plan
+# 遗留明文同步数据清除计划
 
-> **Status:** Proposed; no production action is authorized by this document
+> **状态：** 提案中；本文档不授权任何生产操作
 >
-> **Scope:** The hosted production SuperSync service only. Client-side
-> file-based sync providers (WebDAV, Dropbox, local file storage) are out of
-> scope: that data lives on user-controlled storage and is not the operator's
-> responsibility. Server file storage is not a concern either: the production
-> `dataDir` holds no legacy file-storage directories (operator-confirmed);
-> the directories `scripts/clear-data.ts` sweeps are defensive legacy
-> handling only. Self-hosted deployments are explicitly out of scope by
-> operator decision; the gate ships in the shared image and their legacy data
-> is their operators' concern.
+> **范围：** 仅托管生产 SuperSync 服务。客户端侧基于文件的同步提供商（WebDAV、
+> Dropbox、本地文件存储）不在范围内：那些数据位于用户控制的存储上，不是运营者的责任。
+> 服务器文件存储也不是关注点：生产 `dataDir` 不含遗留文件存储目录（运营者已确认）；
+> `scripts/clear-data.ts` 扫描的目录仅为防御性遗留处理。自托管部署由运营者决定
+> 明确排除在外；门控随共享镜像一并发布，其遗留数据是其运营者的责任。
 >
-> **Strategy in one paragraph:** Enforce encrypted-only uploads, notify and
-> wait at least 45 days, then delete the accounts that still hold plaintext
-> and have gone dormant (the operator accepts that returning users
-> re-register), clean-slate the few still-active holdouts, and let old
-> backups expire under normal rotation. Everything after the gate is one
-> existing script, one small script, and waiting. An optional deferred
-> volume migration removes disk-level remnants; without it the claim covers
-> database contents, not disk forensics.
+> **策略一句话：** 强制仅加密上传，通知并至少等待 45 天，然后删除仍持有明文且已休眠的
+> 账户（运营者接受回访用户重新注册），对少数仍活跃的顽固账户做干净白板重置，并让旧备份
+> 在正常轮换下过期。门控之后的一切就是一个现有脚本、一个小脚本，以及等待。可选的延期
+> 卷迁移可消除磁盘级残留；不做则声明覆盖数据库内容，而非磁盘取证。
 
-## Publication scope
+## 发布范围
 
-This document is deliberately public; the policy and client impact are
-community-facing. Concrete hostnames, backup schedules, and the actual
-deadline date belong in a private operations runbook, because until
-eradication completes this document also describes where recoverable
-plaintext still exists.
+本文档刻意公开；政策与客户端影响面向社区。具体主机名、备份计划与实际截止日期属于
+私有运维 runbook，因为在清除完成之前，本文档也描述了可恢复明文仍存在于何处。
 
-## Objective and completion claim
+## 目标与完成声明
 
-The invariant to reach and keep:
+要达到并保持的不变量：
 
-> The SuperSync service retains no known server-readable user-content payload
-> or derived application-state snapshot. Every retained operation payload is
-> encryption-flagged and has the supported ciphertext transport shape. All
-> older copies that could contain plaintext have been destroyed or have
-> expired under recorded retention.
+> SuperSync 服务不保留任何已知服务器可读的用户内容载荷或派生的应用状态快照。
+> 每一条保留的操作载荷均带有加密标志，并具有受支持的密文传输形态。所有可能包含明文的
+> 旧副本已被销毁或已在已记录的保留期下过期。
 
-Account data and envelope metadata (emails, authentication records, operation
-type, entity ids, vector clocks, timestamps, the `isPayloadEncrypted` flag)
-remain server-visible; changing that is a separate protocol design.
+账户数据与信封元数据（邮箱、认证记录、操作类型、实体 id、向量时钟、时间戳、
+`isPayloadEncrypted` 标志）仍对服务器可见；改变这一点是单独的协议设计。
 
-The plan is complete when:
+计划在以下条件满足时完成：
 
-- new plaintext or missing-flag uploads are rejected before any persistence
-  side effect;
-- `operations` has no row with `is_payload_encrypted IS NOT TRUE` and every
-  retained payload passes the ciphertext transport classifier;
-- `user_sync_state.snapshot_data` is null everywhere;
-- every recorded legacy backup artifact and the affected-user CSV is
-  destroyed or past its recorded expiry; and
-- the invariant still holds at 7 days and on a restored post-cleanup backup.
+- 新的明文或缺失标志的上传在任何持久化副作用之前被拒绝；
+- `operations` 中没有 `is_payload_encrypted IS NOT TRUE` 的行，且每条保留载荷均通过
+  密文传输分类器；
+- `user_sync_state.snapshot_data` 处处为 null；
+- 每一份已记录的遗留备份工件与受影响用户 CSV 已被销毁或已过其记录的过期时间；并且
+- 不变量在 7 天后以及清理后恢复的备份上仍然成立。
 
-Two honest limits. First, the server holds no E2EE key, so it cannot prove a
-base64 string is ciphertext; the gate blocks accidental plaintext, while a
-malicious client lying about the flag is out of scope (it requires a
-cryptographically verifiable protocol). Second, without the optional volume
-migration (Step 5), deleted tuples and rotated-out WAL may linger beneath the
-database files until pages recycle; the claim then covers what the database
-can return, not what disk forensics on operator-controlled hardware could
-recover.
+两个诚实的限制。第一，服务器不持有 E2EE 密钥，因此无法证明某个 base64 字符串是密文；
+门控阻止意外明文，而恶意客户端谎报标志则不在范围内（那需要密码学可验证协议）。第二，
+若不做可选的卷迁移（步骤 5），已删除的元组与已轮换出的 WAL 可能在页面回收前残留于
+数据库文件之下；此时声明覆盖数据库能返回的内容，而非运营者控制硬件上磁盘取证可恢复的内容。
 
-## Counting, and why it matters here
+## 计数，以及此处为何重要
 
-The cleanup list is built from two detectors, run in primary-key batches on a
-session without the application `statement_timeout`:
+清理列表由两个检测器构建，在无应用 `statement_timeout` 的会话上按主键分批运行：
 
-- the flag query: accounts with any `is_payload_encrypted IS NOT TRUE` row or
-  a non-null `snapshot_data` (the server only ever caches plaintext state);
-- the Step 1 classifier over all retained rows, which also catches rows
-  flagged encrypted whose payload is not a canonical-base64 AES-GCM envelope.
+- 标志查询：存在任何 `is_payload_encrypted IS NOT TRUE` 行或非空 `snapshot_data` 的账户
+  （服务器只缓存明文状态）；
+- 步骤 1 分类器覆盖所有保留行，也会抓住已标记为加密但其载荷不是规范 base64 AES-GCM
+  信封的行。
 
-Because the cleanup targets enumerated accounts, this list is load-bearing:
-its sensitivity equals the completion claim's, so there is no gap between
-what the plan can detect and what it removes. The count keeps growing until
-the gate deploys (pre-v18.13.0 clients can still upload plaintext), so the
-final list is built at the deadline, not before. Plaintext in old backup
-generations is handled by expiry, never by enumeration.
+因为清理针对枚举出的账户，该列表是承重的：其灵敏度等于完成声明的灵敏度，因此计划能检测的
+与它移除的之间没有缺口。计数会持续增长直到门控部署（v18.13.0 之前的客户端仍可上传明文），
+因此最终列表在截止日期构建，而非之前。旧备份代中的明文由过期处理，从不靠枚举。
 
-## Why this strategy
+## 为何采用此策略
 
-The recovery design treats clients as the source of truth, per account: an
-account whose server sync tables are empty is re-seeded by any client that
-holds its data, a path already proven by the accounts-only restore E2E and
-the #9444 Force Overwrite work. That, plus two operator decisions, removes
-every heavyweight mechanism earlier revisions carried:
+恢复设计将客户端视为每个账户的真相来源：服务器同步表为空的账户可由任何持有其数据的客户端
+重新播种，该路径已由仅账户恢复 E2E 与 #9444 Force Overwrite 工作证明。再加上两项运营者决策，
+移除了早期修订中携带的所有重量级机制：
 
-- **Dormant users may re-register.** So dormant plaintext accounts need no
-  preservation: delete them with the existing `delete-user` tooling (row
-  cascade removes their operations and state). No account-only backup, no
-  `lastSeq` bookkeeping for the bulk of the list, and their email PII goes
-  too, which is data minimization, not collateral.
-- **There is time to spare.** So old backups need no destruction sweep; they
-  expire under normal rotation on recordable dates. And a long notice period
-  shrinks the deletion list for free: after the gate deploys, any still
-  active old-client user is loudly forced to update, and updated clients
-  convert through the documented Force Overwrite flow.
+- **休眠用户可以重新注册。** 因此休眠明文账户无需保留：用现有 `delete-user` 工具删除它们
+  （行级级联移除其操作与状态）。无需仅账户备份，无需为列表中的大部分做 `lastSeq` 簿记，
+  其邮箱 PII 也一并移除，这是数据最小化，而非附带损害。
+- **有时间可用。** 因此旧备份无需销毁扫荡；它们在可记录的日期下按正常轮换过期。而较长的
+  通知期免费缩小删除列表：门控部署后，任何仍活跃的旧客户端用户会被大声强制更新，更新后的
+  客户端通过已文档化的 Force Overwrite 流程转换。
 
-What remains active at the deadline is the small set of accounts with modern
-clients and lingering plaintext deep in history (they sync fine and ignore
-notices). Those cannot be deleted (they are live users) and get a per-account
-clean-slate instead; their clients detect the reset and re-upload encrypted
-state. Clean-slating dormant accounts instead of deleting them would be an
-equal-effort alternative if keeping their logins ever mattered; the operator
-has said it does not.
+截止日期仍活跃的是少数持有现代客户端且历史深处仍有明文的账户（它们同步正常并忽略通知）。
+这些不能删除（它们是在线用户），改为每账户干净白板重置；其客户端检测到重置并重新上传
+加密状态。若保留其登录曾经重要，对休眠账户做干净白板而非删除会是同等工作量的替代方案；
+运营者已表示不重要。
 
-Containment is valuable on its own: the Step 1 gate closes the server side of
-the class whose client side was closed in v18.13.0 (#8670,
-GHSA-9v8x-68pf-p5x7). Ship it regardless of the rest. There is no need to
-retry `REINDEX INDEX CONCURRENTLY ix_ops_plaintext`; the audit index was for
-discovery, not eradication.
+遏制本身就有价值：步骤 1 门控关闭了 v18.13.0（#8670，GHSA-9v8x-68pf-p5x7）已关闭客户端侧的
+那一类问题的服务器侧。无论其余部分如何，都请先发布它。无需重试
+`REINDEX INDEX CONCURRENTLY ix_ops_plaintext`；审计索引用于发现，而非清除。
 
-## What must not be simplified
+## 不可简化之处
 
-1. The gate rejects **before** any persistence side effect, so a rejected
-   upload can never partially land.
-2. **The deletion list is the sharpest knife in this plan.** A predicate
-   mistake deletes an active user's account. The dormancy cutoff (no sync
-   activity for at least 45 days) and the plaintext predicate are reviewed
-   together, the list is produced as a dry run first, and the operator
-   reviews aggregate counts (and spot-checks activity timestamps) before the
-   destructive run. The notice period names the exact criteria.
-3. The clean-slate path for the active holdouts preserves each account's
-   `lastSeq` (the #9444-verified semantics); deleting rows without it hands
-   out duplicate sequence numbers later. Verify the tooling; do not assume
-   `scripts/clear-data.ts` as-is.
-4. The wipe-and-recover path is proven in E2E before the deadline, including
-   a divergent pending local edit on a clean-slated multi-device account,
-   with no branch disappearing silently.
-5. The verification script gates every "done" claim; nothing is declared
-   clean by construction.
+1. 门控在任何持久化副作用 **之前** 拒绝，因此被拒绝的上传绝不能部分落地。
+2. **删除列表是本计划中最锋利的刀。** 谓词错误会删除活跃用户的账户。休眠截止
+   （至少 45 天无同步活动）与明文谓词一并审查，列表先以 dry run 产出，运营者在破坏性运行前
+   审查聚合计数（并抽查活动时间戳）。通知期点明确切标准。
+3. 活跃顽固账户的干净白板路径保留每个账户的 `lastSeq`（#9444 已验证的语义）；不保留就删除行
+   会在之后发出重复序列号。请验证工具；不要假设现成的 `scripts/clear-data.ts` 即可。
+4. 擦除并恢复路径在截止日期前于 E2E 中证明，包括干净白板多设备账户上的分歧待本地编辑，
+   且无分支静默消失。
+5. 验证脚本门控每一个「完成」声明；没有任何内容被构造成声明为干净。
 
-## The plan
+## 计划
 
-### Step 1: Encrypted-only ingress gate
+### 步骤 1：仅加密入口门控
 
-The only real engineering in this plan. Keep the wire-format definition in
-`@sp/sync-core`, where the AES-GCM envelope layout and `detectFormat()`
-already live; expose one small pure transport classifier there and apply it
-from both SuperSync upload entry points after the existing request schema
-parse, including `SYNC_IMPORT`, `BACKUP_IMPORT`, and `REPAIR` (remove the
-legacy plaintext repair exception from the externally reachable path). Do not
-tighten the shared response schema: downloads of historical plaintext keep
-working until the cleanup, then become impossible because no plaintext rows
-remain.
+本计划中唯一真正的工程。将线格式定义保留在 `@sp/sync-core`，AES-GCM 信封布局与
+`detectFormat()` 已在那里；在那里暴露一个小的纯传输分类器，并在现有请求 schema 解析之后
+从两个 SuperSync 上传入口点应用它，包括 `SYNC_IMPORT`、`BACKUP_IMPORT` 与 `REPAIR`
+（从外部可达路径移除遗留明文修复例外）。不要收紧共享响应 schema：历史明文的下载在清理前
+继续工作，之后因无明文行而变为不可能。
 
-The policy: `isPayloadEncrypted === true` (missing is rejected), a string
-payload, canonical base64, decoded length compatible with a supported
-envelope (at least 28 bytes legacy, at least 44 bytes Argon2id). Structural
-check only; never attempt decryption, never log the value. Reject whole
-batches with a stable `E2EE_REQUIRED` code before request fingerprinting,
-deduplication, quota work, snapshot preparation, or persistence.
+策略：`isPayloadEncrypted === true`（缺失即拒绝）、字符串载荷、规范 base64、解码长度与
+受支持信封兼容（遗留至少 28 字节，Argon2id 至少 44 字节）。仅做结构检查；从不尝试解密，
+从不记录该值。在请求指纹、去重、配额工作、快照准备或持久化之前，以稳定的
+`E2EE_REQUIRED` 代码拒绝整批。
 
-No database constraint ships in this step. The intended CHECK backstop on
-`operations` turned out to be undeployable before the cleanup: a `NOT VALID`
-CHECK is still enforced on every UPDATE, and the payload-bytes backfill
-(`scripts/migrate-payload-bytes.ts`, kept for storage-quota reconciliation)
-updates exactly the legacy plaintext rows, so the constraint
-would permanently wedge that backfill on any install still holding them. The
-`snapshot_data IS NULL` constraint on `user_sync_state` has the same
-UPDATE-enforcement problem on every sync. Both backstops therefore land in
-Step 3, where the rows they would trip on no longer exist. Until then the
-route gate is the only control, and that is sufficient: the two gated routes
-are the entire external write surface, and the server has no internal
-plaintext writer. The gate itself retires the upload-path plaintext cache
-write (encrypted snapshots are never cached); the server-side regeneration
-path behind the restore endpoint keeps working for legacy accounts until
-Step 3 removes it with the rest of the plaintext restore feature. Do not
-bump the sync schema version; this is ingress policy, not replay semantics.
+本步骤不发布数据库约束。原先打算在 `operations` 上的 CHECK 兜底在清理前被证明无法部署：
+`NOT VALID` CHECK 仍在每次 UPDATE 上强制执行，而载荷字节回填
+（`scripts/migrate-payload-bytes.ts`，为存储配额对账保留）恰好更新遗留明文行，因此该约束
+会永久卡住任何仍持有这些行的安装上的回填。`user_sync_state` 上的 `snapshot_data IS NULL`
+约束在每次同步上有同样的 UPDATE 强制执行问题。因此两个兜底都落在步骤 3，那时它们会绊倒的行
+已不存在。在此之前路由门控是唯一控制，且已足够：两个被门控的路由是整个外部写面，服务器没有
+内部明文写入器。门控本身退役上传路径的明文缓存写入（加密快照从不缓存）；恢复端点背后的
+服务器侧再生成路径对遗留账户在步骤 3 与其余明文恢复功能一并移除之前继续工作。不要提升同步
+schema 版本；这是入口策略，而非回放语义。
 
-Coordinate with #9439/PR #9444: its E2E seeds a plaintext operation through
-the upload path this gate rejects (convert the seed to a direct database
-insert), and its Force Overwrite documentation is the supported conversion
-path until the cleanup. Before production deploy, spot-check one or two real
-pre-v18.13.0 builds against staging to confirm rejection does not silently
-discard their local data and retries stay bounded. Two cases belong in that
-observation: a retry of an upload that committed BEFORE the gate deployed
-(the gate runs before request dedup, so the client receives a 400 for an
-upload that durably succeeded; it must not present as data loss), and that
-updated clients treat `E2EE_REQUIRED` as terminal rather than blind-retrying
-a whole batch wedged behind one bad op.
+与 #9439/PR #9444 协调：其 E2E 通过本门控会拒绝的上传路径播种明文操作（将播种改为直接
+数据库插入），其 Force Overwrite 文档是清理前受支持的转换路径。生产部署前，在 staging 上
+抽查一两个真实的 v18.13.0 之前构建，确认拒绝不会静默丢弃其本地数据且重试保持有界。该观察
+属于两种情况：门控部署 **之前** 已提交的上传的重试（门控在请求去重之前运行，因此客户端对
+已持久成功的上传收到 400；不得表现为数据丢失），以及更新后的客户端将 `E2EE_REQUIRED` 视为
+终态而非盲目重试整批卡在一个坏操作后面。
 
-Suggested files: `packages/sync-core/src/encryption/web-crypto.ts`,
-`packages/sync-core/src/index.ts`,
-`packages/super-sync-server/src/sync/sync.routes.ops-handler.ts`,
-`packages/super-sync-server/src/sync/sync.routes.snapshot-handler.ts`,
-`packages/super-sync-server/src/sync/sync.types.ts`.
+建议文件：`packages/sync-core/src/encryption/web-crypto.ts`、
+`packages/sync-core/src/index.ts`、
+`packages/super-sync-server/src/sync/sync.routes.ops-handler.ts`、
+`packages/super-sync-server/src/sync/sync.routes.snapshot-handler.ts`、
+`packages/super-sync-server/src/sync/sync.types.ts`。
 
-Done when: route tests cover plain JSON, gzip-compressed, batch, snapshot,
-import, and repair uploads; rejection creates no operation, device row,
-snapshot cache, storage delta, or dedup result; valid legacy and Argon2id
-envelopes are accepted; no payload content in logs or responses; server unit
-and PostgreSQL integration suites pass.
+完成条件：路由测试覆盖纯 JSON、gzip 压缩、批量、快照、导入与修复上传；拒绝不创建任何操作、
+设备行、快照缓存、存储增量或去重结果；接受有效的遗留与 Argon2id 信封；日志或响应中无载荷内容；
+服务器单元与 PostgreSQL 集成套件通过。
 
-### Step 2: Notify and wait at least 45 days
+### 步骤 2：通知并至少等待 45 天
 
-Deploy Step 1, then email the accounts on the current plaintext list: the
-deadline, the exact criteria (plaintext data plus 45 days of inactivity means
-account deletion; active accounts get a data reset), and the conversion
-instructions (update, set an encryption password, reconnect each device, use
-the documented Force Overwrite where mixed history wedges the client).
-Publish the same guidance in release notes and the wiki. Every conversion
-removes an account from the list. Track one aggregate number weekly. Time is
-the cheapest risk reducer here; a longer wait means a shorter deletion list.
+部署步骤 1，然后向当前明文列表上的账户发邮件：截止日期、确切标准（明文数据加上 45 天不活跃
+意味着账户删除；活跃账户做数据重置），以及转换说明（更新、设置加密密码、每台设备重新连接，
+在混合历史卡住客户端时使用已文档化的 Force Overwrite）。在发布说明与 wiki 中发布相同指引。
+每一次转换从列表中移除一个账户。每周跟踪一个聚合数字。时间是此处最便宜的风险降低手段；
+等待越长，删除列表越短。
 
-Done when the deadline has passed and the operator accepts the remaining
-counts.
+完成条件：截止日期已过，且运营者接受剩余计数。
 
-### Step 3: Deadline cleanup
+### 步骤 3：截止日期清理
 
-Rebuild the list from both detectors, then:
+从两个检测器重建列表，然后：
 
-1. **Dry run:** produce the deletion sublist (plaintext and dormant for at
-   least 45 days) and the clean-slate sublist (plaintext and active), review
-   aggregate counts and spot-check dormancy timestamps.
-2. **Delete** the dormant sublist with the existing `delete-user` tooling.
-3. **Clean-slate** the active sublist with `lastSeq`-preserving semantics.
-4. **Null** every remaining non-null `snapshot_data`.
-5. **Add and validate the database backstops**, now safe because the rows
-   they would trip on are gone: a CHECK on `operations`
-   (`is_payload_encrypted IS TRUE` and `jsonb_typeof(payload) = 'string'`)
-   and `snapshot_data IS NULL` on `user_sync_state`. Notes for that
-   migration: prepend `SET lock_timeout = '5s'` (the ALTER takes an ACCESS
-   EXCLUSIVE lock on the hottest table and must fail fast, not queue the
-   sync path behind it); a firing CHECK writes the failing row, payload
-   included, into the PostgreSQL server log at default verbosity, so set
-   DB-log retention accordingly and sanitize the app-side catch logging; the
-   payload-bytes backfill must be complete first.
-6. **Delete the dead plaintext paths** the gate made unreachable and re-run
-   the external-write-surface bypass sweep afterward:
-   `sync.routes.snapshot-handler.ts` (the `?? false` op default and the
-   plaintext cache-delta quota branch), `prepareSnapshotCache` (its
-   stringify+gzip is pure overhead for encrypted state; only the byte
-   measurement is needed), the `snapshot.service.ts` cache writers,
-   `snapshot-generation.service.ts` with the `/restore/:serverSeq` endpoint,
-   and the `?? false` defaults in `operation-upload.service.ts`.
-7. **Run the verification script** (Step 6); all counts must be zero.
+1. **Dry run：** 产出删除子列表（明文且至少休眠 45 天）与干净白板子列表（明文且活跃），
+   审查聚合计数并抽查休眠时间戳。
+2. **删除** 休眠子列表，使用现有 `delete-user` 工具。
+3. **干净白板** 活跃子列表，采用保留 `lastSeq` 的语义。
+4. **置空** 每一个剩余的非空 `snapshot_data`。
+5. **添加并验证数据库兜底**，此时安全因为它们会绊倒的行已不存在：`operations` 上的 CHECK
+   （`is_payload_encrypted IS TRUE` 且 `jsonb_typeof(payload) = 'string'`）以及
+   `user_sync_state` 上的 `snapshot_data IS NULL`。该迁移注意事项：前置
+   `SET lock_timeout = '5s'`（ALTER 对最热表取 ACCESS EXCLUSIVE 锁，必须快速失败，而不是把
+   同步路径排在后面）；触发的 CHECK 会在默认详细级别下将失败行（含载荷）写入 PostgreSQL
+   服务器日志，因此请相应设置 DB 日志保留并净化应用侧 catch 日志；载荷字节回填必须先完成。
+6. **删除门控已使其不可达的死明文路径**，之后重新运行外部写面旁路扫荡：
+   `sync.routes.snapshot-handler.ts`（`?? false` 操作默认值与明文缓存增量配额分支）、
+   `prepareSnapshotCache`（其对加密状态的 stringify+gzip 纯属开销；只需字节测量）、
+   `snapshot.service.ts` 的缓存写入器、带 `/restore/:serverSeq` 端点的
+   `snapshot-generation.service.ts`，以及 `operation-upload.service.ts` 中的 `?? false` 默认值。
+7. **运行验证脚本**（步骤 6）；所有计数必须为零。
 
-Prove the clean-slate recovery in E2E before the deadline: extend the
-existing accounts-only restore and #9444 specs with a server-initiated
-per-account clean-slate where two clients each hold a distinct pending edit;
-both retain local state, the conflict surfaces rather than a branch silently
-vanishing, and all re-uploaded operations pass the classifier. Run the full
-SuperSync E2E suite via the scheduled GitHub Actions workflow.
+在截止日期前于 E2E 中证明干净白板恢复：扩展现有仅账户恢复与 #9444 规格，加入服务器发起的
+每账户干净白板，其中两个客户端各持有不同的待编辑；二者均保留本地状态，冲突显现而非分支
+静默消失，且所有重新上传的操作通过分类器。通过计划的 GitHub Actions 工作流运行完整
+SuperSync E2E 套件。
 
-### Step 4: Let old copies expire
+### 步骤 4：让旧副本过期
 
-Record the expiry date of every backup generation that predates the cleanup,
-and verify each date as it passes; do not build a destruction pipeline for
-artifacts that delete themselves. Deliberately destroy only what has no
-automatic expiry: manual exports and `affected-users.csv`. Confirm the
-monitoring store holds only aggregates. Keep as audit evidence only aggregate
-counts, timestamps, and confirmation records, never the affected-user rows.
-The completion claim closes when the last recorded artifact is gone.
+记录每一代早于清理的备份的过期日期，并在每个日期到来时验证；不要为会自行删除的工件构建
+销毁管道。仅刻意销毁没有自动过期的内容：手动导出与 `affected-users.csv`。确认监控存储
+仅持有聚合。仅将聚合计数、时间戳与确认记录作为审计证据保留，从不保留受影响用户行。
+完成声明在最后一份已记录工件消失时关闭。
 
-### Step 5 (optional, deferrable): encrypted-volume migration
+### 步骤 5（可选，可延期）：加密卷迁移
 
-At any convenient later date: short maintenance stop, logical dump of the
-verified-clean database, restore onto a fresh volume with at-rest encryption,
-run the verification script against the copy, repoint the application and the
-backup jobs, then destroy the old volume once the first new-volume backup
-restore-tests green. Identical data and sequence space, so clients never
-notice, and a failed migration falls back to the old volume with nothing
-lost. Skipping this step leaves the disk-forensics limit stated in the
-completion claim; running it also gains at-rest encryption, which the current
-deployment lacks.
+在任意方便的稍后日期：短暂维护停机，对已验证干净的数据库做逻辑转储，恢复到带静态加密的
+新卷，对副本运行验证脚本，重新指向应用与备份任务，然后在第一次新卷备份恢复测试变绿后销毁
+旧卷。数据与序列空间相同，因此客户端不会察觉，失败的迁移回退到旧卷且无损失。跳过此步骤
+会留下完成声明中所述的磁盘取证限制；运行它还会获得当前部署所缺乏的静态加密。
 
-### Step 6: Verify
+### 步骤 6：验证
 
-One read-only script, run after Step 3, at 7 days, and against a restored
-post-cleanup backup:
+一个只读脚本，在步骤 3 之后、7 天时，以及对清理后恢复的备份运行：
 
 ```sql
 SELECT count(*) AS plaintext_or_unflagged_ops
@@ -287,86 +201,54 @@ FROM user_sync_state
 WHERE snapshot_data IS NOT NULL;
 ```
 
-All three must be zero, and because a plaintext string with a true flag
-passes them, the script also scans retained payloads in primary-key batches
-with the exact Step 1 classifier; the invalid count must be zero. Also
-confirm the upload routes still reject, both constraints are validated, and
-logs contain no request bodies. Keep all of it off `/health` and readiness
-paths; the gate plus validated constraints are the continuous controls.
+三者必须为零，又因为带真标志的明文字符串会通过它们，脚本还按主键分批用确切的步骤 1
+分类器扫描保留载荷；无效计数必须为零。同时确认上传路由仍拒绝、两个约束已验证，以及日志
+不含请求体。全部远离 `/health` 与就绪路径；门控加上已验证约束是持续控制。
 
-## Checkpoints
+## 检查点
 
-1. **A (gate shipped):** Step 1 live against the production database. No data
-   deleted; valuable even if nothing else is approved.
-2. **B (deadline passed):** notice period over, remaining counts accepted,
-   clean-slate E2E green, dry-run lists reviewed.
-3. **C (database clean):** deletions and clean-slates done, constraints
-   validated, verification script green live and on a restored backup.
-4. **D (claim closed):** last recorded legacy artifact expired or destroyed;
-   script green at 7 days. Step 5 may run any time before or after D.
+1. **A（门控已发布）：** 步骤 1 对生产数据库生效。未删除任何数据；即使其余部分未获批准也有价值。
+2. **B（截止日期已过）：** 通知期结束，剩余计数已接受，干净白板 E2E 变绿，dry-run 列表已审查。
+3. **C（数据库干净）：** 删除与干净白板完成，约束已验证，验证脚本在线上与恢复的备份上变绿。
+4. **D（声明关闭）：** 最后一份已记录遗留工件已过期或销毁；脚本在 7 天时变绿。步骤 5 可在 D
+   之前或之后任意时间运行。
 
-## Approaches explicitly rejected
+## 明确拒绝的方案
 
-- **A fleet-wide reset (with or without account preservation), revisions 1
-  to 4:** resets every account including converted and always-encrypted
-  ones, forces a mass reconnect wave, and (in the account-preserving form)
-  requires a bespoke account-only backup path. Targeted cleanup touches only
-  the accounts that are the problem.
-- **Deleting accounts by inactivity alone:** still rejected. Deletion here
-  requires plaintext data AND dormancy AND a passed notice deadline; the
-  operator has explicitly accepted that such users re-register.
-- **Deleting only `is_payload_encrypted=false` rows inside a kept account:**
-  breaks sequence, cursor, and replay assumptions. Whole-account deletion or
-  `lastSeq`-preserving clean-slate are the supported granularities.
-- **Clearing only `snapshot_data`:** leaves plaintext operations in place.
-- **Waiting for the 45-day retention job alone:** it prunes only history
-  behind a full-state boundary, so unconverted accounts keep plaintext
-  forever; the deadline is what makes waiting terminate.
-- **Trusting the flag without the shape check:** the flag is unauthenticated.
-- **A manual destruction sweep across every backup system:** more actions,
-  more chances to delete the wrong thing than rotation with recorded dates.
-- **Keeping an encrypted legacy full dump indefinitely:** the operator-held
-  key keeps the content recoverable, so the claim would be false.
+- **全舰队重置（无论是否保留账户），修订 1 至 4：** 重置每个账户，包括已转换与始终加密的账户，
+  强制大规模重连浪潮，且（在保留账户的形式中）需要定制的仅账户备份路径。定向清理只触及
+  成问题的账户。
+- **仅按不活跃删除账户：** 仍被拒绝。此处删除需要明文数据 **且** 休眠 **且** 已过通知截止日期；
+  运营者已明确接受此类用户重新注册。
+- **在保留的账户内仅删除 `is_payload_encrypted=false` 行：** 破坏序列、游标与回放假设。整账户删除或
+  保留 `lastSeq` 的干净白板是受支持的粒度。
+- **仅清除 `snapshot_data`：** 明文操作仍在。
+- **仅等待 45 天保留任务：** 它只修剪全量状态边界之后的历史，因此未转换账户会永久保留明文；
+  截止日期才使等待有终点。
+- **信任标志而不做形态检查：** 标志未经认证。
+- **跨每个备份系统手动销毁扫荡：** 动作更多，比带记录日期的轮换更有机会删错东西。
+- **无限期保留加密遗留全量转储：** 运营者持有的密钥使内容可恢复，因此声明会为假。
 
-## Required human decisions before execution
+## 执行前所需的人工决策
 
-- Approve the deadline, the notice wording, and the 45-day dormancy cutoff.
-- Accept account deletion for dormant plaintext holders (re-registration is
-  the recovery path) and the divergent-edit risk for clean-slated active
-  accounts.
-- Approve the final dry-run counts before the destructive run.
-- Decide whether and when to run the optional Step 5 migration, accepting
-  the disk-forensics limit if it is skipped.
-- Accept that the completion claim closes only when the last recorded backup
-  generation expires.
+- 批准截止日期、通知措辞与 45 天休眠截止。
+- 接受对休眠明文持有者删除账户（重新注册是恢复路径）以及对干净白板活跃账户的分歧编辑风险。
+- 在破坏性运行前批准最终 dry-run 计数。
+- 决定是否以及何时运行可选的步骤 5 迁移，若跳过则接受磁盘取证限制。
+- 接受完成声明仅在最后一代已记录备份过期时关闭。
 
-## Revision history
+## 修订历史
 
-1. First draft, six-perspective review plus an adversarial pass. Strategy:
-   fleet-wide accounts-preserving reset with active destruction of every
-   legacy copy.
-2. 2026-08-05: claims re-verified against the codebase; added shipped-client
-   observation, announce-and-wait, #9439/#9444 coordination, the counting
-   section; scoped out file-based sync storage (client-side is
-   user-controlled; production `dataDir` holds no legacy file storage).
-3. 2026-08-05: simplification pass: destruction by retention expiry, load
-   rehearsal replaced by a watched reopen, reconnect matrix reduced to one
-   divergent-edit reproduction.
-4. 2026-08-05: time-to-spare pass: fleet reset replaced by a per-account
-   deadline wipe; volume replacement became a deferred routine migration.
-5. 2026-08-05: KISS pass under two new operator decisions (self-hosted out of
-   scope; dormant users may re-register): dormant plaintext accounts are
-   deleted with existing tooling instead of preserved, which removes the
-   account-only backup and most `lastSeq` bookkeeping; the volume migration
-   became optional with its residual disk-forensics limit stated honestly;
-   the deletion-list predicate was promoted to the plan's top-listed risk.
-6. 2026-08-05: Step 1 implemented (transport classifier in `@sp/sync-core`,
-   gate in both upload handlers, `E2EE_REQUIRED`, route and classifier
-   specs) and hardened by a seven-reviewer pass. The review moved the
-   database backstops out of Step 1 entirely: a `NOT VALID` CHECK still
-   fires on every UPDATE, and the payload-bytes backfill updates legacy
-   rows, so both constraints now land in Step 3 together with their
-   operational notes (lock timeout, failing-row logging). The review also
-   fixed the clean-slate quota gate to stop charging phantom snapshot-cache
-   bytes for encrypted uploads, and added the dead-path cleanup checklist
-   and the two old-client observation cases now recorded above.
+1. 初稿，六视角审查加对抗性审阅。策略：全舰队保留账户的重置，并对每一份遗留副本主动销毁。
+2. 2026-08-05：对照代码库重新验证声明；加入已发布客户端观察、公告并等待、#9439/#9444 协调、
+   计数章节；将基于文件的同步存储排除在范围外（客户端侧由用户控制；生产 `dataDir` 不含遗留文件存储）。
+3. 2026-08-05：简化轮次：靠保留过期销毁，负载彩排改为受监视的重新开放，重连矩阵缩减为一次分歧编辑复现。
+4. 2026-08-05：有时间可用轮次：舰队重置改为每账户截止日期擦除；卷替换变为延期的例行迁移。
+5. 2026-08-05：在两项新运营者决策下的 KISS 轮次（自托管排除在外；休眠用户可重新注册）：休眠明文账户
+   用现有工具删除而非保留，从而移除仅账户备份与大部分 `lastSeq` 簿记；卷迁移变为可选并诚实陈述其
+   残留磁盘取证限制；删除列表谓词提升为计划中列于首位的风险。
+6. 2026-08-05：步骤 1 已实现（`@sp/sync-core` 中的传输分类器、两个上传处理器中的门控、
+   `E2EE_REQUIRED`、路由与分类器规格）并由七位审查者加固。审查将数据库兜底完全移出步骤 1：
+   `NOT VALID` CHECK 仍在每次 UPDATE 上触发，且载荷字节回填更新遗留行，因此两个约束现与其运维说明
+   （锁超时、失败行日志）一并落在步骤 3。审查还修复了干净白板配额门控，使其不再对加密上传计费
+   幻影快照缓存字节，并加入了上文现已记录的死路径清理清单与两种旧客户端观察情况。

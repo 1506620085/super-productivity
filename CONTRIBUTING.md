@@ -1,33 +1,33 @@
 :hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts:
 
-Welcome you awesome human being! You want to contribute to this repository? This is gonna be great!
+欢迎你，了不起的贡献者！想为这个仓库出一份力？太棒了！
 
-If you want to discuss something private, please write an email to contact@super-productivity.com.
+如果想讨论私密事项，请发邮件至 contact@super-productivity.com。
 
-### Code of conduct
+### 行为准则
 
-Don't be a d\*\*\*!
+别当混蛋！
 
-### Options for contributing
+### 贡献方式
 
-In case you want to contribute, but you wouldn't know how, here are some suggestions:
+如果你想贡献却不知道从何入手，这里有一些建议：
 
-1. **Spread the word:** More users means more people testing and contributing to the app which in turn means better stability and possibly more and better features. You can vote for Super Productivity on [Slant](https://www.slant.co/topics/14021/viewpoints/7/~productivity-tools-for-linux~super-productivity), [Product Hunt](https://www.producthunt.com/posts/super-productivity), [Softpedia](https://www.softpedia.com/get/Office-tools/Diary-Organizers-Calendar/Super-Productivity.shtml) or on [AlternativeTo](https://alternativeto.net/software/super-productivity/), you can [tweet about it](https://twitter.com/intent/tweet?text=I%20like%20Super%20Productivity%20%20https%3A%2F%2Fsuper-productivity.com), share it on [LinkedIn](http://www.linkedin.com/shareArticle?mini=true&url=https://super-productivity.com&title=I%20like%20Super%20Productivity&), [reddit](http://www.reddit.com/submit?url=https%3A%2F%2Fsuper-productivity.com&title=I%20like%20Super%20Productivity) or any of your favorite social media platforms. Every little bit helps!
+1. **传播消息：** 用户越多，测试和贡献的人就越多，应用也会更稳定，并可能带来更多更好的功能。你可以在 [Slant](https://www.slant.co/topics/14021/viewpoints/7/~productivity-tools-for-linux~super-productivity)、[Product Hunt](https://www.producthunt.com/posts/super-productivity)、[Softpedia](https://www.softpedia.com/get/Office-tools/Diary-Organizers-Calendar/Super-Productivity.shtml) 或 [AlternativeTo](https://alternativeto.net/software/super-productivity/) 上为 Super Productivity 投票；也可以 [发推介绍它](https://twitter.com/intent/tweet?text=I%20like%20Super%20Productivity%20%20https%3A%2F%2Fsuper-productivity.com)，在 [LinkedIn](http://www.linkedin.com/shareArticle?mini=true&url=https://super-productivity.com&title=I%20like%20Super%20Productivity&)、[reddit](http://www.reddit.com/submit?url=https%3A%2F%2Fsuper-productivity.com&title=I%20like%20Super%20Productivity) 或你喜欢的社交平台上分享。点滴帮助都很重要！
 
-2. **Provide a Pull Request:** Here is a list of [the most popular community requests](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) and here some info on **[how to run the development build](https://github.com/super-productivity/super-productivity/wiki/2.11-Run-the-Development-Server)** (wiki). Please make sure that you're following the commit message format documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md#commit-message-format) and to also include the issue number in your commit message, if you're fixing a particular issue (e.g.: `feat: add nice feature #31`). If your change touches synced state (effects, reducers, bulk dispatches), read the [Contributor Sync Model](docs/sync-and-op-log/contributor-sync-model.md) first — one invariant, partly lint-enforced.
+2. **提交 Pull Request：** 这里有 [最受欢迎的社区需求列表](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc)，以及 **[如何运行开发构建](https://github.com/super-productivity/super-productivity/wiki/2.11-Run-the-Development-Server)**（wiki）的说明。请务必遵循 [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md#commit-message-format) 中记录的提交信息格式；若修复的是某个具体 issue，请在提交信息中包含 issue 编号（例如：`feat: add nice feature #31`）。若改动触及同步状态（effects、reducers、批量 dispatch），请先阅读 [Contributor Sync Model](docs/sync-and-op-log/contributor-sync-model.md)——只有一条不变量，部分由 lint 强制执行。
 
-3. **[Answer questions](https://github.com/super-productivity/super-productivity/discussions)**: You know the answer to another user's problem? Share your knowledge!
+3. **[回答问题](https://github.com/super-productivity/super-productivity/discussions)**：你知道其他用户问题的答案？把知识分享出去！
 
-4. **[Provide your opinion](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22community+feedback+wanted%22):** Some community suggestions are controversial. Your input might be helpful even if it is just an up- or down-vote.
+4. **[提出你的看法](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22community+feedback+wanted%22)**：有些社区建议存在争议。哪怕只是一个赞同或反对票，你的意见也可能很有帮助。
 
-5. **[Provide a more refined UI spec for existing feature requests](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+label%3A%22needs+concept+and%2For+ui+spec%22)**
+5. **[为已有功能请求提供更完善的 UI 规格](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+label%3A%22needs+concept+and%2For+ui+spec%22)**
 
-6. **[Report bugs](https://github.com/super-productivity/super-productivity/issues/new)**
+6. **[报告 Bug](https://github.com/super-productivity/super-productivity/issues/new)**
 
-7. **[Make a feature or improvement request](https://github.com/super-productivity/super-productivity/issues/new)**: Something can be done better? Something essential missing? Let us know!
+7. **[提出功能或改进请求](https://github.com/super-productivity/super-productivity/issues/new)**：有什么可以做得更好？缺了什么关键能力？告诉我们！
 
-8. **[Translations](docs/TRANSLATING.md)**: You don't have to be programmer to help. See our [translation guide](docs/TRANSLATING.md) for details on how to contribute translations.
+8. **[翻译](docs/TRANSLATING.md)**：不必是程序员也能帮忙。详见我们的 [翻译指南](docs/TRANSLATING.md)。
 
-9. **[Sponsor the project](https://github.com/sponsors/johannesjo)**
+9. **[赞助本项目](https://github.com/sponsors/johannesjo)**
 
 :hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts:

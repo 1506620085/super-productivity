@@ -1,31 +1,27 @@
-# Android edge-to-edge + soft keyboard (IME)
+# Android edge-to-edge（边到边）+ 软键盘（IME）
 
-How the global add-task bar is positioned over the keyboard, and the full #8508
-saga. **Read this before touching anything keyboard/IME-related on Android — this
-area has regressed repeatedly (#8295, then #8508).**
+全局添加任务栏如何叠在键盘之上，以及完整的 #8508 始末。**在改动 Android 上任何与键盘/IME（输入法编辑器）相关的逻辑之前请先读本文——该区域已反复回退（#8295，随后是 #8508）。**
 
-> **Update (2026-06-22): migrated off `@capawesome/...edge-to-edge-support` to
-> Capacitor's built-in `SystemBars`** (`insetsHandling: 'css'`). Edge-to-edge
-> insets + IME padding are now handled by SystemBars on **WebView ≥ 140** (or
-> API ≥ 35); the **WebView < 140 / API < 35** tail is covered by env() + a native
-> keyboard shim (`adjustWebViewHeightForKeyboardBelowApi30`, now gated to
-> WebView < 140 so it never fights SystemBars). Bar backgrounds are no longer
-> painted by a plugin (SystemBars has no color API) — the bars are transparent
-> and the theme color shows through via `NavigationBarPlugin.setWebViewBackgroundColor`
-> (window decor + WebView surface). The #8508 sections below describe the _former_
-> `@capawesome` mechanics and are kept as history. The migration and device-matrix
-> verification landed in [PR #8543](https://github.com/super-productivity/super-productivity/pull/8543).
+> **更新（2026-06-22）：已从 `@capawesome/...edge-to-edge-support` 迁移到
+> Capacitor 内置的 `SystemBars`**（`insetsHandling: 'css'`）。边到边
+> inset（安全区/内边距）+ IME 内边距现由 SystemBars 在 **WebView ≥ 140**（或
+> API ≥ 35）上处理；**WebView < 140 / API < 35** 的尾部场景由 env() + 原生
+> 键盘 shim（`adjustWebViewHeightForKeyboardBelowApi30`，现已门控为
+> WebView < 140，以免与 SystemBars 冲突）覆盖。栏背景不再由插件绘制（SystemBars 没有颜色 API）——栏为透明，
+> 主题色通过 `NavigationBarPlugin.setWebViewBackgroundColor`
+> （窗口装饰 + WebView 表面）透出。下方关于 #8508 的章节描述的是 _此前_
+> `@capawesome` 的机制，作为历史保留。迁移与设备矩阵验证已合入 [PR #8543](https://github.com/super-productivity/super-productivity/pull/8543)。
 
-> **⚠️ Do NOT inset the WebView for the IME based on an assumption that the
-> system "doesn't resize on Android 15/16."** Real devices (incl. a Pixel-class
-> Android 16 phone) still resize the window for the keyboard. Insetting on top of
-> that double-counts and squashes the WebView. See #8508 below. Any future inset
-> must _detect_ whether the window already resized.
+> **⚠️ 切勿基于「系统在 Android 15/16 上不会为键盘调整大小」的假设，
+> 去为 IME 给 WebView 做 inset。** 真实设备（包括 Pixel 级别的
+> Android 16 手机）仍会为键盘调整窗口大小。在此之上再做 inset
+> 会双重计数并压扁 WebView。见下方 #8508。任何未来的 inset
+> 都必须 _检测_ 窗口是否已经调整过大小。
 
-## How the bar is positioned
+## 添加任务栏如何定位
 
-The global add-task bar is `position: fixed` and lifted off the bottom by a CSS
-variable only:
+全局添加任务栏是 `position: fixed`，且仅通过一个 CSS
+变量从底部抬起：
 
 ```scss
 // add-task-bar.component.scss
@@ -34,206 +30,178 @@ variable only:
 }
 ```
 
-`--keyboard-height` defaults to `0px`. On Android/web it is set by
+`--keyboard-height` 默认值为 `0px`。在 Android/web 上由
 `GlobalThemeService._initVisualViewportKeyboardTracking()`
-(`src/app/core/theme/global-theme.service.ts`) from
-`obscured = window.innerHeight - visualViewport.height`, with a 100px floor
-(`KEYBOARD_THRESHOLD_PX` — `obscured <= 100` is treated as `0`). On iOS the
-Capacitor Keyboard plugin sets it.
+（`src/app/core/theme/global-theme.service.ts`）根据
+`obscured = window.innerHeight - visualViewport.height` 设置，并有 100px 下限
+（`KEYBOARD_THRESHOLD_PX`——`obscured <= 100` 视为 `0`）。在 iOS 上由
+Capacitor Keyboard 插件设置。
 
-So the bar floats above the keyboard if **either** the window/WebView shrinks
-(then `bottom: 0` is already above the IME) **or** the visual viewport shrinks
-(then `--keyboard-height` lifts the bar). On the devices we have tested, the
-window **does** shrink (the system resizes for the IME), so `--keyboard-height`
-stays `0` and the bar sits correctly at `bottom: var(--s2)`.
+因此，若 **要么** 窗口/WebView 收缩
+（此时 `bottom: 0` 已在 IME 之上），**要么** 可视视口收缩
+（此时 `--keyboard-height` 抬起任务栏），任务栏都会浮在键盘之上。在我们测试过的设备上，窗口
+**确实** 会收缩（系统为 IME 调整大小），因此 `--keyboard-height`
+保持为 `0`，任务栏正确位于 `bottom: var(--s2)`。
 
-## #8508 — reversed / invisible characters (the actual root cause)
+## #8508 — 倒序 / 不可见字符（真正根因）
 
-**Symptom.** On Android, the add-task bar (and search) showed reversed or
-invisible characters; some users reported "I can't see what I'm writing and Enter
-does nothing." Reported on v18.11.0 only (Pixel 10/Android 17, Galaxy S23 Ultra,
-Pixel 8a, Tab S5e/Android 15).
+**现象。** 在 Android 上，添加任务栏（以及搜索）出现倒序或
+不可见字符；部分用户反馈「看不到自己在写什么，且 Enter
+无效」。仅在 v18.11.0 上报（Pixel 10/Android 17、Galaxy S23 Ultra、
+Pixel 8a、Tab S5e/Android 15）。
 
-**Root cause.** v18.11.0 shipped a `patch-package` patch (commit `5497212b9`) to
-`@capawesome/capacitor-android-edge-to-edge-support` that **always** inset the
-WebView by the IME height (`bottomMargin = max(imeInsets.bottom, …)` on every
-`OnApplyWindowInsetsListener` callback), to fix the bar sitting _behind_ the
-keyboard under _assumed_ enforced edge-to-edge.
+**根因。** v18.11.0 通过 `patch-package` 补丁（提交 `5497212b9`）修改了
+`@capawesome/capacitor-android-edge-to-edge-support`，使其 **始终** 按 IME 高度
+给 WebView 做 inset（每次 `OnApplyWindowInsetsListener` 回调时
+`bottomMargin = max(imeInsets.bottom, …)`），以修复在 _假定_ 强制边到边模式下
+任务栏位于键盘 _后面_ 的问题。
 
-On real devices the assumption is false: the system **still resizes the window
-for the IME** even on Android 16. Measured on an Android 16 phone with the
-keyboard up: `window.innerHeight` went **732 → 141** (and `--keyboard-height`
-stayed `0`). The patch then added **another ~909px** inset on top of the already
-shrunk window → the WebView was squashed to a ~141px sliver with a huge blank
-gap above the keyboard. That squashed layout is almost certainly the
-"can't see what I'm writing" report.
+在真实设备上该假定不成立：即便在 Android 16 上，系统 **仍会为 IME 调整窗口大小**。
+在一台 Android 16 手机上键盘弹出时测得：`window.innerHeight` 从 **732 → 141**（且 `--keyboard-height`
+保持为 `0`）。补丁随后在已收缩的窗口之上再叠加 **约 ~909px** 的 inset → WebView 被压成约 ~141px 的细条，
+键盘上方出现巨大空白。这种压扁布局几乎可以肯定就是
+「看不到自己在写什么」报告的原因。
 
-**Fix (this change).** The patch was **removed entirely**. The plugin's stock
-behavior — `bottomMargin = keyboardVisible ? 0 : max(imeInsets.bottom, …)`, i.e.
-no inset while the keyboard is up — lets the system handle the keyboard.
-**Verified on an Android 16 phone: gap gone, WebView fills the resized window,
-bar sits just above the keyboard (no behind-keyboard regression).**
+**修复（本次变更）。** 补丁已 **完全移除**。插件的原有行为——
+`bottomMargin = keyboardVisible ? 0 : max(imeInsets.bottom, …)`，即
+键盘弹出时不做 inset——让系统自行处理键盘。
+**已在 Android 16 手机上验证：空隙消失，WebView 填满调整后的窗口，
+任务栏紧贴键盘上方（未再出现键盘后方回退）。**
 
-## Theories that were RULED OUT (don't re-chase)
+## 已排除的理论（勿再追查）
 
-- **"Angular `ngModel` `writeValue` resets the caret during composition."**
-  REFUTED. `NgModel`'s `isPropertyUpdated` guard skips `writeValue` while the
-  model equals the just-typed value, and the add-task bar never touches
-  `value`/`setSelectionRange`/`focus` mid-composition. Proven with an e2e CDP IME
-  probe (since removed) and the unit specs.
-- **"Per-keystroke DOM churn (signal updates) during composition."** Not the
-  cause. On-device logging showed the WebView does **not** relayout during steady
-  typing.
-- **An SDK-version gate (inset only on API 36+) and an inset "latch."** Both
-  tried and reverted. The gate is wrong because the Android 16 phone _resizes_
-  (so it still double-counted there); the latch held a stale keyboard height and
-  produced its own gap.
+- **「Angular `ngModel` 的 `writeValue` 在 composition（输入合成）期间重置光标。」**
+  已证伪。`NgModel` 的 `isPropertyUpdated` 守卫在模型等于刚输入的值时会跳过 `writeValue`，
+  且添加任务栏在 composition 中途从不触碰
+  `value`/`setSelectionRange`/`focus`。已用 e2e CDP IME
+  探测（现已移除）及单元测试证明。
+- **「composition 期间每按键的 DOM 抖动（signal 更新）。」** 不是
+  原因。设备上日志显示 WebView 在稳定输入时 **不会** 重新布局。
+- **按 SDK 版本门控（仅在 API 36+ 做 inset）以及 inset「闩锁」。** 两者
+  都试过并已回退。门控是错的，因为 Android 16 手机会 _调整大小_
+  （因此在那里仍会双重计数）；闩锁会持有过期的键盘高度并
+  产生自己的空隙。
 
-## Open items — if this is NOT fixed for the reporters
+## 未决事项 — 若对报告者而言仍未修复
 
-1. **Confirm the "reversed characters" symptom on the reporters' devices.** The
-   squashed-WebView / gap is verified fixed on the maintainer's Android 16 phone.
-   It is **not yet confirmed** that the _reversal_ is gone for all reporters
-   (Pixel 10/A17, S23, Pixel 8a, Tab S5e). Ask them to test the next build.
-2. **Residual: the system itself resizes on suggestion-strip changes.** Even with
-   the patch gone, the logs show the IME inset oscillating (`imeBottom 909↔996`)
-   as the suggestion strip toggles — and the _system_ resizes the window each
-   time. Typing during that system resize could still disrupt composition. This
-   is Android's own `adjustResize`, not our code. If reports persist, this is the
-   next lead (e.g. a content-stable layout, or debouncing).
-3. **The other v18.11.0 change.** If the reversal persists with the patch gone,
-   re-examine the `@angular/* 21.2.11 → 21.2.17` bump (commit `f51954f80`) — the
-   only other IME-adjacent change in the release.
-4. **Long-term proper fix.** Removing the patch only puts the bar behind the
-   keyboard on a device that enforces edge-to-edge **and** whose _visual_ viewport
-   also fails to shrink for the IME — otherwise `--keyboard-height` still lifts
-   the bar. That is cosmetic and likely rare, vs. the squashed layout on every
-   real device tested. The correct inset would be **resize-detecting**: only inset
-   when the window did not already shrink for the IME. Web-side detection already
-   exists — `GlobalThemeService._isVisualViewportResizedForKeyboard()` — so a
-   future native inset can reuse that logic rather than re-derive it. Validate on
-   the device matrix below.
-5. **Re-enable diagnostics.** Add `android.util.Log.d("SP8508", …)` in
-   `EdgeToEdge.applyInsetsInternal` logging `kbVisible` / `imeBottom` /
-   `bottomMargin` / whether a relayout fired, then `adb -d logcat -s SP8508`.
-   On the web side, `chrome://inspect` →
-   `{innerH: innerHeight, vvH: visualViewport.height, kb: getComputedStyle(document.documentElement).getPropertyValue('--keyboard-height')}`.
+1. **在报告者设备上确认「倒序字符」现象。** 压扁 WebView / 空隙已在维护者的 Android 16 手机上验证修复。
+   尚 **未确认** 所有报告者的 _倒序_ 是否都已消失
+   （Pixel 10/A17、S23、Pixel 8a、Tab S5e）。请他们测试下一版构建。
+2. **残留：系统本身会在建议条变化时调整大小。** 即便
+   补丁已移除，日志仍显示 IME inset 在建议条切换时振荡（`imeBottom 909↔996`）——
+   且 _系统_ 每次都会调整窗口大小。在系统调整大小期间输入仍可能打断 composition。这是
+   Android 自身的 `adjustResize`，不是我们的代码。若报告持续，这是
+   下一条线索（例如内容稳定布局，或防抖）。
+3. **v18.11.0 的另一处变更。** 若补丁移除后倒序仍存在，
+   请重新检查 `@angular/* 21.2.11 → 21.2.17` 升级（提交 `f51954f80`）——该发行版中
+   唯一另一处与 IME 相邻的变更。
+4. **长期正确修复。** 移除补丁只会在「强制边到边 **且** _可视_ 视口
+   也不会因 IME 收缩」的设备上让任务栏落在键盘后面——否则 `--keyboard-height` 仍会抬起
+   任务栏。那是外观问题且可能很少见，相对之下测试过的每台真实设备都会出现压扁布局。正确的 inset 应是 **检测是否调整大小**：仅在窗口
+   尚未因 IME 收缩时做 inset。Web 侧检测已
+   存在——`GlobalThemeService._isVisualViewportResizedForKeyboard()`——因此未来原生 inset 可复用该逻辑，而非重新推导。请在
+   下方设备矩阵上验证。
+5. **重新启用诊断。** 在 `EdgeToEdge.applyInsetsInternal` 中添加 `android.util.Log.d("SP8508", …)`，
+   记录 `kbVisible` / `imeBottom` /
+   `bottomMargin` / 是否触发了重新布局，然后 `adb -d logcat -s SP8508`。
+   Web 侧：`chrome://inspect` →
+   `{innerH: innerHeight, vvH: visualViewport.height, kb: getComputedStyle(document.documentElement).getPropertyValue('--keyboard-height')}`。
 
-## #8508 follow-up — SDK 28 (Android 9): add-task bar sits BEHIND the keyboard
+## #8508 后续 — SDK 28（Android 9）：添加任务栏位于键盘 BEHIND（后方）
 
-**Status: fix implemented (`CapacitorMainActivity.adjustWebViewForKeyboardBelowApi30`),
-PENDING ON-DEVICE VALIDATION across the matrix below.** After 18.12.0 (patch
-removed) a user on **Android 9 / API 28** reports the global add-task bar sits
-_below / behind_ the soft keyboard. This is the realization of open item #4
-above, and the device class it predicted.
+**状态：修复已实现（`CapacitorMainActivity.adjustWebViewForKeyboardBelowApi30`），
+待下方矩阵的设备上验证。** 18.12.0（补丁移除）之后，一名 **Android 9 / API 28** 用户报告全局添加任务栏位于
+软键盘 _下方 / 后方_。这正是上方未决事项 #4 的兑现，以及它所预测的设备类别。
 
-**Why API 28 specifically.** The bar is positioned _only_ from
-`--keyboard-height`, which `GlobalThemeService._initVisualViewportKeyboardTracking()`
-derives from `obscured = window.innerHeight - visualViewport.height`. It is
-correct iff **either** the window resized for the IME **or** the VisualViewport
-shrank. On API 28 _neither_ does:
+**为何特指 API 28。** 任务栏定位 _仅_ 依赖
+`--keyboard-height`，由 `GlobalThemeService._initVisualViewportKeyboardTracking()`
+从 `obscured = window.innerHeight - visualViewport.height` 得出。仅当 **要么** 窗口因 IME 调整大小 **要么** VisualViewport
+收缩时才正确。在 API 28 上 _两者都不发生_：
 
-1. `targetSdk 36` + the `@capawesome` edge-to-edge plugin call
-   `setDecorFitsSystemWindows(window, false)` on **all** API levels → the window
-   goes edge-to-edge → the system stops resizing for the IME.
-2. The plugin _does_ detect the IME on this device
-   (`WindowInsetsCompat.Type.ime()` reports visible) and sets WebView
-   `bottomMargin = 0` while the keyboard is up — `EdgeToEdge.applyInsetsInternal`:
-   "the system already resizes the window for the keyboard". But it does **not**
-   resize (point 1), so the WebView keeps its full height and the bar stays put.
-   _(An on-device logcat confirmed `keyboardVisible == true` here; the earlier
-   guess that `Type.ime()` is simply unreliable < 30 was wrong for this device.)_
-3. The WebView's VisualViewport doesn't shrink either →
-   `obscured ≈ 0` → `--keyboard-height = 0` → the `position: fixed` bar sits
-   behind the keyboard.
+1. `targetSdk 36` + `@capawesome` 边到边插件在 **所有** API 级别调用
+   `setDecorFitsSystemWindows(window, false)` → 窗口进入边到边 → 系统停止为 IME 调整大小。
+2. 插件在该设备上 _确实_ 检测到 IME
+   （`WindowInsetsCompat.Type.ime()` 报告可见），并在键盘弹出时将 WebView
+   `bottomMargin = 0`——`EdgeToEdge.applyInsetsInternal`：
+   「系统已为键盘调整窗口大小」。但它 **没有**
+   调整大小（见第 1 点），因此 WebView 保持全高，任务栏原地不动。
+   _（设备上 logcat 确认此处 `keyboardVisible == true`；早先猜测
+   `Type.ime()` 在 < 30 上单纯不可靠，对该设备而言是错的。）_
+3. WebView 的 VisualViewport 也不收缩 →
+   `obscured ≈ 0` → `--keyboard-height = 0` → `position: fixed` 的任务栏位于
+   键盘后方。
 
-**Do NOT "fix" this on the web side.** It is tempting to feed `--keyboard-height`
-from a native height fallback (the activity already measures the IME on every
-layout pass — `CapacitorMainActivity` `OnGlobalLayoutListener`:
-`keypadHeight = screenHeight - rect.bottom`, reliable on every API level). The
-trap: `obscured` is `≈0` in **both** the working case (window resized 732→141)
-and this broken case (nothing resized), so the web side cannot tell them apart
-without tracking a baseline `innerHeight` and computing
-`max(obscured, nativeKbHeight - layoutShrink)` — which is **precisely the
-reverted #8295 formula in "What NOT to do" below**. On a device that _does_
-resize, that double-counts and floats the bar mid-screen. The web layer lacks
-the signal to disambiguate; native has it unambiguously.
+**切勿在 Web 侧「修复」此问题。** 很诱人从原生高度回退去喂 `--keyboard-height`
+（Activity 已在每次布局时测量 IME——`CapacitorMainActivity` 的 `OnGlobalLayoutListener`：
+`keypadHeight = screenHeight - rect.bottom`，在每个 API 级别都可靠）。陷阱在于：`obscured` 在 **两种** 情况下都是 `≈0`——正常情况（窗口 732→141）
+与本次故障情况（什么都没调整）——因此 Web 侧无法区分，除非跟踪基线 `innerHeight` 并计算
+`max(obscured, nativeKbHeight - layoutShrink)`——而这 **正是** 下方「切勿做什么」中
+已回退的 #8295 公式。在 _会_ 调整大小的设备上，那会双重计数并把任务栏浮到屏幕中间。Web 层缺少
+区分信号；原生层有明确几何信息。
 
-**Implemented fix (native, explicit WebView height while the IME is up, scoped to
-API < 30) — `CapacitorMainActivity.adjustWebViewHeightForKeyboardBelowApi30`.**
-Driven from the existing keyboard `OnGlobalLayoutListener`:
+**已实现修复（原生，IME 弹出时显式设置 WebView 高度，限定于
+API < 30）——`CapacitorMainActivity.adjustWebViewHeightForKeyboardBelowApi30`。**
+由既有键盘 `OnGlobalLayoutListener` 驱动：
 
-- while the keyboard is up: set an explicit WebView **layout height** to the
-  keyboard top, `height = rect.bottom − webViewTopOnScreen`
-  (`getWindowVisibleDisplayFrame`, reliable on API 28). Shrinking the view shrinks
-  the web layout viewport, so the existing CSS resolves the bar above the keyboard
-  with no web-side keyboard-height math.
-- while the keyboard is down: restore the resting height
-  (`webViewLayoutHeightDefault`, captured at startup, e.g. `MATCH_PARENT`), so the
-  plugin's normal margin-based layout applies unchanged.
-- gated `Build.VERSION.SDK_INT < 30`, so on API >= 30 it is a strict no-op and the
-  behavior verified in 18.12.0 is **untouched**.
+- 键盘弹出时：将 WebView 的显式 **布局高度** 设为键盘顶部，
+  `height = rect.bottom − webViewTopOnScreen`
+  （`getWindowVisibleDisplayFrame`，在 API 28 上可靠）。收缩视图会收缩
+  web 布局视口，因此现有 CSS 会把任务栏解析到键盘上方，
+  无需 Web 侧键盘高度运算。
+- 键盘收起时：恢复静止高度
+  （`webViewLayoutHeightDefault`，启动时捕获，例如 `MATCH_PARENT`），以便
+  插件的正常基于 margin 的布局原样生效。
+- 门控为 `Build.VERSION.SDK_INT < 30`，因此在 API >= 30 上严格空操作，18.12.0 已验证的行为
+  **不受影响**。
 
-> **Why height, not `bottomMargin` and not the plugin's listener.** The plugin owns
-> `webView.bottomMargin` and rewrites it to 0 on every inset dispatch while the IME
-> is visible (`EdgeToEdge.applyInsetsInternal`, because it expects the system to
-> resize — which enforced edge-to-edge prevents on API < 30). Correcting the margin
-> from a second writer made the bar **flicker constantly** (on-device logcat showed
-> the margin alternating `0 ↔ lift` every frame); WebView bottom _padding_ doesn't
-> move the web layout viewport; and fully replacing the plugin's listener fixed the
-> flicker but stopped the plugin re-sizing its status/nav **color overlays**, so the
-> navbar showed a **white gap**. Setting an explicit `layout_height` is the way out:
-> it is a different property than the margin the plugin manages, and for an
-> explicit-height view the bottom margin does not change the view's size — so the two
-> never fight, and the plugin keeps doing _everything else_ (insets + color overlays,
-> no white gap). The target is read from the visible frame and does not depend on the
-> WebView's own height, so it is stable pass-to-pass (no feedback loop).
+> **为何用高度，而非 `bottomMargin`，也非插件的 listener。** 插件拥有
+> `webView.bottomMargin`，并在 IME 可见时每次 inset 分发都把它重写为 0（`EdgeToEdge.applyInsetsInternal`，因为它期望系统
+> 调整大小——而强制边到边在 API < 30 上阻止了这一点）。从第二个写入者修正 margin
+> 会让任务栏 **不断闪烁**（设备上 logcat 显示
+> margin 每帧在 `0 ↔ lift` 间交替）；WebView 底部 _padding_ 不会
+> 移动 web 布局视口；完全替换插件的 listener 虽修复了闪烁，但阻止了插件重新调整其状态栏/导航栏
+> **颜色覆盖层**，导致导航栏出现 **白色空隙**。设置显式 `layout_height` 是出路：
+> 它是与插件管理的 margin 不同的属性，且对显式高度的视图而言，底部 margin 不会改变视图尺寸——因此两者
+> 永不冲突，插件仍可做 _其他一切_（inset + 颜色覆盖层，
+> 无白色空隙）。目标从可见 frame 读取，不依赖
+> WebView 自身高度，因此各次布局稳定（无反馈环）。
 
-**Upstream status (why a local workaround at all).** This is a known, repeatedly
-regressed area in `@capawesome/capacitor-android-edge-to-edge-support` (pinned
-8.0.8): see `capawesome-team/capacitor-plugins` #845/#490/#596/#725/#819 (closed)
-and #847 (open). The buggy `keyboardVisible ? 0 : max(ime, navbar)` ternary in
-`EdgeToEdge.applyInsetsInternal` is acknowledged — the maintainer redirects to
-Capacitor core `ionic-team/capacitor#8466` (fixed for the **built-in** `SystemBars`
-by core PR #8481, merged), and plugin PR #848 ("correct WebView margin
-calculation") would fix the ternary but is **still open/unreleased**. So there is no
-shipped fix on the plugin path we use; this native workaround is independent of that
-timeline. Longer term, migrating to Capacitor 8's built-in `SystemBars`
-(`insetsHandling`) + dropping the plugin is the maintainer's implied direction.
+**上游状态（为何需要本地变通）。** 这是 `@capawesome/capacitor-android-edge-to-edge-support`（固定
+8.0.8）中已知、反复回退的区域：见 `capawesome-team/capacitor-plugins` #845/#490/#596/#725/#819（已关闭）
+以及 #847（开放）。`EdgeToEdge.applyInsetsInternal` 中有问题的 `keyboardVisible ? 0 : max(ime, navbar)` 三元表达式
+已被承认——维护者指向 Capacitor 核心 `ionic-team/capacitor#8466`（核心 PR #8481 已为 **内置** `SystemBars`
+修复并合并），插件 PR #848（「correct WebView margin
+calculation」）会修复该三元式但 **仍开放/未发布**。因此我们使用的插件路径上尚无
+已发布修复；此原生变通独立于该时间线。长期而言，迁移到 Capacitor 8 内置 `SystemBars`
+（`insetsHandling`）并弃用该插件，是维护者暗示的方向。
 
-**Why not the web side:** `obscured` cannot distinguish "window resized" from
-"nothing resized", so a web `--keyboard-height` fallback is the reverted #8295
-formula. Native has the unambiguous geometry.
+**为何不用 Web 侧：** `obscured` 无法区分「窗口已调整」与
+「什么都没调整」，因此 Web 侧 `--keyboard-height` 回退就是已回退的 #8295
+公式。原生有明确几何信息。
 
-**Still REQUIRED before release:** validate across the device matrix below — this
-area has silently regressed at #8295 and twice at #8508. Confirm on a real
-API < 30 device that the bar lands flush on the keyboard top (no white gap, no
-flicker) and that the status/nav-bar layout is unchanged with the keyboard down,
-and on an API >= 30 device that nothing changed at all. A debug-only
-`Log.d("SUPKeyboard", "webView height …")` reports each height write — in steady
-state expect one per show/hide, not a stream. Remove that log before merge.
+**发布前仍需：** 在下方设备矩阵上验证——该区域已在 #8295 静默回退，并在 #8508 回退两次。在真实
+API < 30 设备上确认任务栏紧贴键盘顶部（无白色空隙、无闪烁），键盘收起时状态栏/导航栏布局不变；
+在 API >= 30 设备上确认完全无变化。仅调试用的
+`Log.d("SUPKeyboard", "webView height …")` 会报告每次高度写入——稳态下
+期望每次显示/隐藏一次，而非一串流。合并前移除该日志。
 
-## #8508 follow-up — fullscreen markdown / notes editor squashed
+## #8508 后续 — 全屏 markdown / 笔记编辑器被压扁
 
-**Status: CSS fix implemented, PENDING ON-DEVICE VALIDATION.** Reported on #8508:
-editing a project (or task) note on Android with the keyboard up, the
-`DialogFullscreenMarkdownComponent` toolbar + textarea + Close/Save controls were
-squashed into the top of the screen with a large blank gap down to the keyboard.
+**状态：CSS 修复已实现，待设备上验证。** 在 #8508 上报：
+在 Android 上键盘弹出时编辑项目（或任务）笔记，
+`DialogFullscreenMarkdownComponent` 的工具栏 + 文本区 + 关闭/保存控件被
+压到屏幕顶部，下方到键盘之间有大片空白。
 
-**Why.** The bar is not the only `position: fixed` surface that must clear the
-keyboard — this dialog is `position: fixed; height: 100%` too. Its keyboard rule
-subtracted `--keyboard-overlay-offset`, which is set **only on iOS**, so on
-Android it was a no-op. With the keyboard up the dialog therefore kept whatever
-height `100%` resolved to: full (content behind the keyboard) on a non-resizing
-device, or the squashed sliver on the buggy v18.11.0 WebView.
+**原因。** 任务栏并非唯一必须避开键盘的 `position: fixed` 表面——该对话框也是 `position: fixed; height: 100%`。其键盘规则
+减去了 `--keyboard-overlay-offset`，而该变量 **仅在 iOS 上** 设置，因此在
+Android 上是空操作。键盘弹出时对话框因此保持 `100%` 解析到的高度：在不调整大小的设备上为全高（内容在键盘后方），
+或在有问题的 v18.11.0 WebView 上为压扁细条。
 
-**Fix (`dialog-fullscreen-markdown.component.scss`).** Use the same
-resize-detecting `--keyboard-height` the add-task bar uses for the
-Android / mobile-web case; keep the iOS `--keyboard-overlay-offset` path in a
-separate rule. iOS carries **both** `isNativeMobile` and `isIOS` (and sets
-`--keyboard-height` non-zero), so the Android rule excludes iOS with
-`:not(.isIOS)` — the two rules are mutually exclusive and order-independent
-(rather than relying on equal-specificity source order):
+**修复（`dialog-fullscreen-markdown.component.scss`）。** 对 Android / 移动 web 情况使用与添加任务栏相同的、
+可检测调整大小的 `--keyboard-height`；在单独规则中保留 iOS 的 `--keyboard-overlay-offset` 路径。iOS 同时带有
+`isNativeMobile` 与 `isIOS`（并设置非零的 `--keyboard-height`），因此 Android 规则用
+`:not(.isIOS)` 排除 iOS——两条规则互斥且与顺序无关
+（而非依赖同等特异性的源码顺序）：
 
 ```scss
 :host-context(body.isNativeMobile:not(.isIOS).isKeyboardVisible) {
@@ -244,62 +212,50 @@ separate rule. iOS carries **both** `isNativeMobile` and `isIOS` (and sets
 }
 ```
 
-This is **not** the reverted-#8295 trap above: it reads the pure VisualViewport
-`--keyboard-height`, never augments it with native data. Coverage across the
-device classes this doc tracks:
+这 **不是** 上方已回退的 #8295 陷阱：它读取纯 VisualViewport 的
+`--keyboard-height`，从不叠加原生数据。本文档跟踪的设备类别覆盖：
 
-- **API < 30** — the SDK 28 native fix shrinks the WebView layout height, so
-  `100%` is already above the keyboard and `--keyboard-height == 0`; the rule is
-  `100% - 0`. Works.
-- **API >= 30, window resizes** (verified 18.12.0) — `--keyboard-height == 0`,
-  so `100% - 0`. Works.
-- **API >= 30, no resize but VisualViewport shrinks** (open item #4) —
-  `--keyboard-height > 0` lifts the dialog above the keyboard, on par with the
-  add-task bar.
+- **API < 30** — SDK 28 原生修复收缩 WebView 布局高度，因此
+  `100%` 已在键盘之上且 `--keyboard-height == 0`；规则为
+  `100% - 0`。可行。
+- **API >= 30，设备会调整大小**（已验证 18.12.0）— `--keyboard-height == 0`，
+  因此 `100% - 0`。可行。
+- **API >= 30，不调整大小但 VisualViewport 收缩**（未决事项 #4）—
+  `--keyboard-height > 0` 将对话框抬到键盘之上，与添加任务栏一致。
 
-**Do NOT also subtract `--safe-area-top` here.** An earlier version of this fix
-did (`100% - --keyboard-height - --safe-area-top`). That is a double-count:
-`:host` is `border-box` (global `* { box-sizing: border-box }`) and already has
-`padding-top: var(--safe-area-top)`, so the top inset is _inside_ `height: 100%`.
-Subtracting it again left a `--safe-area-top`-sized gap between the Close/Save
-controls and the keyboard. It was invisible while `--safe-area-top` was 0 on
-API < 30, then surfaced the moment the status-bar fix above made it non-zero
-(also latent on API >= 30, where env() already gave a non-zero `--safe-area-top`).
-The iOS rule keeps its `- --safe-area-top` term for now — its keyboard runtime
-differs (the WebView does not resize) and it is unverified on an iOS device; if
-an iOS bottom gap appears, drop the term there too.
+**切勿在此再减去 `--safe-area-top`。** 该修复的早期版本
+曾这样做（`100% - --keyboard-height - --safe-area-top`）。那是双重计数：
+`:host` 是 `border-box`（全局 `* { box-sizing: border-box }`）且已有
+`padding-top: var(--safe-area-top)`，因此顶部 inset 已 _包含在_ `height: 100%` 内。
+再减一次会在关闭/保存控件与键盘之间留下 `--safe-area-top` 大小的空隙。在 API < 30 上 `--safe-area-top` 为 0 时不可见，
+一旦上方状态栏修复使其非零就会显现
+（在 API >= 30 上也是潜伏问题，因为 env() 已给出非零 `--safe-area-top`）。
+iOS 规则暂时保留其 `- --safe-area-top` 项——其键盘运行时
+不同（WebView 不调整大小），且未在 iOS 设备上验证；若出现 iOS 底部空隙，也应去掉该项。
 
-## #8508 follow-up — SDK 28 (Android 9): header draws BEHIND the status bar
+## #8508 后续 — SDK 28（Android 9）：页眉绘制在状态栏 BEHIND（后方）
 
-**Status: fix implemented (`CapacitorMainActivity.pushStatusBarOverlapBelowApi30`),
-PENDING ON-DEVICE VALIDATION.** Separate from the keyboard — on API 28 the web
-header overlaps the **status bar** (no top gap), reported on #8508.
+**状态：修复已实现（`CapacitorMainActivity.pushStatusBarOverlapBelowApi30`），
+待设备上验证。** 与键盘无关——在 API 28 上 web 页眉与 **状态栏** 重叠（无顶部空隙），在 #8508 上报。
 
-**Root cause.** Post the SystemBars migration, Android no longer writes
-`--safe-area-inset-*` from JS; `--safe-area-top` resolves via the SCSS fallback
-`var(--safe-area-inset-top, env(safe-area-inset-top, 0px))` (`_css-variables.scss`).
-On **API >= 35** SystemBars injects `--safe-area-inset-top`, and on **WebView >= 140**
-the WebView's own `env(safe-area-inset-top)` is correct — but on the
-**WebView < 140 tail** under enforced edge-to-edge the WebView extends under the
-status bar while `env(safe-area-inset-top)` resolves to **0** (old WebViews map
-only display _cutouts_ into safe-area insets, not the status bar). So
-`--safe-area-top == 0` and content draws under the status bar (Android 9 / API 28).
+**根因。** SystemBars 迁移后，Android 不再从 JS 写入
+`--safe-area-inset-*`；`--safe-area-top` 通过 SCSS 回退
+`var(--safe-area-inset-top, env(safe-area-inset-top, 0px))`（`_css-variables.scss`）解析。
+在 **API >= 35** 上 SystemBars 注入 `--safe-area-inset-top`，在 **WebView >= 140** 上
+WebView 自身的 `env(safe-area-inset-top)` 正确——但在强制边到边的
+**WebView < 140 尾部**，WebView 延伸到状态栏下方，同时 `env(safe-area-inset-top)` 解析为 **0**（旧 WebView 仅把显示
+_刘海/挖孔_ 映射为安全区内边距，而非状态栏）。因此
+`--safe-area-top == 0`，内容绘制在状态栏下方（Android 9 / API 28）。
 
-**Why not a pure web-side fallback.** The web side cannot tell "WebView is
-edge-to-edge under the status bar" from "WebView is already inset below it" —
-`env()` is 0 in both, and adding the status-bar height blindly would double-count
-in the inset case. Native has the geometry.
+**为何不能纯 Web 侧回退。** Web 侧无法区分「WebView 边到边延伸到状态栏下」与「WebView 已 inset 到其下方」——
+两种情况下 `env()` 都是 0，盲目加上状态栏高度会在已 inset 情况下双重计数。原生有几何信息。
 
-**Fix (native overlap → SCSS fallback) — `pushStatusBarOverlapBelowApi30`.** From
-the existing keyboard `OnGlobalLayoutListener`, measure the overlap
-`max(0, rect.top − webViewTopOnScreen)` — `rect.top` is the visible-frame top
-(= status-bar height, reliable on API 28; the same frame the keyboard path reads)
-and `getLocationOnScreen` is the WebView's top (0 edge-to-edge, == status-bar
-height once inset). Publish it (physical px → CSS px, deduped) as the
-`--android-status-bar-overlap` CSS var, gated **SDK < 30 AND WebView < 140**
-(mirrors the keyboard shim, never fights SystemBars). The var is folded into the
-SCSS fallback (`_css-variables.scss`) — NOT written from JS, so it never races
-SystemBars on `--safe-area-inset-*`:
+**修复（原生重叠 → SCSS 回退）——`pushStatusBarOverlapBelowApi30`。** 从既有键盘 `OnGlobalLayoutListener` 测量重叠
+`max(0, rect.top − webViewTopOnScreen)`——`rect.top` 是可见 frame 顶部
+（= 状态栏高度，在 API 28 上可靠；与键盘路径读取的同一 frame），
+`getLocationOnScreen` 是 WebView 顶部（边到边时为 0，已 inset 后 == 状态栏高度）。将其发布（物理 px → CSS px，去重）为
+`--android-status-bar-overlap` CSS 变量，门控为 **SDK < 30 且 WebView < 140**
+（镜像键盘 shim，永不与 SystemBars 冲突）。该变量折入 SCSS 回退（`_css-variables.scss`）——不从 JS 写入，因此永不与 SystemBars 在 `--safe-area-inset-*` 上竞态：
 
 ```scss
 --safe-area-top: var(
@@ -308,75 +264,54 @@ SystemBars on `--safe-area-inset-*`:
 );
 ```
 
-- `max()`, not a sum, so it never double-counts: WebView < 140 edge-to-edge →
-  env 0, overlap = status bar → status bar; once inset → env 0, overlap 0 → 0.
-- On **API >= 35 / WebView >= 140** `--safe-area-inset-top` is set (SystemBars) or
-  env() is correct, so `var()` precedence / `max()` ignore the overlap entirely —
-  verified behavior untouched.
-- JS readers (`_patchCdkViewportForSafeArea`) still parse the `var(max(...))`
-  token to 0, so overlay positioning is unchanged — preserving #8283 scoping
-  (only the header padding is affected).
-- Known small gap: an **API 30–34** device on an **old WebView < 140** also has
-  env()==0 but is excluded by the SDK < 30 gate; rare (WebView auto-updates above
-  API 30) — broaden the gate to WebView-only if it ever surfaces.
-- The var lives only as an inline style on the document, so a web-side reload
-  (`window.location.reload()` — language change, PWA update, sync-conflict
-  recovery) wipes it. The native dedupe (`lastStatusBarOverlapCssPx`) is reset in
-  `flushPendingShareIntent()` (runs on every frontend (re)load) so the next layout
-  pass re-publishes it; without the reset the unchanged value would be skipped and
-  the overlap would regress after a reload.
+- 用 `max()` 而非求和，因此永不双重计数：WebView < 140 边到边 →
+  env 为 0，overlap = 状态栏 → 状态栏；一旦已 inset → env 为 0，overlap 为 0 → 0。
+- 在 **API >= 35 / WebView >= 140** 上 `--safe-area-inset-top` 已设置（SystemBars）或
+  env() 正确，因此 `var()` 优先级 / `max()` 完全忽略 overlap——
+  已验证行为不受影响。
+- JS 读取方（`_patchCdkViewportForSafeArea`）仍将 `var(max(...))`
+  词法解析为 0，因此覆盖层定位不变——保留 #8283 的作用域
+  （仅页眉 padding 受影响）。
+- 已知小缺口：一台 **API 30–34**、**旧 WebView < 140** 的设备也会有
+  env()==0，但被 SDK < 30 门控排除；罕见（API 30 以上 WebView 会自动更新）——若出现可把门控放宽为仅 WebView。
+- 该变量仅作为文档上的内联样式存在，因此 Web 侧重载
+  （`window.location.reload()`——语言切换、PWA 更新、同步冲突恢复）会擦除它。原生去重（`lastStatusBarOverlapCssPx`）在
+  `flushPendingShareIntent()` 中重置（每次前端（重新）加载都会运行），以便下次布局
+  重新发布；若不重置，未变化的值会被跳过，重叠会在重载后回退。
 
-## What NOT to do
+## 切勿做什么
 
-Do not stack a second/third keyboard-height source on top of the VisualViewport
-signal (native physical-px height + a `baseInnerHeight`-tracking path combined as
-`max(obscured, nativeKeyboardHeight - layoutShrink)`). That was #8295; the
-sources race on separate async events, the baseline gets reset to the shrunk
-`innerHeight` mid-animation, the double-count guard collapses, and the bar is
-mispositioned. It was reverted. Fix the inset at the source, and **only after
-detecting** whether the system already resized.
+不要在 VisualViewport 信号之上再堆叠第二/第三个键盘高度来源（原生物理 px 高度 + `baseInnerHeight` 跟踪路径组合为
+`max(obscured, nativeKeyboardHeight - layoutShrink)`）。那就是 #8295；来源在独立的异步事件上竞态，基线在动画中途被重置为已收缩的
+`innerHeight`，双重计数守卫崩溃，任务栏被错位。已回退。在源头修复 inset，且 **仅在检测到** 系统是否已调整大小之后。
 
-## SystemBars inset-source risks (unconfirmed on device)
+## SystemBars inset 来源风险（设备上未确认）
 
-Carried over from the 2026-06 SystemBars migration review. These are device-matrix
-items to **check**, not to blind-fix — a blind fix risks re-creating #8508.
+自 2026-06 SystemBars 迁移评审结转。这些是设备矩阵上待 **检查** 的项，不是盲目修复——盲目修复有重现 #8508 的风险。
 
-1. **API >= 35 + WebView < 140 double-count (narrow band).** In SystemBars'
-   non-passthrough branch (API >= 35) it `setPadding`s the WebView parent _and_
-   injects `--safe-area-inset-*`. If the web also pads via `var(--safe-area-*)`,
-   that double-counts. The common API 36 case is WebView >= 140 = passthrough (no
-   static parent padding, so no double-count), making this the stale-WebView
-   corner. This is what `--bottom-nav-safe-area` in `src/styles/_css-variables.scss`
-   halves the inset for. Verify on an API 35/36 device with an old WebView; if it
-   is real, gate the web padding off on that band rather than removing it globally.
-2. **`env(safe-area-inset-bottom)` vs `var(--safe-area-bottom)` consumers diverge
-   on API >= 35.** Some SCSS reads raw `env()`, other SCSS reads
-   `var(--safe-area-*)`. On API >= 35 SystemBars can zero the passed-through
-   insets while injecting real px into the vars, so the two families disagree.
-   Confirm bottom-nav / add-task-bar spacing on API 35/36; reconcile to one source
-   per band if it is wrong.
-3. **API 30-34 + WebView < 140 IME owner.** The native shim is gated `SDK_INT < 30`
-   deliberately (newer APIs were observed to resize the window for the IME, and
-   insetting on top of that re-creates the #8508 squash). Under SystemBars,
-   WebView < 140 gets no IME padding below API 35. Verify whether the window still
-   resizes on API 30-34: if it does, there is no gap; if it does not, extend the
-   shim to `< 35 && WebView < 140` — but only after confirming on a device.
-4. **CDK overlay / context-menu top position shifts on API >= 35.**
-   `--safe-area-inset-top` resolves to real px there (it was 0 on Android before),
-   so connected overlays clamp below the status bar. Likely more correct; re-test
-   the overlay matrix.
+1. **API >= 35 + WebView < 140 双重计数（窄带）。** 在 SystemBars 的非透传分支（API >= 35）中，它会对 WebView 父级 `setPadding` _并_
+   注入 `--safe-area-inset-*`。若 web 也通过 `var(--safe-area-*)` 做 padding，
+   会双重计数。常见的 API 36 情况是 WebView >= 140 = 透传（无静态父级 padding，因此无双重计数），使这成为陈旧 WebView 的边角。这正是 `src/styles/_css-variables.scss` 中 `--bottom-nav-safe-area`
+   将 inset 减半的原因。在带旧 WebView 的 API 35/36 设备上验证；若属实，
+   在该频段关掉 web padding，而非全局移除。
+2. **`env(safe-area-inset-bottom)` 与 `var(--safe-area-bottom)` 消费者在 API >= 35 上分叉。** 部分 SCSS 读原始 `env()`，其他 SCSS 读
+   `var(--safe-area-*)`。在 API >= 35 上 SystemBars 可能将透传 inset 置零，同时向变量注入真实 px，因此两族不一致。
+   在 API 35/36 上确认底部导航 / 添加任务栏间距；若错误则按频段统一到单一来源。
+3. **API 30-34 + WebView < 140 的 IME 归属。** 原生 shim 故意门控为 `SDK_INT < 30`
+   （观察到较新 API 会为 IME 调整窗口大小，在其上再做 inset 会重现 #8508 压扁）。在 SystemBars 下，
+   WebView < 140 在 API 35 以下得不到 IME padding。验证 API 30-34 上窗口是否仍调整大小：若会，则无空隙；若不会，将 shim 扩展到
+   `< 35 && WebView < 140`——但仅在设备上确认之后。
+4. **CDK overlay / 上下文菜单顶部位置在 API >= 35 上偏移。**
+   `--safe-area-inset-top` 在该处解析为真实 px（此前在 Android 上为 0），
+   因此连接的 overlay 会钳制在状态栏下方。可能更正确；请重新测试 overlay 矩阵。
 
-## Device test matrix (required before merging IME changes)
+## 设备测试矩阵（合并 IME 变更前必需）
 
-Behavior differs across devices — test the add-task bar opening the keyboard, and
-typing a word fast right after tapping +, on:
+行为因设备而异——测试打开键盘的添加任务栏，以及点击 + 后立即快速输入一个词，覆盖：
 
-- Android 10 (API 29) — pre-edge-to-edge; `Type.ime()` insets are unreliable here
-- Android 14 (API 34) — edge-to-edge opt-out still possible
-- Android 15 (API 35) — we opt out via `windowOptOutEdgeToEdgeEnforcement`
-- Android 16 (API 36) — our target; the system was observed to still resize for
-  the IME on a real device
+- Android 10（API 29）— 边到边之前；此处 `Type.ime()` inset 不可靠
+- Android 14（API 34）— 仍可选择退出边到边
+- Android 15（API 35）— 我们通过 `windowOptOutEdgeToEdgeEnforcement` 选择退出
+- Android 16（API 36）— 我们的目标；在真实设备上观察到系统仍会为 IME 调整大小
 
-Both gesture-nav and 3-button-nav, light and dark. Confirm: no blank gap above
-the keyboard, bar visible just above the keyboard, and typed characters appear in
-order (not reversed).
+手势导航与三键导航、浅色与深色均需覆盖。确认：键盘上方无空白空隙，任务栏紧贴键盘上方可见，且输入字符按顺序出现（非倒序）。

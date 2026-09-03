@@ -1,22 +1,22 @@
-# E2E Test Reference
+# E2E 测试参考
 
-## Run Tests
+## 运行测试
 
 ```bash
-npm run e2e:file tests/path/to/test.spec.ts   # Single test (~20s/test)
-npm run e2e                                    # All tests
-npm run e2e:supersync:file <path>              # SuperSync E2E (auto-starts server)
+npm run e2e:file tests/path/to/test.spec.ts   # 单个测试（约 20 秒/个）
+npm run e2e                                    # 全部测试
+npm run e2e:supersync:file <path>              # SuperSync E2E（自动启动服务器）
 ```
 
-When iterating, prefer single-file runs with `--retries=0` to avoid long waits, and `--grep "test name"` for one test:
+迭代时优先对单文件使用 `--retries=0` 以避免长时间等待，并用 `--grep "test name"` 只跑某一个测试：
 
 ```bash
 npm run e2e:file <path> -- --retries=0 --grep "should X"
 ```
 
-## SuperSync full suite
+## SuperSync 完整套件
 
-The `npm run e2e:supersync` script buffers output, which is unhelpful for live debugging. Run Playwright directly with a line reporter instead:
+`npm run e2e:supersync` 脚本会缓冲输出，不利于实时调试。请改为直接用 Playwright 并以 line reporter 运行：
 
 ```bash
 # Start the server
@@ -31,7 +31,7 @@ npx playwright test --config e2e/playwright.config.ts --grep @supersync --report
 docker compose -f docker-compose.yaml -f docker-compose.supersync.yaml down supersync
 ```
 
-## Test Template
+## 测试模板
 
 ```typescript
 // Import path depends on test depth (see Import Paths below)
@@ -48,30 +48,30 @@ test.describe('Feature', () => {
 });
 ```
 
-## Import Paths
+## 导入路径
 
-| Test Location                    | Import Path                      |
+| 测试位置                         | 导入路径                           |
 | -------------------------------- | -------------------------------- |
 | `tests/feature/test.spec.ts`     | `../../fixtures/test.fixture`    |
 | `tests/feature/sub/test.spec.ts` | `../../../fixtures/test.fixture` |
 
-## All Fixtures
+## 全部 Fixture
 
-| Fixture        | Use For                                          |
+| Fixture        | 用途                                               |
 | -------------- | ------------------------------------------------ |
-| `workViewPage` | Task list, adding tasks                          |
-| `taskPage`     | Task operations (get, edit, mark done)           |
-| `projectPage`  | Project CRUD, navigation                         |
-| `settingsPage` | Settings navigation, plugin management           |
-| `dialogPage`   | Modal/dialog interactions                        |
-| `plannerPage`  | Planner view operations                          |
-| `syncPage`     | WebDAV sync setup                                |
-| `tagPage`      | Tag management                                   |
-| `notePage`     | Notes functionality                              |
-| `sideNavPage`  | Side navigation                                  |
-| `testPrefix`   | Auto-applied to task/project names for isolation |
+| `workViewPage` | 任务列表、添加任务                                 |
+| `taskPage`     | 任务操作（获取、编辑、标记完成）                   |
+| `projectPage`  | 项目 CRUD、导航                                    |
+| `settingsPage` | 设置导航、插件管理                                 |
+| `dialogPage`   | 模态框/对话框交互                                  |
+| `plannerPage`  | 规划视图操作                                       |
+| `syncPage`     | WebDAV 同步设置                                    |
+| `tagPage`      | 标签管理                                           |
+| `notePage`     | 笔记功能                                           |
+| `sideNavPage`  | 侧边导航                                           |
+| `testPrefix`   | 自动加到任务/项目名称前缀以实现隔离                |
 
-## Assertion Helpers
+## 断言辅助函数
 
 ```typescript
 import {
@@ -91,9 +91,9 @@ await expectDialogVisible(dialogPage);
 await expectNoGlobalError(page);
 ```
 
-## Common Patterns
+## 常见模式
 
-### Create project with tasks
+### 创建带任务的项目
 
 ```typescript
 await projectPage.createAndGoToTestProject();
@@ -102,7 +102,7 @@ await workViewPage.addTask('Task 2');
 await expectTaskCount(taskPage, 2);
 ```
 
-### Mark task done and verify
+### 标记任务完成并验证
 
 ```typescript
 await workViewPage.addTask('My Task');
@@ -111,7 +111,7 @@ await taskPage.markTaskAsDone(task);
 await expectDoneTaskCount(taskPage, 1);
 ```
 
-### Dialog interaction
+### 对话框交互
 
 ```typescript
 // Trigger dialog via some action, then:
@@ -121,7 +121,7 @@ await dialogPage.clickSaveButton();
 await dialogPage.waitForDialogToClose();
 ```
 
-### Sync tests (serial execution required)
+### 同步测试（需串行执行）
 
 ```typescript
 test.describe.configure({ mode: 'serial' });
@@ -133,17 +133,17 @@ test.describe('Sync Feature', () => {
 });
 ```
 
-## Key Methods
+## 关键方法
 
 ### workViewPage
 
-- `waitForTaskList()` - Call first in every test
-- `addTask(name)` - Add task via global input
+- `waitForTaskList()` - 每个测试中首先调用
+- `addTask(name)` - 通过全局输入框添加任务
 
 ### taskPage
 
 - `getTaskByText(text)` → Locator
-- `getTask(index)` → Locator (1-based)
+- `getTask(index)` → Locator（从 1 开始）
 - `getAllTasks()` → Locator
 - `markTaskAsDone(task)`
 - `getTaskCount()` → number
@@ -154,7 +154,7 @@ test.describe('Sync Feature', () => {
 
 - `createProject(name)`
 - `navigateToProjectByName(name)`
-- `createAndGoToTestProject()` - Quick setup
+- `createAndGoToTestProject()` - 快速搭建
 
 ### settingsPage
 
@@ -168,19 +168,19 @@ test.describe('Sync Feature', () => {
 - `fillDialogInput(selector, value)`
 - `waitForDialogToClose()`
 
-For full method list, read the page object file: `e2e/pages/<name>.page.ts`
+完整方法列表请阅读页面对象文件：`e2e/pages/<name>.page.ts`
 
-## Selectors
+## 选择器
 
 ```typescript
 import { cssSelectors } from '../../constants/selectors';
 // Available: TASK, FIRST_TASK, TASK_TITLE, TASK_DONE_BTN, ADD_TASK_INPUT, MAT_DIALOG, SIDENAV, etc.
 ```
 
-## Critical Rules
+## 关键规则
 
-1. **Always start with** `await workViewPage.waitForTaskList()`
-2. **Use page objects** - not raw `page.locator()` for common actions
-3. **No `waitForTimeout()`** - use `expect().toBeVisible()` instead
-4. **Tests are isolated** - each gets fresh browser context + IndexedDB
-5. **Use assertion helpers** - for consistent, readable tests
+1. **始终以** `await workViewPage.waitForTaskList()` **开头**
+2. **使用页面对象**——常见操作不要用原始的 `page.locator()`
+3. **不要使用 `waitForTimeout()`**——改用 `expect().toBeVisible()`
+4. **测试相互隔离**——每个测试获得全新浏览器上下文 + IndexedDB
+5. **使用断言辅助函数**——保持测试一致、可读

@@ -1,34 +1,34 @@
-# Super Productivity Packages
+# Super Productivity 包
 
-This directory contains plugin packages and the plugin API for Super Productivity.
+本目录包含 Super Productivity 的插件包与插件 API。
 
-## Structure
+## 结构
 
-- `plugin-api/` - TypeScript definitions for the plugin API
-- `plugin-dev/` - Plugin development examples and tools
-  - `api-test-plugin/` - Basic API test plugin
-  - `procrastination-buster/` - Example SolidJS-based plugin
-  - `yesterday-tasks-plugin/` - Simple plugin showing yesterday's tasks
-  - `boilerplate-solid-js/` - Template for creating new SolidJS plugins (not built)
-  - `sync-md/` - Markdown sync plugin (not built)
+- `plugin-api/` - 插件 API 的 TypeScript 类型定义
+- `plugin-dev/` - 插件开发示例与工具
+  - `api-test-plugin/` - 基础 API 测试插件
+  - `procrastination-buster/` - 基于 SolidJS 的示例插件
+  - `yesterday-tasks-plugin/` - 展示昨日任务的简单插件
+  - `boilerplate-solid-js/` - 创建新 SolidJS 插件的模板（不参与构建）
+  - `sync-md/` - Markdown 同步插件（不参与构建）
 
-## Building Packages
+## 构建包
 
-All packages are built automatically when running the main build process:
+运行主构建流程时，所有包会自动构建：
 
 ```bash
 npm run build:packages
 ```
 
-This command:
+该命令会：
 
-1. Builds the plugin-api TypeScript definitions
-2. Builds plugins that require compilation (e.g., procrastination-buster)
-3. Copies plugin files to `src/assets/` for inclusion in the app
+1. 构建 plugin-api 的 TypeScript 类型定义
+2. 构建需要编译的插件（例如 procrastination-buster）
+3. 将插件文件复制到 `src/assets/`，以便打包进应用
 
-## Development
+## 开发
 
-To work on a specific plugin:
+开发某个具体插件时：
 
 ```bash
 cd plugin-dev/[plugin-name]
@@ -36,14 +36,14 @@ npm install
 npm run dev
 ```
 
-## Adding a New Plugin
+## 添加新插件
 
-1. Create a new directory in `plugin-dev/`
-2. Add the plugin configuration to `/packages/build-packages.js`
-3. Run `npm run build:packages` to test the build
+1. 在 `plugin-dev/` 下创建新目录
+2. 将插件配置加入 `/packages/build-packages.js`
+3. 运行 `npm run build:packages` 以测试构建
 
-## Notes
+## 说明
 
-- The `boilerplate-solid-js` and `sync-md` plugins are development templates and are not included in production builds
-- Plugin files are automatically copied to `src/assets/` during the build process
-- The build script handles dependency installation automatically
+- `boilerplate-solid-js` 与 `sync-md` 插件是开发模板，不会包含在生产构建中
+- 构建过程中，插件文件会自动复制到 `src/assets/`
+- 构建脚本会自动处理依赖安装

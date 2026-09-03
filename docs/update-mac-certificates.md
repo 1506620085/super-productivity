@@ -1,82 +1,65 @@
-# Update macOS certificates for electron-builder
+# 更新 electron-builder 所用的 macOS 证书
 
-> **Related macOS docs:**
+> **相关 macOS 文档：**
 >
-> - [Release and publishing](release-and-publishing.md)
-> - [Mac App Store signing](mac-app-store-code-signing-guide.md)
+> - [发布与上架](release-and-publishing.md)
+> - [Mac App Store 签名](mac-app-store-code-signing-guide.md)
 
-This rotation updates the certificate bundle and provisioning profiles used by
-the macOS GitHub Actions runners. Perform it on a Mac with access to the Apple
-Developer team.
+本次轮换更新 macOS GitHub Actions runner 使用的证书包与配置描述文件。在能访问 Apple Developer 团队的 Mac 上执行。
 
-Keep the currently working identities valid until the replacement bundle has
-passed local and CI signing checks. Revoking first creates an avoidable release
-outage and can destroy the only usable private-key pairing.
+在替换包通过本地与 CI 签名检查之前，保持当前可用身份有效。先撤销会造成本可避免的发布中断，并可能毁掉唯一可用的私钥配对。
 
-## 1. Inventory and back up the working setup
+## 1. 清点并备份可用配置
 
-1. Record which Apple Distribution, Mac Installer Distribution, and Developer
-   ID identities the current workflows use:
+1. 记录当前 workflow 使用的 Apple Distribution、Mac Installer Distribution 与 Developer ID 身份：
 
    ```bash
    security find-identity -v -p codesigning
    ```
 
-2. Export the working identities and private keys from **Keychain Access → My
-   Certificates** to an encrypted PKCS#12 backup. Store it in the team's secure
-   credential storage.
-3. Record the active certificate expiration dates and the profile names used by
-   `mas_provision_profile` and `dl_provision_profile`.
+2. 从 **钥匙串访问 → 我的证书** 将可用身份与私钥导出为加密 PKCS#12 备份。存入团队安全凭证存储。
+3. 记录活跃证书过期日期，以及 `mas_provision_profile` 与 `dl_provision_profile` 使用的配置文件名。
 
-If Apple's certificate quota prevents creating a replacement alongside the
-working certificate, confirm the backup can be imported and schedule a
-maintenance window before revoking anything.
+若 Apple 证书配额阻止在可用证书旁创建替换项，先确认备份可导入，并在撤销任何东西前安排维护窗口。
 
-## 2. Create and install replacements
+## 2. 创建并安装替换项
 
-1. In Keychain Access, create a certificate signing request for the Apple
-   Developer team.
-2. In the
-   [Apple Developer certificate portal](https://developer.apple.com/account/resources/certificates/list),
-   issue the certificate types required by the current workflows:
-   - Apple Distribution for Mac App Store application signing
-   - Mac Installer Distribution for the uploaded Mac App Store package
-   - Developer ID Application for direct-download builds
-   - any additional identity still referenced by a current workflow
-3. Download and install each certificate in the login keychain.
-4. In **My Certificates**, expand every new identity and confirm that its private
-   key is attached.
+1. 在钥匙串访问中，为 Apple Developer 团队创建证书签名请求。
+2. 在
+   [Apple Developer 证书门户](https://developer.apple.com/account/resources/certificates/list)
+   中签发当前 workflow 所需的证书类型：
+   - Apple Distribution，用于 Mac App Store 应用签名
+   - Mac Installer Distribution，用于上传的 Mac App Store 包
+   - Developer ID Application，用于直接下载构建
+   - 当前 workflow 仍引用的任何额外身份
+3. 下载并将每个证书安装到登录钥匙串。
+4. 在 **我的证书** 中展开每个新身份，确认私钥已附着。
 
-Do not remove or revoke the old identities yet.
+先不要移除或撤销旧身份。
 
-## 3. Create replacement provisioning profiles
+## 3. 创建替换配置描述文件
 
-Create profiles only after the new certificates exist:
+仅在新证书存在后创建配置文件：
 
-1. Create a Mac App Store profile for `com.super-productivity.app` using the new
-   Apple Distribution certificate. Save it as
-   `tools/mac-profiles/mas.provisionprofile`.
-2. If the direct-download workflow still uses a Developer ID profile, create it
-   with the new Developer ID Application certificate and save it as
-   `tools/mac-profiles/dl.provisionprofile`.
-3. Inspect each profile and confirm its embedded certificate is one of the new
-   identities:
+1. 使用新 Apple Distribution 证书为 `com.super-productivity.app` 创建 Mac App Store 配置文件。保存为
+   `tools/mac-profiles/mas.provisionprofile`。
+2. 若直接下载 workflow 仍使用 Developer ID 配置文件，用新 Developer ID Application 证书创建，并保存为
+   `tools/mac-profiles/dl.provisionprofile`。
+3. 检查每个配置文件，确认其嵌入证书是新身份之一：
 
    ```bash
    security cms -D -i tools/mac-profiles/mas.provisionprofile
    security cms -D -i tools/mac-profiles/dl.provisionprofile
    ```
 
-The profile certificate and the identity selected for signing must match. The
-dynamic verification procedure is in
-[Mac App Store signing](mac-app-store-code-signing-guide.md).
+配置文件证书与签名所选身份必须匹配。动态验证流程见
+[Mac App Store 签名](mac-app-store-code-signing-guide.md)。
 
-## 4. Export and update CI secrets
+## 4. 导出并更新 CI secrets
 
-1. In Keychain Access, export the replacement identities and their private keys
-   as one password-protected `all-certs.p12`. Use a newly generated password.
-2. Verify that the bundle imports into a temporary keychain before uploading it.
-3. Base64-encode the bundle and profiles:
+1. 在钥匙串访问中，将替换身份及其私钥导出为一个带密码保护的 `all-certs.p12`。使用新生成的密码。
+2. 上传前验证该包可导入临时钥匙串。
+3. Base64 编码包与配置文件：
 
    ```bash
    base64 -i all-certs.p12 -o all-certs.b64
@@ -84,17 +67,16 @@ dynamic verification procedure is in
    base64 -i tools/mac-profiles/dl.provisionprofile -o dmg-profile.b64
    ```
 
-4. Update the GitHub Actions secrets referenced by the workflows:
-   - `mac_certs` and `mac_certs_password`
+4. 更新 workflow 引用的 GitHub Actions secrets：
+   - `mac_certs` 与 `mac_certs_password`
    - `mas_provision_profile`
    - `dl_provision_profile`
 
-The workflow files are authoritative for secret names and whether a profile is
-still required. Never commit PKCS#12 files, encoded secret files, or passwords.
+workflow 文件对 secret 名称以及是否仍需要配置文件具有权威性。绝不要提交 PKCS#12 文件、编码后的 secret 文件或密码。
 
-## 5. Validate before revoking anything
+## 5. 撤销前先验证
 
-1. Build and verify the Mac App Store package:
+1. 构建并验证 Mac App Store 包：
 
    ```bash
    cp tools/mac-profiles/mas.provisionprofile embedded.provisionprofile
@@ -106,10 +88,8 @@ still required. Never commit PKCS#12 files, encoded secret files, or passwords.
      .tmp/app-builds/mas-universal/super*.pkg
    ```
 
-2. For a local direct-download notarization test, enter credentials through
-   silent prompts so the app-specific password is not written to shell history.
-   Run the following in Bash; the subshell limits the exported values to the
-   build:
+2. 本地直接下载公证测试时，通过静默提示输入凭证，使应用专用密码不写入 shell 历史。
+   在 Bash 中运行以下内容；子 shell 将导出值限制在构建内：
 
    ```bash
    (
@@ -124,7 +104,7 @@ still required. Never commit PKCS#12 files, encoded secret files, or passwords.
    )
    ```
 
-3. Verify the DMG signature and notarization:
+3. 验证 DMG 签名与公证：
 
    ```bash
    codesign --verify --deep --strict --verbose=2 "<path-to-built-app>"
@@ -133,16 +113,13 @@ still required. Never commit PKCS#12 files, encoded secret files, or passwords.
    xcrun stapler validate "<path-to-dmg>"
    ```
 
-4. Run the macOS signing workflow that exercises the updated secrets and confirm
-   its certificate/profile diagnostics match.
+4. 运行会使用更新后 secrets 的 macOS 签名 workflow，并确认其证书/配置文件诊断匹配。
 
-## 6. Retire old material
+## 6. 退役旧材料
 
-Only after both replacement build paths pass:
+仅在两条替换构建路径都通过后：
 
-1. Revoke the superseded certificates in the Apple Developer portal.
-2. Remove the old identities from the local keychain.
-3. Delete local unencrypted and base64 working files after confirming the secure
-   backup and GitHub secrets are usable.
-4. Record the rotation date and the new expiration dates in the team's
-   credential inventory.
+1. 在 Apple Developer 门户撤销被取代的证书。
+2. 从本地钥匙串移除旧身份。
+3. 确认安全备份与 GitHub secrets 可用后，删除本地未加密与 base64 工作文件。
+4. 在团队凭证清单中记录轮换日期与新过期日期。

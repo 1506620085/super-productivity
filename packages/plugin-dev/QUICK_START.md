@@ -1,6 +1,6 @@
-# Plugin Development Quick Start
+# 插件开发快速开始
 
-## Option 1: Plain JavaScript (Simplest)
+## 方案 1：纯 JavaScript（最简单）
 
 ```bash
 cd minimal-plugin
@@ -8,10 +8,10 @@ cd minimal-plugin
 # Zip the files and upload
 ```
 
-**Pros:** No build step, instant feedback
-**Cons:** No TypeScript, no bundling
+**优点：** 无需构建步骤，即时反馈
+**缺点：** 无 TypeScript，无打包
 
-## Option 2: Simple TypeScript (Recommended)
+## 方案 2：简单 TypeScript（推荐）
 
 ```bash
 cd simple-typescript-plugin
@@ -20,10 +20,10 @@ npm run build
 # Find plugin.zip in dist/
 ```
 
-**Pros:** TypeScript support, simple build
-**Cons:** Limited to single file
+**优点：** 支持 TypeScript，构建简单
+**缺点：** 限于单文件
 
-## Option 3: Full TypeScript + Webpack (Advanced)
+## 方案 3：完整 TypeScript + Webpack（进阶）
 
 ```bash
 cd example-plugin
@@ -32,24 +32,24 @@ npm run build
 npm run package
 ```
 
-**Pros:** Multiple files, full tooling
-**Cons:** More complex setup
+**优点：** 多文件，完整工具链
+**缺点：** 配置更复杂
 
-## Which Should I Use?
+## 我该用哪个？
 
-- **Just testing?** → Use minimal-plugin
-- **Want TypeScript?** → Use simple-typescript-plugin
-- **Building complex plugin?** → Use example-plugin
+- **只是试用？** → 使用 minimal-plugin
+- **想要 TypeScript？** → 使用 simple-typescript-plugin
+- **构建复杂插件？** → 使用 example-plugin
 
-## Development Tips
+## 开发提示
 
-1. Start with minimal-plugin to understand the API
-2. Move to TypeScript when you need type safety
-3. Only use webpack if you need multiple source files
+1. 从 minimal-plugin 开始，了解 API
+2. 需要类型安全时再转到 TypeScript
+3. 仅在需要多个源文件时使用 webpack
 
-## Testing Your Plugin
+## 测试插件
 
-1. Copy files to `src/assets/my-plugin/` for local testing
-2. Or zip and upload via Settings → Plugins
+1. 将文件复制到 `src/assets/my-plugin/` 做本地测试
+2. 或打包成 zip，通过 设置 → 插件 上传
 
-That's it! 🚀
+就这些！🚀

@@ -1,52 +1,35 @@
-# Android home-screen widget
+# Android 主屏幕小组件
 
-> **Status:** Maintained
+> **状态：** 维护中
 >
-> **Last verified:** 2026-07-29
+> **最后核实：** 2026-07-29
 
-The widget displays up to 20 tasks from the app's last snapshot of the Today
-view and lets the user toggle completion. It is a native projection of Angular
-state, not an independent task or calendar engine.
+小组件显示应用今日视图最近快照中最多 20 个任务，并允许用户切换完成状态。它是 Angular 状态的原生投影，不是独立的任务或日历引擎。
 
-## Contract and ownership
+## 契约与归属
 
-- Angular's `WidgetDataService` is the only writer of the `widget_data` JSON
-  snapshot. The TypeScript contract is
-  `src/app/features/android/android-widget.model.ts`.
-- Kotlin parses the versioned `v: 1` shape in
-  `android/app/src/main/java/com/superproductivity/superproductivity/widget/WidgetData.kt`.
-  Unknown versions fail closed to an empty list.
-- Native checkbox taps write only to `WidgetDoneQueue`. The renderer overlays
-  queued target states immediately; Angular later drains, deduplicates, and
-  applies those intents. Native code must never rewrite the snapshot.
-- Keep the explicit-component PendingIntent and exported-receiver restrictions;
-  external apps must not be able to complete tasks.
+- Angular 的 `WidgetDataService` 是 `widget_data` JSON 快照的唯一写入者。TypeScript 契约在
+  `src/app/features/android/android-widget.model.ts`。
+- Kotlin 在
+  `android/app/src/main/java/com/superproductivity/superproductivity/widget/WidgetData.kt`
+  中解析带版本的 `v: 1` 形态。未知版本失败关闭为空列表。
+- 原生复选框点击只写入 `WidgetDoneQueue`。渲染器立即叠加队列中的目标状态；Angular 稍后排空、去重并应用这些意图。原生代码绝不可改写快照。
+- 保持显式组件 PendingIntent 与 exported-receiver 限制；外部应用不得能完成任务。
 
-The serializer and Kotlin parser are locked to the same golden shape by
-`android-widget.selectors.spec.ts` and `WidgetDataTest.kt`. Update both ends and
-both tests when the contract changes.
+序列化器与 Kotlin 解析器由 `android-widget.selectors.spec.ts` 与 `WidgetDataTest.kt` 锁定为同一 golden 形态。契约变更时两端与两个测试都要更新。
 
-## Day and freshness semantics
+## 日期与新鲜度语义
 
-Angular supplies `dayStr` and `validUntil`. Native code judges staleness only as
-`now >= validUntil`; it must not reproduce logical-day offsets, recurring-task
-materialization, overdue carry-over, or virtual `TODAY_TAG` membership.
+Angular 提供 `dayStr` 与 `validUntil`。原生代码仅以 `now >= validUntil` 判断过期；不得复现逻辑日偏移、重复任务物化、逾期结转或虚拟 `TODAY_TAG` 成员关系。
 
-The widget reflects the last state produced while the app was able to run. When
-the process is dead it cannot create a new day's recurring tasks or receive
-cross-client changes. Its 30-minute platform refresh is inexact and may be
-deferred by Doze. A pre-`validUntil` snapshot cannot be classified as stale
-until the app writes a current snapshot.
+小组件反映应用尚能运行时产生的最后状态。进程死亡时无法创建新一天的重复任务或接收跨客户端变更。其 30 分钟平台刷新不精确，且可能被 Doze 推迟。在应用写入当前快照之前，`validUntil` 之前的快照不能被判定为过期。
 
-## Deliberate limitations
+## 有意限制
 
-- No task creation, undo, or per-task deep link.
-- Native widget chrome is English-only and uses fixed styling.
-- At most 20 tasks are rendered.
-- Cross-client freshness while the app is dead requires a separate background
-  sync design. The reminder worker's cursor is not an authoritative app-state
-  cursor; see
-  [Android background sync improvements](long-term-plans/android-background-sync-improvements.md).
+- 无任务创建、撤销或按任务深度链接。
+- 原生小组件外观仅英文，使用固定样式。
+- 最多渲染 20 个任务。
+- 应用死亡时的跨客户端新鲜度需要单独的后台同步设计。提醒 worker 的游标不是权威应用状态游标；见
+  [Android 后台同步改进](long-term-plans/android-background-sync-improvements.md)。
 
-Changes should preserve the single-writer snapshot, queued-intent delivery,
-logical-day boundary, and post-sync refresh invariants.
+改动应保持单写入者快照、队列意图投递、逻辑日边界与同步后刷新不变量。

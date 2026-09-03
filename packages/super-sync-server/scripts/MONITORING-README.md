@@ -1,8 +1,8 @@
-# SuperSync Monitoring & Analysis Tools
+# SuperSync 监控与分析工具
 
-Comprehensive suite of tools for monitoring and analyzing SuperSync server storage, operations, and user patterns.
+用于监控与分析 SuperSync 服务器存储、操作与用户模式的综合工具套件。
 
-## Quick Start
+## 快速开始
 
 ```bash
 # Run all monitoring checks
@@ -18,11 +18,11 @@ npm run monitor:all:save
 npm run monitor:all -- --user 29
 ```
 
-## Available Tools
+## 可用工具
 
-### 1. Basic Monitoring (`monitor.ts`)
+### 1. 基础监控（`monitor.ts`）
 
-General server health and user storage tracking.
+通用服务器健康与用户存储跟踪。
 
 ```bash
 # System vitals (CPU, memory, disk, DB)
@@ -48,9 +48,9 @@ npm run monitor:dev -- logs --search "error"
 npm run monitor:dev -- logs --error
 ```
 
-### 2. Storage Analysis (`analyze-storage.ts`)
+### 2. 存储分析（`analyze-storage.ts`）
 
-Deep-dive analysis for investigating storage anomalies and patterns.
+用于调查存储异常与模式的深度分析。
 
 ```bash
 # Analyze operation size distribution
@@ -84,26 +84,23 @@ npm run analyze-storage -- export-ops --user 29 --limit 1000
 npm run analyze-storage -- compare-users 27 29
 ```
 
-The all-user operation reports (`operation-sizes`, `operation-types`,
-`large-ops`, `rapid-fire`, `operation-timeline`, and `monitor -- ops`) sample the
-200 most recently active users by default. `MONITOR_SCOPE_USERS` moves that cap —
-raise it for a wider picture, lower it if a report hits the database
-`statement_timeout`. See [Performance Notes](#performance-notes).
+全用户操作报告（`operation-sizes`、`operation-types`、`large-ops`、`rapid-fire`、
+`operation-timeline` 与 `monitor -- ops`）默认采样最近最活跃的 200 个用户。
+`MONITOR_SCOPE_USERS` 可移动该上限 — 需要更宽画面时提高，若报告撞上数据库
+`statement_timeout` 则降低。参见 [性能说明](#性能说明)。
 
-It is an environment variable rather than a flag so that it also reaches the
-suite, which builds its own child command lines and forwards no per-report flags:
+它是环境变量而非标志，以便也能到达套件；套件自行构建子命令行且不转发每报告标志：
 
 ```bash
 MONITOR_SCOPE_USERS=500 npm run analyze-storage -- operation-sizes
 MONITOR_SCOPE_USERS=25 npm run monitor:all          # applies to all six reports
 ```
 
-Each report prints the population it actually measured, including how many users
-matched, so a truncated sample cannot be mistaken for a complete one.
+每个报告会打印其实际测量的总体，包括匹配了多少用户，因此截断样本不会被误认为完整总体。
 
-### 3. Complete Monitoring Suite (`run-all-monitoring.ts`)
+### 3. 完整监控套件（`run-all-monitoring.ts`）
 
-Runs all monitoring and analysis tools in sequence.
+按顺序运行所有监控与分析工具。
 
 ```bash
 # Run everything
@@ -119,25 +116,25 @@ npm run monitor:all:save
 npm run monitor:all -- --user 29 --save
 ```
 
-## Investigation Workflows
+## 调查工作流
 
-### Workflow 1: General Health Check
+### 工作流 1：通用健康检查
 
 ```bash
 npm run monitor:all:quick
 ```
 
-Review:
+审查：
 
-- System vitals
-- Top users by storage
-- Operation size distribution
-- Large operations
-- Rapid-fire detection
+- 系统生命体征
+- 按存储量排名的顶级用户
+- 操作大小分布
+- 大型操作
+- 快速连发检测
 
-### Workflow 2: Investigate User with High Storage
+### 工作流 2：调查高存储用户
 
-User has unusually high storage (e.g., User #29 with 28k operations):
+用户存储异常偏高（例如用户 #29 有 28k 操作）：
 
 ```bash
 # Step 1: Get complete picture
@@ -150,9 +147,9 @@ npm run analyze-storage -- rapid-fire --threshold 3
 npm run analyze-storage -- export-ops --user 29 --limit 5000
 ```
 
-### Workflow 3: Investigate Large Operations
+### 工作流 3：调查大型操作
 
-User has unusually large operations (e.g., User #27 with 54KB avg):
+用户操作异常偏大（例如用户 #27 平均 54KB）：
 
 ```bash
 # Step 1: Find the largest operations among currently-active users.
@@ -166,9 +163,9 @@ npm run analyze-storage -- user-deep-dive --user 27
 npm run analyze-storage -- compare-users 27 29
 ```
 
-### Workflow 4: Investigate Sync Loops
+### 工作流 4：调查同步循环
 
-Suspect a sync loop or rapid-fire operations:
+怀疑同步循环或快速连发操作：
 
 ```bash
 # Step 1: Detect rapid-fire (lower threshold)
@@ -181,9 +178,9 @@ npm run analyze-storage -- operation-timeline --user 29
 npm run analyze-storage -- operation-types --user 29
 ```
 
-### Workflow 5: Monthly Report
+### 工作流 5：月度报告
 
-Generate comprehensive monthly storage report:
+生成全面的月度存储报告：
 
 ```bash
 # Generate and save full report
@@ -193,257 +190,170 @@ npm run monitor:all:save
 npm run monitor:dev -- usage-history --tail 30
 ```
 
-### Workflow 6: Digging out of an ops backlog
+### 工作流 6：从操作积压中挖出
 
-Retention failing silently (see the `Cleanup [old-ops]` warnings in the server
-log) leaves a prunable backlog that the steady-state budget cannot clear: the
-sweep runs **once per day**, so the 25k default clears 25k/day — a 4.4M-row backlog
-takes about six months, and a few million takes months.
+保留静默失败（参见服务器日志中的 `Cleanup [old-ops]` 警告）会留下稳态预算无法清掉的
+可修剪积压：扫荡 **每天运行一次**，因此默认 25k 每天清 25k — 440 万行积压大约需要六个月，
+几百万行需要数月。
 
 ```bash
 npm run dry-run-old-ops-sweep     # read-only; predicts what would go
 ```
 
-Run it **off-peak**: it is two full aggregate passes over `operations` and will evict the
-page cache the live site depends on. It also _over_-predicts slightly — it mirrors the
-sweep's skip reasons in SQL, but it cannot model a user the sweep skips on a database
-error, which is exactly the deep-prefix cohort you are digging out of. The
-`N user(s) threw before their drain` count below is that discrepancy.
+**在非高峰运行**：它对 `operations` 做两遍完整聚合，会驱逐线上站点依赖的页缓存。它还会略微
+_过度_预测 — 它在 SQL 中镜像扫荡的跳过原因，但无法建模扫荡因数据库错误跳过的用户，而这正是
+你正在挖出的深前缀队列。下方的 `N user(s) threw before their drain` 计数就是该差异。
 
-Size `OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN` against that number so the backlog
-clears in a defined number of nights, then put it **back** to the default — a
-permanently high ceiling turns a future runaway into a bigger one. Raise in steps
-and watch three signals:
+对照该数字设定 `OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN`，使积压在确定的若干个夜间清完，然后
+**改回**默认值 — 永久偏高的上限会把未来的失控变成更大的失控。分步提高并观察三个信号：
 
-- `N user(s) failed mid-drain` — the **delete** batch is hitting the database
-  `statement_timeout`. Lower `OLD_OPS_CLEANUP_DELETE_BATCH_SIZE` (on a host with slow
-  cold reads, try 500–1000 rather than the 5000 default); do not raise the timeout.
-- `N user(s) threw before their drain` — a **probe** timed out on a deep prefix, before
-  anything was deleted. Lowering the batch size does not help; this is the cohort that
-  needs a partial index covering the causal-boundary probe (see the operations
-  runbook for the outage analysis and index SQL).
-- the pool-busy health alert — the sweep is competing with real traffic.
+- `N user(s) failed mid-drain` — **删除**批次撞上数据库 `statement_timeout`。降低
+  `OLD_OPS_CLEANUP_DELETE_BATCH_SIZE`（冷读慢的主机上尝试 500–1000 而非默认 5000）；
+  不要提高超时。
+- `N user(s) threw before their drain` — **探测**在深前缀上超时，任何内容被删除之前。降低
+  批次大小无济于事；这是需要覆盖因果边界探测的部分索引的队列（参见运维 runbook 中的故障分析与索引 SQL）。
+- 连接池繁忙健康告警 — 扫荡在与真实流量竞争。
 
-`Cleanup [old-ops]: abandoned the run after N consecutive candidate failures` means the
-fault is systemic (pool exhausted, cold cache, database down), not per-user; the sweep
-stopped on purpose rather than hammering the whole fleet at one timeout each.
+`Cleanup [old-ops]: abandoned the run after N consecutive candidate failures` 意味着故障是系统性的
+（池耗尽、冷缓存、数据库宕机），而非每用户；扫荡刻意停止，而不是以每个一次超时去锤整个舰队。
 
-Two things surprise people afterwards. Deleting millions of rows leaves that many
-dead tuples, so expect autovacuum work. And the table does **not** shrink on
-disk — `DELETE` returns space to PostgreSQL for reuse, not to the OS; only
-`VACUUM FULL` or `pg_repack` does that, both needing a maintenance window. Dumps
-shrink immediately either way, since `pg_dump` writes live rows only.
+之后有两件事会让人惊讶。删除数百万行会留下同样多的死元组，因此预期有 autovacuum 工作。
+而且表在磁盘上 **不会**缩小 — `DELETE` 把空间还给 PostgreSQL 以供重用，而非还给 OS；只有
+`VACUUM FULL` 或 `pg_repack` 会那样做，二者都需要维护窗口。无论如何转储会立即缩小，因为
+`pg_dump` 只写存活行。
 
-The daily sweep fires ~10s after the app starts and then every 24h, so the
-**restart time picks the hour it runs**. Restart at a quiet hour — and not during
-the backup window — if the sweep is heavy.
+每日扫荡在应用启动约 10 秒后触发，然后每 24 小时一次，因此 **重启时间决定它运行的小时**。
+若扫荡很重，请在安静时段重启 — 且不要在备份窗口期间。
 
-## Output Files
+## 输出文件
 
-- **Usage History**: `logs/usage-history.jsonl` - Appended by `monitor.ts usage`
-- **Analysis Exports**: `analysis-output/` - JSON exports from `export-ops`
-- **Full Reports**: `monitoring-reports/` - Timestamped reports from `monitor:all --save`
+- **用量历史**：`logs/usage-history.jsonl` — 由 `monitor.ts usage` 追加
+- **分析导出**：`analysis-output/` — 来自 `export-ops` 的 JSON 导出
+- **完整报告**：`monitoring-reports/` — 来自 `monitor:all --save` 的带时间戳报告
 
-## Common Patterns to Investigate
+## 常见需调查的模式
 
-### High Operation Count (>10k ops)
+### 高操作计数（>10k ops）
 
-Possible causes:
+可能原因：
 
-- Long-time user (check first_op timestamp)
-- Sync loop (check rapid-fire detection)
-- Small operations (check avg op size)
+- 长期用户（检查 first_op 时间戳）
+- 同步循环（检查快速连发检测）
+- 小操作（检查平均操作大小）
 
-**Investigate**: `user-deep-dive`, `operation-timeline`, `rapid-fire`
+**调查**：`user-deep-dive`、`operation-timeline`、`rapid-fire`
 
-### Large Average Operation Size (>10KB)
+### 大平均操作大小（>10KB）
 
-Possible causes:
+可能原因：
 
-- SYNC_IMPORT operations
-- Large task attachments
-- Bulk operations
+- SYNC_IMPORT 操作
+- 大任务附件
+- 批量操作
 
-**Investigate**: `large-ops`, `operation-types`, compare with normal users
+**调查**：`large-ops`、`operation-types`，与正常用户比较
 
-### Many Operations per Second
+### 每秒大量操作
 
-Possible causes:
+可能原因：
 
-- Sync loop between devices
-- Rapid user interaction
-- Buggy client
+- 设备间同步循环
+- 快速用户交互
+- 有缺陷的客户端
 
-**Investigate**: `rapid-fire`, `operation-timeline`, per-device breakdown in `user-deep-dive`
+**调查**：`rapid-fire`、`operation-timeline`、`user-deep-dive` 中的每设备分解
 
-### Large Snapshots
+### 大快照
 
-Possible causes:
+可能原因：
 
-- High operation count triggering snapshot
-- Large state size
+- 高操作计数触发快照
+- 大状态大小
 
-**Investigate**: `snapshot-analysis`, correlation with op count
+**调查**：`snapshot-analysis`，与操作计数的相关性
 
-## Alerting (health-alert.sh)
+## 告警（health-alert.sh）
 
-The reports above are things you go and read. `health-alert.sh` is the only thing
-that comes and finds you, and it is **the piece that has to be installed** — it
-is not started by `deploy.sh` and nothing else runs it:
+上面的报告是你去读的东西。`health-alert.sh` 是唯一会来找你的东西，而且它是
+**必须安装的那一块** — `deploy.sh` 不会启动它，也没有其他东西会运行它：
 
 ```bash
 (crontab -l 2>/dev/null; echo "*/5 * * * * ALERT_EMAIL=you@example.com /path/to/super-sync-server/scripts/health-alert.sh") | crontab -
 ```
 
-### The cron entry is not enough — you also need an MTA
+### 仅有 cron 条目不够 — 你还需要 MTA
 
-`ALERT_EMAIL` plus the crontab line above gets the _checks_ running. Delivering
-their result needs a working `mail` command, and stock Debian and Ubuntu have
-none. Install `mailutils` or `bsd-mailx` — those provide `mail` itself. Neither
-`msmtp` nor `msmtp-mta` does: msmtp is a transport and `msmtp-mta` only supplies
-the `sendmail` interface underneath, so installing it alone leaves the check
-still failing. Use it _in addition to_ `bsd-mailx` if msmtp is your relay.
+`ALERT_EMAIL` 加上上面的 crontab 行能让_检查_跑起来。投递其结果需要可用的 `mail` 命令，
+而标准 Debian 与 Ubuntu 没有。安装 `mailutils` 或 `bsd-mailx` — 它们提供 `mail` 本身。
+`msmtp` 与 `msmtp-mta` 都不行：msmtp 是传输，`msmtp-mta` 只在底下提供 `sendmail` 接口，
+因此单独安装它仍会让检查失败。若 msmtp 是你的中继，请_额外_配合 `bsd-mailx` 使用。
 
-`health-alert.sh` checks for the binary on every run and records its absence
-in `.health-alert/mail-failed`, which `deploy.sh` surfaces. The same marker
-pattern carries `.health-alert/oom-check-blind` (see the OOM section below):
-conditions that mean _a check could not run_ are reported at deploy time, never
-in the alert body, so they cannot keep `PROBLEMS` permanently non-empty and
-disable the recovery mail. Confirm delivery end to end before trusting the
-setup:
+`health-alert.sh` 每次运行都会检查该二进制，并将其缺失记录在 `.health-alert/mail-failed`，
+由 `deploy.sh` 呈现。相同的标记模式承载 `.health-alert/oom-check-blind`（见下方 OOM 章节）：
+意味着_检查无法运行_的条件在部署时报告，从不进入告警正文，以免它们永久保持 `PROBLEMS`
+非空并禁用恢复邮件。在信任该设置之前端到端确认投递：
 
 ```bash
 echo test | mail -s 'SuperSync test' you@example.com
 ```
 
-A queuing MTA exits 0 on accept, not on delivery, so check the message actually
-arrived. If it did not, `mailx` writes the undelivered body to `~/dead.letter`
-for the cron user.
+排队型 MTA 在接受时退出 0，而非在投递时，因此请检查消息是否真正到达。若未到达，
+`mailx` 会将未投递正文写入 cron 用户的 `~/dead.letter`。
 
-`deploy.sh` reports at the end of every successful deploy whether this exact cron exists,
-whether it is still completing, and why the last attempted email failed. If it
-says the cron is missing, nothing is watching the server.
+`deploy.sh` 在每次成功部署结束时报告该确切 cron 是否存在、是否仍在完成，以及上次尝试发信
+为何失败。若它说 cron 缺失，则没有任何东西在监视服务器。
 
-If the cron was already running _before_ you installed the MTA, the missing-binary
-marker gets you that proof for free: the next healthy run sends one
-`SuperSync OK: Health Check Recovered` message and clears the marker. In the other
-order nothing is sent on a healthy server, so use the manual test above.
+若在安装 MTA _之前_ cron 已在运行，缺失二进制标记会免费给你该证明：下一次健康运行会发送一条
+`SuperSync OK: Health Check Recovered` 消息并清除标记。另一顺序下健康服务器不会发信，
+因此使用上面的手动测试。
 
-The `Reason:` line `deploy.sh` prints comes from your MTA and can name the recipient
-address and the relay host — redact it before pasting into an issue.
+`deploy.sh` 打印的 `Reason:` 行来自你的 MTA，可能点名收件人地址与中继主机 — 粘贴到 issue 前请脱敏。
 
-### What it checks
+### 它检查什么
 
-| #     | Check                                                 | Fires when                                                                                                                                                                                                             |
+| #     | 检查                                                  | 触发条件                                                                                                                                                                                                               |
 | ----- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0,1,3 | Docker daemon, container state/health, restart counts | a container is down, unhealthy, or crash-looping. A stopped container reports its exit code (`state: exited (exit 128)`)                                                                                               |
-| 2     | OOM kills (kernel log)                                | an OOM kill in the last 6 min. Needs the cron user to read the kernel log (`systemd-journal`, or `adm`); otherwise skipped and reported via the marker below, never as a health finding. Runs even when Docker is down |
-| 4     | `/health` endpoint                                    | HTTP != 200                                                                                                                                                                                                            |
-| 5     | Disk usage                                            | > 85%                                                                                                                                                                                                                  |
-| 6     | Long-running queries                                  | any query `active` > `MAX_QUERY_SECONDS` (default 120)                                                                                                                                                                 |
-| 7     | Pool busy                                             | connections concurrently busy ≥ `POOL_WARN_PCT`% (default 75) of `connection_limit` in **two consecutive runs**                                                                                                        |
-| 8     | Invalid operations indexes                            | a non-building index is not valid/ready/live                                                                                                                                                                           |
-| 9     | PostgreSQL in-place crash-restart                     | the postmaster logged `all server processes terminated; reinitializing` in the last 6 min — a backend crash plus WAL recovery inside the still-running container                                                       |
+| 0,1,3 | Docker 守护进程、容器状态/健康、重启计数              | 容器宕机、不健康或崩溃循环。已停止的容器报告其退出码（`state: exited (exit 128)`）                                                                                                                                     |
+| 2     | OOM 杀死（内核日志）                                  | 最近 6 分钟内有 OOM kill。需要 cron 用户能读内核日志（`systemd-journal` 或 `adm`）；否则跳过并通过下方标记报告，从不作为健康发现。即使 Docker 宕机也会运行                                                                 |
+| 4     | `/health` 端点                                        | HTTP != 200                                                                                                                                                                                                            |
+| 5     | 磁盘用量                                              | > 85%                                                                                                                                                                                                                  |
+| 6     | 长时间运行查询                                        | 任何查询 `active` > `MAX_QUERY_SECONDS`（默认 120）                                                                                                                                                                    |
+| 7     | 连接池繁忙                                            | 并发繁忙连接 ≥ `connection_limit` 的 `POOL_WARN_PCT`%（默认 75），且在 **连续两次运行** 中如此                                                                                                                         |
+| 8     | 关键操作索引                                          | 非构建中的索引无效/未就绪/未上线                                                                                                                                                                                       |
+| 9     | PostgreSQL 原地崩溃重启                               | postmaster 在最近 6 分钟内记录了 `all server processes terminated; reinitializing` — 在仍运行的容器内发生后端崩溃加 WAL 恢复                                                                                           |
 
-Check 2 runs outside the Docker gate on purpose: a host that just OOM-killed something
-is exactly when `docker info` is least likely to answer.
+检查 2 刻意在 Docker 门控外运行：刚 OOM 杀死了什么的主机，正是 `docker info` 最不可能应答之时。
 
-Checks 0–5 detect the outage once containers or `/health` fail. Checks 6–8 inspect
-the database through the app container and catch the precursor while the server
-can still answer. This also works when `POSTGRES_SERVICE=` selects an external
-database. A failed/malformed probe and a missing `connection_limit` are themselves
-alertable problems, so the new checks cannot silently become inert.
+检查 0–5 在容器或 `/health` 失败时检测中断。检查 6–8 通过应用容器检查数据库，并在服务器仍能应答时捕获前兆。当 `POSTGRES_SERVICE=` 选择外部数据库时这也有效。失败/畸形探测与缺失的 `connection_limit` 本身就是可告警问题，因此新检查不会静默变成惰性。
 
-Check 7 counts connections that are **busy** — `active`, or holding an open
-transaction — not connections the pool has open. Prisma keeps its connections
-open after use, so a healthy server sits near `connection_limit` in _occupancy_
-essentially all the time while this check correctly reads low: on the hosted
-server, 57 of 60 connections were open and `idle` while the probe reported 0.
-That is why the alert says "busy" and not "saturated" — the number that moves is
-concurrency, and it is the one worth paging on. It also means an `idle in
-transaction` leak shows up here but **never** in check 6, whose age is measured
-only for `active` sessions. The count is database-wide for the sync user — a
-migrator, the monitor, or a second replica all add to it — while the limit is one
-client's pool cap, so the percentage can legitimately exceed 100. The threshold is
-deliberately a **ratio** against `connection_limit`, not a fixed number: measured steady state sits the same order
-of magnitude below the pathological-query ceiling (pool size ÷ worst-case query
-duration), so the absolute margin is thin and a fixed threshold would not survive
-a pool resize.
+检查 7 计数 **繁忙** 的连接 — `active`，或持有打开事务 — 而非池已打开的连接。Prisma 在使用后保持连接打开，因此健康服务器在_占用率_上几乎始终接近 `connection_limit`，而本检查正确读低：在托管服务器上，60 个连接中有 57 个打开且为 `idle`，而探测报告 0。这就是为何告警说「繁忙」而非「饱和」— 会动的数字是并发，也是值得叫人的那个。这也意味着 `idle in transaction` 泄漏会出现在这里，但 **从不** 出现在检查 6，其年龄仅对 `active` 会话测量。计数对同步用户是数据库范围的 — 迁移器、监控器或第二副本都会计入 — 而上限是一个客户端的池上限，因此百分比可以合理地超过 100。阈值刻意是相对 `connection_limit` 的 **比率**，而非固定数字：实测稳态与病理查询上限（池大小 ÷ 最坏情况查询时长）处于同一数量级，因此绝对余量很薄，固定阈值无法在池调整大小后存活。
 
-Check 7 is also the only one that pages on **persistence**: the crossing must be
-seen in two consecutive runs (~10 min). It samples an instantaneous gauge, and a
-single crossing is routinely a stampede that self-heals within one interval —
-the morning of 2026-08-27 produced three fail+recovery pairs that way
-(hourly-aligned client sync at 04:00Z/06:00Z, the reconnect herd after a deploy
-restart at 07:00Z). Sustained exhaustion still pages, one interval later. The
-pending marker (`.health-alert/pool-busy-pending`) ages out after three
-intervals, so a gap of three or more intervals cannot weld two unrelated spikes
-into a "sustained" condition (a shorter blind gap — a probe failure between two
-spikes — still can, costing one bounded false pair).
+检查 7 也是唯一按 **持续性** 叫人的：必须在连续两次运行（约 10 分钟）中看到越界。它采样瞬时仪表，单次越界通常是一次间隔内自愈的踩踏 — 2026-08-27 早晨就这样产生了三对失败+恢复（04:00Z/06:00Z 的按小时对齐客户端同步，07:00Z 部署重启后的重连羊群）。持续耗尽仍会叫人，晚一个间隔。待定标记（`.health-alert/pool-busy-pending`）在三个间隔后过期，因此三个或更多间隔的空隙不会把两次无关尖峰焊成「持续」条件（更短的盲隙 — 两次尖峰之间的探测失败 — 仍可以，代价是一对有界误报）。
 
-Check 8 matters more than it looks. An interrupted `CREATE INDEX CONCURRENTLY`
-leaves an index that is **unusable for reads but still maintained on every
-insert**. If `operations_entity_ids_gin` were the invalid one, the conflict
-lookup would silently degrade to a sequential scan on every upload, permanently,
-and nothing else in the codebase would report it.
+检查 8 比看起来更重要。被中断的 `CREATE INDEX CONCURRENTLY` 会留下 **对读不可用但仍在每次插入时维护** 的索引。若 `operations_entity_ids_gin` 是无效的那个，冲突查找会在每次上传时静默退化为顺序扫描，永久如此，且代码库中没有任何其他东西会报告它。
 
-Check 9 exists because PostgreSQL recovers from a backend crash **inside** the
-running container: the postmaster terminates every connection, re-runs WAL
-recovery, and is answering again within seconds. `RestartCount` stays 0, the
-container never leaves `running`, and the compose healthcheck needs five
-consecutive failed probes — so checks 0–3 are all structurally blind to it. The
-hosted server crash-restarted 45 times over three months before the first one
-was noticed ([#9695](https://github.com/super-productivity/super-productivity/issues/9695));
-users see each one only as a failed sync. The check reads the postgres container
-log directly (the app-container probe cannot: the crash kills its connection),
-so it is skipped when `POSTGRES_SERVICE=` selects an external database — an
-external database's availability still surfaces through checks 4 and 6–8.
+检查 9 存在是因为 PostgreSQL 在运行中的容器 **内部** 从后端崩溃恢复：postmaster 终止每个连接，重新运行 WAL 恢复，并在数秒内再次应答。`RestartCount` 保持 0，容器从不离开 `running`，而 compose 健康检查需要连续五次失败探测 — 因此检查 0–3 在结构上对其全部盲目。托管服务器在三个月内崩溃重启了 45 次才注意到第一次（[#9695](https://github.com/super-productivity/super-productivity/issues/9695)）；用户每次只看到同步失败。该检查直接读取 postgres 容器日志（应用容器探测做不到：崩溃会杀死其连接），因此当 `POSTGRES_SERVICE=` 选择外部数据库时会跳过 — 外部数据库的可用性仍通过检查 4 与 6–8 显现。
 
-The known migrator and the nightly backup (`backup.sh`, which tags its `pg_dump`
-sessions `supersync-backup`) are excluded from the long-query check — a full dump
-legitimately runs for hours, and an alert that fires on a timetable teaches you to
-ignore the channel. Both still count toward check 7, so a dump that genuinely
-starves the pool is still caught. Indexes currently
-listed in `pg_stat_progress_create_index`, and invalid indexes carrying the
-exact DDL lock held by an active migrator, are excluded from check 8. The latter
-also covers `DROP INDEX CONCURRENTLY`, which has no progress-view entry, without
-hiding unrelated invalid indexes. Each migration run has a unique database
-application id; its finite database/client timeouts and targeted backend cleanup
-bound interrupted DDL without generating incident/recovery noise.
+已知的迁移器与夜间备份（`backup.sh`，将其 `pg_dump` 会话标记为 `supersync-backup`）被排除在长查询检查之外 — 完整转储合理地运行数小时，按时间表触发的告警会教你忽略该渠道。二者仍计入检查 7，因此真正饿死连接池的转储仍会被抓住。当前列在 `pg_stat_progress_create_index` 中的索引，以及携带活跃迁移器所持有的确切 DDL 锁的无效索引，被排除在检查 8 之外。后者也覆盖没有进度视图条目的 `DROP INDEX CONCURRENTLY`，同时不隐藏无关的无效索引。每次迁移运行有唯一的数据库 application id；其有限的数据库/客户端超时与定向后端清理在不产生事故/恢复噪声的情况下约束被中断的 DDL。
 
-### Alert damping
+### 告警阻尼
 
-Repeat alerts for the same problem are suppressed by a content hash, so counts,
-durations and the probe's exit status are normalised out — you get one mail per
-distinct problem, plus a recovery mail when it clears.
+同一问题的重复告警按内容哈希抑制，因此计数、时长与探测的退出状态被归一化掉 — 每个不同问题你收到一封邮件，清除时另有一封恢复邮件。
 
-On top of that, two rules bound how loud a single incident can get. They exist
-because one incident is routinely reported as several different problems: a long
-query saturates the pool, the health probe then times out behind it, and the
-status it dies with alternates run to run (124 timeout, 143 SIGTERM, 128 exec
-failure). Every one of those is a different hash, and a single-slot state file
-re-mailed on every flip.
+除此之外，两条规则限制单个事故能有多吵。它们存在是因为一次事故通常被报告为几个不同问题：长查询使连接池饱和，健康探测随后在其后超时，且其死亡时的状态在运行间交替（124 超时、143 SIGTERM、128 exec 失败）。每一个都是不同哈希，而单槽状态文件在每次翻转时重新发信。
 
-| Rule                                                               | Tunable                           |
+| 规则                                                               | 可调项                            |
 | ------------------------------------------------------------------ | --------------------------------- |
-| A problem already mailed in the current incident never mails again | —                                 |
-| Recovery needs this many consecutive healthy runs                  | `RECOVERY_CLEAN_RUNS` (default 2) |
+| 当前事故中已发过信的问题不再发信                                   | —                                 |
+| 恢复需要这么多次连续健康运行                                       | `RECOVERY_CLEAN_RUNS`（默认 2）   |
 
-There is deliberately **no** minimum gap between alert mails: normalisation
-already collapses every volatile field, so a hash that is genuinely new means a
-symptom nobody has been told about yet, and a blanket rate cap would hold a
-disk-95% or OOM alert for half an hour because an unrelated minor problem mailed
-first. `RECOVERY_CLEAN_RUNS` falls back to its default on a bad value rather than
-joining `CONFIG_PROBLEMS`: that string is the alert body _and_ the dedupe input,
-so a typo there would keep `PROBLEMS` permanently non-empty and disable the
-recovery mail — the same trap as the OOM marker.
+刻意 **没有** 告警邮件之间的最小间隔：归一化已折叠每个易变字段，因此真正新的哈希意味着尚无人得知的症状，而一刀切的速率上限会因无关的次要问题先发信而把磁盘 95% 或 OOM 告警压半小时。坏值时 `RECOVERY_CLEAN_RUNS` 回退到默认值而非加入 `CONFIG_PROBLEMS`：该字符串是告警正文 _也是_ 去重输入，因此那里的拼写错误会永久保持 `PROBLEMS` 非空并禁用恢复邮件 — 与 OOM 标记相同的陷阱。
 
-State lives in `.health-alert/`: `state` (one hash per line: the problems already
-mailed in this incident) and `clean-runs`.
+状态位于 `.health-alert/`：`state`（每行一个哈希：本事故中已发过信的问题）与 `clean-runs`。
 
-## Automation
+## 自动化
 
-You can set up cron jobs for regular monitoring:
+你可以为定期监控设置 cron 任务：
 
 ```bash
 # Daily health check at 2 AM
@@ -456,177 +366,144 @@ You can set up cron jobs for regular monitoring:
 0 * * * * cd /path/to/super-sync-server && npm run analyze-storage -- rapid-fire >> logs/rapid-fire.log 2>&1
 ```
 
-## Tips
+## 技巧
 
-1. **Start broad, then narrow**: Use `monitor:all:quick` first, then drill down with specific commands
-2. **Always save significant findings**: Use `--save` or redirect output to files
-3. **Compare users**: Use `compare-users` to understand what's "normal" vs anomalous
-4. **Export for deep analysis**: Use `export-ops` to get raw data for custom analysis
-5. **Watch trends**: Regular `usage-history` checks reveal growth patterns
+1. **先广后窄**：先用 `monitor:all:quick`，再用具体命令下钻
+2. **始终保存重要发现**：使用 `--save` 或将输出重定向到文件
+3. **比较用户**：用 `compare-users` 理解什么是「正常」与异常
+4. **导出做深度分析**：用 `export-ops` 获取原始数据做自定义分析
+5. **观察趋势**：定期 `usage-history` 检查揭示增长模式
 
-## Troubleshooting
+## 故障排除
 
-### "Database connection failed"
+### 「Database connection failed」
 
-- Check DATABASE_URL in .env
-- Ensure PostgreSQL is running
-- Verify network access
+- 检查 .env 中的 DATABASE_URL
+- 确保 PostgreSQL 在运行
+- 验证网络访问
 
-### "Command not found: tsx"
+### 「Command not found: tsx」
 
-- Install tsx globally: `npm install -g tsx`
-- Or use npx: `npx tsx scripts/analyze-storage.ts ...`
+- 全局安装 tsx：`npm install -g tsx`
+- 或使用 npx：`npx tsx scripts/analyze-storage.ts ...`
 
-### "Out of memory"
+### 「Out of memory」
 
-- Reduce `--limit` values
-- Run in quick mode
-- Increase Node.js heap: `NODE_OPTIONS=--max-old-space-size=4096 npm run ...`
+- 降低 `--limit` 值
+- 以快速模式运行
+- 增加 Node.js 堆：`NODE_OPTIONS=--max-old-space-size=4096 npm run ...`
 
-### `deploy.sh` warns "OOM detection is BLIND"
+### `deploy.sh` 警告「OOM detection is BLIND」
 
-The OOM check reads `journalctl -k`. A cron user outside `adm`/`systemd-journal`
-— or any host without systemd — gets no output and **exit 0**, so before
-2026-08-25 the check silently could never fire and the absence of an OOM alert
-was not evidence of no OOM. It now probes readability first.
+OOM 检查读取 `journalctl -k`。不在 `adm`/`systemd-journal` 中的 cron 用户 —
+或任何没有 systemd 的主机 — 得不到输出且 **exit 0**，因此在 2026-08-25 之前该检查
+可能静默地永远不触发，而没有 OOM 告警并不证明没有 OOM。现在它会先探测可读性。
 
-An unreadable kernel log is a broken capability, not an unhealthy service, so it
-is recorded in `.health-alert/oom-check-blind` and surfaced by `deploy.sh`
-alongside the `mail-failed` marker — deliberately **not** added to the alert
-body. Putting it there would keep `PROBLEMS` permanently non-empty, and
-`[ -n "$PROBLEMS" ]` gates the recovery branch, so `Health Check Recovered`
-could never be sent again on a host that merely lacks a group. (Alerts
-themselves would keep arriving: the dedupe key is a content hash, so a new
-problem still changes the hash and still mails.)
+不可读的内核日志是损坏的能力，而非不健康的服务，因此记录在 `.health-alert/oom-check-blind`
+并由 `deploy.sh` 与 `mail-failed` 标记一并呈现 — 刻意 **不** 加入告警正文。放在那里会
+永久保持 `PROBLEMS` 非空，而 `[ -n "$PROBLEMS" ]` 门控恢复分支，因此仅缺一个组的主机上
+`Health Check Recovered` 将永远无法再发送。（告警本身会继续到达：去重键是内容哈希，
+因此新问题仍会改变哈希并仍会发信。）
 
-Fix it rather than ignoring it: `sudo usermod -aG systemd-journal "$USER"`
-(re-login required). Prefer `systemd-journal` over `adm` — it grants the journal
-read and nothing else, where `adm` also opens `/var/log` broadly. Running the
-cron as root works too but grants far more than this one read needs. The marker
-clears itself on the next run once the log is readable.
+请修复而非忽略：`sudo usermod -aG systemd-journal "$USER"`
+（需要重新登录）。优先 `systemd-journal` 而非 `adm` — 它只授予日志读取而无其他，
+而 `adm` 还广泛打开 `/var/log`。以 root 运行 cron 也行，但授予的远超这一次读取所需。
+日志可读后标记在下次运行时自行清除。
 
-### "PostgreSQL canceled this query because it exceeded statement_timeout"
+### 「PostgreSQL canceled this query because it exceeded statement_timeout」
 
-The reports no longer inherit the deployment's `statement_timeout`. `monitoring-db.ts`
-appends its own to the connection string (`MONITOR_STATEMENT_TIMEOUT_MS`, default
-300000ms) because the deployment's value is sized for user-facing sync requests,
-where a slow query means someone is waiting — the wrong budget for a report.
+报告不再继承部署的 `statement_timeout`。`monitoring-db.ts` 在连接字符串上追加自己的
+（`MONITOR_STATEMENT_TIMEOUT_MS`，默认 300000ms），因为部署的值是为面向用户的同步请求
+定尺寸的，慢查询意味着有人在等待 — 对报告而言是错误的预算。
 
-This also means monitoring is capped on a stock instance, which sets **none**
-(`statement_timeout` is an opt-in recovery guardrail in `env.example`, and
-`docker-compose.yml` deliberately leaves it off). That retires the old failure
-shape here — a slow report holding a pool connection until someone killed it, the
-shape of the 2026-07-20 incident — at the cost that a stock-instance report which
-used to grind on for 400s now gets cancelled. Raise the variable when that is the
-one you want.
+这也意味着监控在标准实例上是有上限的，标准实例设置了 **无**
+（`statement_timeout` 是 `env.example` 中的可选恢复护栏，且 `docker-compose.yml` 刻意不打开）。
+这退役了这里的旧失败形态 — 慢报告占用池连接直到有人杀死它，即 2026-07-20 事故的形态 —
+代价是曾经会磨上 400 秒的标准实例报告现在会被取消。当你想要那个时再提高该变量。
 
-The app's own sessions are still uncapped on a stock instance. To end one, find it
-with `SELECT pid, query_start, left(query, 80) FROM pg_stat_activity WHERE state = 'active'`
-and stop it with `SELECT pg_cancel_backend(<pid>)`. Monitoring sessions identify
-themselves as `application_name = 'supersync-monitor'`, which is also how
-`health-alert.sh` knows not to page about a long-running report.
+应用自己的会话在标准实例上仍无上限。要结束其中一个，用
+`SELECT pid, query_start, left(query, 80) FROM pg_stat_activity WHERE state = 'active'`
+找到它，并用 `SELECT pg_cancel_backend(<pid>)` 停止它。监控会话将自己标识为
+`application_name = 'supersync-monitor'`，这也是 `health-alert.sh` 知道不对长时间运行报告叫人的方式。
 
-- **Check the `payload_bytes` backfill first.** Rows still at 0 make every size
-  expression read the payload itself, an out-of-line TOAST fetch per row and by
-  far the largest per-row cost in these reports — measured at 6.5x the blocks and
-  10.7x the time of the backfilled path. `SELECT EXISTS (SELECT 1 FROM operations
-WHERE payload_bytes = 0)` answers it through a partial index in one probe.
-  `npm run migrate-payload-bytes` fixes it; it is safe to run online (batched,
-  primary-key updates, no table lock) but it is a long backfill, not a quick fix.
-- **Raise `MONITOR_STATEMENT_TIMEOUT_MS` before shrinking the sample.** These
-  scripts do not inherit the operator's request-path timeout: `monitoring-db.ts`
-  appends its own (default 300000ms) to the connection string, because a budget
-  sized so a user is not left waiting on a sync is the wrong budget for a
-  fleet-wide report. If a report cancels anyway, the honest question is whether
-  it needs longer or is genuinely pathological — raise this first, and only then
-  cut the sample, so you find out which.
-- Lower `MONITOR_SCOPE_USERS`; it is what bounds these reports' cost
-  (`MONITOR_SCOPE_USERS=25 npm run monitor:all`).
-- Scope to one account with `--user <id>` — supported by `operation-sizes`,
-  `operation-types`, `operation-timeline` and `monitor -- ops`. `large-ops` and
-  `rapid-fire` are fleet-wide only.
-- If a report is still slow at a small `MONITOR_SCOPE_USERS`, the database itself
-  is under load — check `monitor -- stats` and the long-query alert in
-  `health-alert.sh`.
+- **先检查 `payload_bytes` 回填。** 仍为 0 的行使每个大小表达式读取载荷本身，每行一次行外
+  TOAST 取回，是这些报告中最大的每行成本 — 实测为回填路径的 6.5 倍块与 10.7 倍时间。
+  `SELECT EXISTS (SELECT 1 FROM operations WHERE payload_bytes = 0)` 通过部分索引一次探测即可回答。
+  `npm run migrate-payload-bytes` 修复它；可在线安全运行（分批、主键更新、无表锁），
+  但是长回填，不是快速修复。
+- **在缩小样本之前提高 `MONITOR_STATEMENT_TIMEOUT_MS`。** 这些脚本不继承运营者的请求路径超时：
+  `monitoring-db.ts` 在连接字符串上追加自己的（默认 300000ms），因为按用户不等待同步定尺寸的预算
+  对舰队级报告是错误的预算。若报告仍被取消，诚实的问题是它需要更久还是真正病态 —
+  先提高这个，然后才削减样本，这样你才能知道是哪一个。
+- 降低 `MONITOR_SCOPE_USERS`；它是约束这些报告成本的东西
+  （`MONITOR_SCOPE_USERS=25 npm run monitor:all`）。
+- 用 `--user <id>` 限定到一个账户 — `operation-sizes`、`operation-types`、`operation-timeline`
+  与 `monitor -- ops` 支持。`large-ops` 与 `rapid-fire` 仅舰队级。
+- 若报告在较小的 `MONITOR_SCOPE_USERS` 下仍慢，数据库本身负载过高 — 检查 `monitor -- stats`
+  与 `health-alert.sh` 中的长查询告警。
 
-## Development
+## 开发
 
-To add new analysis commands:
+要添加新的分析命令：
 
-1. Add function to `scripts/analyze-storage.ts`
-2. Add case to `main()` switch
-3. Update `getMonitoringCommands()` in `run-all-monitoring.ts` if it should run in full suite
-4. Document here
-5. **If it reads `operations`,** drive it from `resolveOperationScope()` in
-   `scripts/monitoring-scope.ts` and add it to `ALL_USER_OPERATION_REPORTS` in
-   `tests/monitoring-scripts.spec.ts`. That test is what keeps the bound below
-   from silently regressing; a new report not listed there is unchecked.
+1. 向 `scripts/analyze-storage.ts` 添加函数
+2. 向 `main()` 的 switch 添加分支
+3. 若应在完整套件中运行，更新 `run-all-monitoring.ts` 中的 `getMonitoringCommands()`
+4. 在此文档中记录
+5. **若它读取 `operations`，** 通过 `scripts/monitoring-scope.ts` 中的 `resolveOperationScope()`
+   驱动它，并将其加入 `tests/monitoring-scripts.spec.ts` 中的 `ALL_USER_OPERATION_REPORTS`。
+   该测试保证下方边界不会静默回退；未列在那里的新报告未受检查。
 
-## Performance Notes
+## 性能说明
 
-Wall-clock timings depend on the instance and have not been re-measured since the
-bounding rewrite; treat the structure below as the contract, not the durations.
+墙钟时间取决于实例，且自边界重写以来未重新测量；将下方结构视为契约，而非时长。
 
-### How the operations reports stay bounded
+### 操作报告如何保持有界
 
-`ops`, `operation-sizes`, `operation-types`, `large-ops`, `rapid-fire` and
-`operation-timeline` are the reports that read `operations`, by far the largest
-table. They all share one driver (`resolveOperationScope()` in
-`scripts/monitoring-scope.ts`): the `MONITOR_SCOPE_USERS` most recently active
-users by device heartbeat, and for each of them a tail of the newest operations
-read backwards through the `(user_id, server_seq)` index.
+`ops`、`operation-sizes`、`operation-types`、`large-ops`、`rapid-fire` 与
+`operation-timeline` 是读取 `operations` 的报告，该表是目前最大的。它们共享一个驱动
+（`scripts/monitoring-scope.ts` 中的 `resolveOperationScope()`）：按设备心跳的
+`MONITOR_SCOPE_USERS` 个最近最活跃用户，并对每个用户通过 `(user_id, server_seq)` 索引
+向后读取最新操作的尾部。
 
-**Work against `operations` is therefore `users x tail` and does not grow with
-the table.** Measured on an 8,610-account / 1.1M-operation fixture: 200 index
-descents, ~1,500 blocks, flat when the operations table shrank 10x. `monitor ops`
-in particular went from 68,919 blocks and a 430-block temp spill to 1,720 blocks.
+**对 `operations` 的工作因此是 `users x tail`，且不随表增长。** 在 8610 账户 / 110 万操作的
+fixture 上实测：200 次索引下降，约 1500 块，当操作表缩小 10 倍时保持平坦。尤其是
+`monitor ops` 从 68919 块与 430 块临时溢出变为 1720 块。
 
-The _driver_ is a different matter and is deliberately not claimed to be
-constant: `sync_devices` has no index on `last_seen_at`, so selecting the top N
-is a sequential scan plus a top-N sort, linear in device count. It is small (72
-blocks / 15ms at 8,610 accounts, measured) and it never touches `operations`, but
-it is the next term that will bind — at 861,000 devices it is 10,476 blocks and
-1.1s. An index on `sync_devices (last_seen_at)` is the fix if it ever matters.
+_驱动_是另一回事，且刻意不声称恒定：`sync_devices` 在 `last_seen_at` 上没有索引，因此选择
+前 N 是顺序扫描加 top-N 排序，与设备数线性相关。它很小（8610 账户时 72 块 / 15ms，实测）
+且从不触及 `operations`，但它是下一个会绑定的项 — 在 861000 设备时是 10476 块与 1.1s。
+若它曾经重要，`sync_devices (last_seen_at)` 上的索引是修复。
 
-That bound is the whole point, so keep it when editing these queries:
+该边界是全部意义所在，因此编辑这些查询时请保持它：
 
-- Never drive a per-user tail from `users`, `user_sync_state`, or an uncapped
-  `sync_devices` scan. Those grow with every signup, including accounts that
-  stopped syncing years ago.
-- Resolve the scope **once per report** and reuse the user list across its
-  statements. Live heartbeats reorder `sync_devices` continuously, so re-running
-  the driver per statement lets one report's tables describe different
-  populations — `operation-types` has three tables, `operation-sizes` two.
-- Never sample the table itself (`TABLESAMPLE SYSTEM (1)` and friends). One
-  percent of a table that keeps growing is not a bound.
-- Compute the size expression **at the scan**, never over a CTE that projects
-  `payload` forward. The extra materialisation pass copies every inline-stored
-  payload and spills it to temp files (measured 46ms/559 temp blocks vs
-  17ms/none on 20k 12KB rows).
-- Keep `received_at` windows outside the per-user tail. Inside it, the LIMIT no
-  longer bounds anything: Postgres walks the user's whole history looking for
-  matches.
+- 从不从 `users`、`user_sync_state` 或无上限的 `sync_devices` 扫描驱动每用户尾部。那些随每次
+  注册增长，包括多年前停止同步的账户。
+- **每个报告解析一次** 范围，并在其语句间重用用户列表。实时心跳持续重排 `sync_devices`，
+  因此每语句重新运行驱动会让同一报告的表格描述不同总体 — `operation-types` 有三张表，
+  `operation-sizes` 有两张。
+- 从不对表本身采样（`TABLESAMPLE SYSTEM (1)` 之类）。持续增长的表的百分之一不是边界。
+- 在扫描处计算大小表达式，从不在将 `payload` 向前投影的 CTE 上计算。额外的物化遍次复制每个
+  内联存储的载荷并将其溢出到临时文件（实测 20k 条 12KB 行上 46ms/559 临时块 vs 17ms/无）。
+- 将 `received_at` 窗口保持在每用户尾部之外。在其内部，LIMIT 不再约束任何东西：Postgres
+  会遍历用户的全部历史寻找匹配。
 
-These reports are samples of recent activity, not full-history statistics — the
-printed header says exactly which population each one measured and how many users
-matched. `operation-sizes`, `operation-types`, `operation-timeline` and
-`monitor -- ops` accept `--user <id>` to read one account's index tail directly
-instead of sampling the fleet; `large-ops` and `rapid-fire` do not.
+这些报告是近期活动的样本，而非全历史统计 — 打印的页头准确说明每个测量了哪个总体以及匹配了
+多少用户。`operation-sizes`、`operation-types`、`operation-timeline` 与 `monitor -- ops`
+接受 `--user <id>` 以直接读取一个账户的索引尾部而非采样舰队；`large-ops` 与 `rapid-fire` 不接受。
 
-One capability was genuinely lost: `large-ops` used to sample 1% of _all_ history
-and so could surface an old outlier. It now reports the largest of the newest
-operations of currently-active users, which answers "is something blowing up
-right now" but not "what is the biggest row ever written". Answering the latter
-exactly would need an index on `payload_bytes` — a permanent write cost on the
-upload hot path for a monitoring convenience — so it is deliberately not done.
+一项能力确实丢失了：`large-ops` 曾经采样 _全部_ 历史的 1%，因此能浮出旧异常值。它现在报告
+当前活跃用户最新操作中的最大者，这回答「现在是否有东西在爆炸」而非「有史以来写过的最大行是什么」。
+精确回答后者需要 `payload_bytes` 上的索引 — 为监控便利在上传热路径上永久增加写成本 —
+因此刻意不做。
 
-## Security Notes
+## 安全说明
 
-- Exports contain full operation payloads - handle securely
-- User emails are included in outputs - be mindful of privacy
-- Encrypted payloads show as encrypted in analysis
-- Clean up old reports periodically
+- 导出包含完整操作载荷 — 请安全处理
+- 输出包含用户邮箱 — 请注意隐私
+- 加密载荷在分析中显示为已加密
+- 定期清理旧报告
 
 ---
 
-**Questions or issues?** File an issue or check the main SuperSync documentation.
+**有问题或议题？** 提交 issue 或查看主 SuperSync 文档。

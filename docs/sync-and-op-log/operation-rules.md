@@ -1,23 +1,20 @@
-# Operation Rules (Compatibility Pointer)
+# 操作规则（兼容性指针）
 
-This path is retained so historical links do not break. The former rules
-catalog mixed durable invariants with stale implementation details and is not a
-source of current behavior.
+保留此路径以免历史链接失效。原先的规则目录把耐用不变量与过时的实现细节混在一起，不是当前行为的来源。
 
-Use these maintained owners instead:
+请改用这些已维护的所有者：
 
-- [`contributor-sync-model.md`](./contributor-sync-model.md) for effect,
-  selector, reducer, and bulk-dispatch rules;
-- [`sync-architecture.html`](./sync-architecture.html) for the current
-  whole-system map and executable source owners;
-- [`operation-log-architecture.md`](./operation-log-architecture.md) for
-  append-only payload/lifecycle semantics, migration policy, and design history;
-- [`section-conflict-replay.md`](./section-conflict-replay.md) for the narrow
-  SECTION semantic-replay exception;
-- [`vector-clocks.md`](./vector-clocks.md) for causality and clock storage; and
+- [`contributor-sync-model.md`](./contributor-sync-model.md) 用于 effect、
+  selector、reducer 与 bulk-dispatch 规则；
+- [`sync-architecture.html`](./sync-architecture.html) 用于当前的
+  全系统地图与可执行源码所有者；
+- [`operation-log-architecture.md`](./operation-log-architecture.md) 用于
+  仅追加的 payload/生命周期语义、迁移策略与设计历史；
+- [`section-conflict-replay.md`](./section-conflict-replay.md) 用于狭义的
+  SECTION 语义重放例外；
+- [`vector-clocks.md`](./vector-clocks.md) 用于因果性与时钟存储；以及
 - [`supersync-encryption-architecture.md`](./supersync-encryption-architecture.md)
-  for the E2EE wire and integrity boundaries.
+  用于 E2EE 线路与完整性边界。
 
-Constants and validation limits are intentionally not copied here. Read their
-executable owners under `src/app/op-log/`, `packages/sync-core/`, and
-`packages/super-sync-server/`.
+常量与校验限制有意不在此复制。请在 `src/app/op-log/`、`packages/sync-core/` 与
+`packages/super-sync-server/` 下阅读其可执行所有者。

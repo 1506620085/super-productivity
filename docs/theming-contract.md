@@ -1,10 +1,10 @@
-# Theming Contract
+# 主题契约（Theming Contract）
 
-Public contract for authoring custom themes for Super Productivity. This document is authoritative — the validator's warning pass keys off the same contract (`src/app/core/theme/theme-contract.const.ts`).
+为 Super Productivity 编写自定义主题的公共契约。本文档权威——校验器的警告通道与同一契约对齐（`src/app/core/theme/theme-contract.const.ts`）。
 
-## TL;DR
+## 简明版
 
-Drop a CSS file with at minimum these four declarations into Settings → Theme → "Install theme…":
+将至少包含以下四个声明的 CSS 文件拖入 设置 → 主题 →「Install theme…」：
 
 ```css
 body {
@@ -15,76 +15,76 @@ body {
 }
 ```
 
-For a polished theme, declare the **recommended** tokens too (see table below). Themes are pure CSS — no scripts, no remote URLs, no bundled assets.
+若要更精致的主题，也请声明**推荐** token（见下表）。主题是纯 CSS——无脚本、无远程 URL、无打包资源。
 
-## How theming works
+## 主题如何工作
 
-The CSS variable architecture has three layers:
+CSS 变量架构有三层：
 
-1. **Primitives** — surface ladder (`--surface-0` through `--surface-4`), ink (`--ink`, `--ink-strong`, `--ink-muted`, `--ink-on-channel`), `--separator`, `--divider`, `--scrim`, `--bg-overlay`, `--brand`, `--focus-ring`. These are the knobs themes turn to feel different.
-2. **Semantic aliases** — high-level tokens like `--bg`, `--card-bg`, `--text-color`. Most of them resolve to a primitive, so changing one primitive ripples through dozens of semantic tokens automatically.
-3. **Category-B tokens** — true light/dark splits whose relationship genuinely differs between modes (e.g. `--close-btn-bg`, `--scrollbar-thumb`). Themes that want to override these must declare both light and dark values.
+1. **原语** — 表面阶梯（`--surface-0` 到 `--surface-4`）、墨色（`--ink`、`--ink-strong`、`--ink-muted`、`--ink-on-channel`）、`--separator`、`--divider`、`--scrim`、`--bg-overlay`、`--brand`、`--focus-ring`。这些是主题用来产生不同感觉的旋钮。
+2. **语义别名** — 高层 token，如 `--bg`、`--card-bg`、`--text-color`。多数解析到某个原语，因此改一个原语会自动波及数十个语义 token。
+3. **Category-B token** — 真浅/深分裂，其关系在模式间确实不同（例如 `--close-btn-bg`、`--scrollbar-thumb`）。想覆盖这些的主题必须声明浅色与深色两套值。
 
-Every theme builds on top of the base. If your CSS doesn't declare a token, the base value applies.
+每个主题叠在基础之上。若你的 CSS 未声明某 token，则使用基础值。
 
-## Required tokens
+## 必填 token
 
-| Token              | What it controls                                    | Notes                                                                                                                                                             |
-| ------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--surface-1`      | App background                                      | Base of the surface ladder.                                                                                                                                       |
-| `--surface-2`      | Card / task / panel background                      | One step up from `--surface-1`.                                                                                                                                   |
-| `--ink`            | Body text color                                     | Most text uses this directly.                                                                                                                                     |
-| `--ink-on-channel` | RGB triplet (no `rgb()` wrapper) for overlay tokens | E.g. `0, 0, 0` for light, `255, 255, 255` for dark. Used as `rgba(var(--ink-on-channel), α)` to make hover/focus overlays mode-correct from a single declaration. |
+| Token              | 控制内容                                          | 说明                                                                                                                                                              |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--surface-1`      | 应用背景                                          | 表面阶梯的基底。                                                                                                                                                  |
+| `--surface-2`      | 卡片 / 任务 / 面板背景                            | 比 `--surface-1` 高一级。                                                                                                                                         |
+| `--ink`            | 正文颜色                                          | 多数文本直接使用。                                                                                                                                                |
+| `--ink-on-channel` | RGB 三元组（无 `rgb()` 包装）用于叠层 token       | 例如浅色用 `0, 0, 0`，深色用 `255, 255, 255`。用作 `rgba(var(--ink-on-channel), α)`，用单一声明做出模式正确的悬停/焦点叠层。                                      |
 
-## Recommended tokens
+## 推荐 token
 
-| Token          | What it controls                                                         |
-| -------------- | ------------------------------------------------------------------------ |
-| `--surface-0`  | Slightly darker than `--surface-1` (used for `--bg-darker` on toolbars). |
-| `--surface-3`  | Elevated surface (current task, drag-drop targets).                      |
-| `--surface-4`  | Highest surface (banner, mobile bottom panel).                           |
-| `--ink-strong` | Maximum-contrast text (used for emphasized labels).                      |
-| `--ink-muted`  | Muted text (helper labels, placeholders).                                |
-| `--separator`  | Soft separator color (between rows).                                     |
-| `--divider`    | Default divider color (used by Material).                                |
-| `--scrim`      | Backdrop / overlay scrim color.                                          |
+| Token          | 控制内容                                                                  |
+| -------------- | ------------------------------------------------------------------------- |
+| `--surface-0`  | 略深于 `--surface-1`（用于工具栏的 `--bg-darker`）。                      |
+| `--surface-3`  | 抬升表面（当前任务、拖放目标）。                                          |
+| `--surface-4`  | 最高表面（横幅、移动底部面板）。                                          |
+| `--ink-strong` | 最大对比文本（强调标签）。                                                |
+| `--ink-muted`  | 弱化文本（辅助标签、占位符）。                                            |
+| `--separator`  | 柔和分隔色（行之间）。                                                    |
+| `--divider`    | 默认分隔线色（Material 使用）。                                           |
+| `--scrim`      | 背景 / 叠层遮罩色。                                                       |
 
-If any of these are missing, the validator emits a warning listing the token names and surfaces a snackbar after install. The theme still installs — the warning is informational.
+若缺少任一推荐项，校验器会发出列出 token 名的警告，并在安装后显示 snackbar。主题仍会安装——警告仅供参考。
 
-## Optional tokens
+## 可选 token
 
-| Token                    | What it controls                          | Default        |
-| ------------------------ | ----------------------------------------- | -------------- |
-| `--state-hover-alpha`    | Hover overlay opacity                     | `0.06`         |
-| `--state-focus-alpha`    | Focus overlay opacity                     | `0.10`         |
-| `--state-pressed-alpha`  | Active/pressed overlay opacity            | `0.14`         |
-| `--state-selected-alpha` | Selected-row overlay opacity              | `0.10`         |
-| `--state-disabled-alpha` | Disabled element opacity                  | `0.40`         |
-| `--focus-ring`           | Focus-ring color (defaults to `--brand`). | `var(--brand)` |
-| `--system-surface`       | Native Android system-bar backdrop.       | `var(--bg)`    |
+| Token                    | 控制内容                             | 默认           |
+| ------------------------ | ------------------------------------ | -------------- |
+| `--state-hover-alpha`    | 悬停叠层不透明度                     | `0.06`         |
+| `--state-focus-alpha`    | 焦点叠层不透明度                     | `0.10`         |
+| `--state-pressed-alpha`  | 按下/激活叠层不透明度                | `0.14`         |
+| `--state-selected-alpha` | 选中行叠层不透明度                   | `0.10`         |
+| `--state-disabled-alpha` | 禁用元素不透明度                     | `0.40`         |
+| `--focus-ring`           | 焦点环颜色（默认为 `--brand`）。     | `var(--brand)` |
+| `--system-surface`       | 原生 Android 系统栏背景。            | `var(--bg)`    |
 
-These are **alpha scalars** (or single colors), not rgba colors. The base composes them with `--ink-on-channel` to produce the actual overlay color, so a theme tuning `--state-hover-alpha` to `0.10` automatically gets a stronger hover in both light and dark modes.
+这些是 **alpha 标量**（或单色），不是 rgba 颜色。基础层用 `--ink-on-channel` 合成实际叠层色，因此将 `--state-hover-alpha` 调到 `0.10` 会在浅色与深色模式自动得到更强悬停。
 
-`--system-surface` must resolve to an opaque `#rgb`, `#rrggbb`, or integer-channel `rgb(...)` color without alpha. Transparent values, percentage channels, and gradients fall back to the Default-theme surface because Android's native color parser cannot use them.
+`--system-surface` 必须解析为不透明的 `#rgb`、`#rrggbb` 或整数通道 `rgb(...)` 颜色且无 alpha。透明值、百分比通道与渐变会回退到 Default 主题表面，因为 Android 原生颜色解析器无法使用它们。
 
-## Special tokens
+## 特殊 token
 
 ### `--ink-on-channel`
 
-This is the keystone primitive. It's an **RGB triplet** — not an `rgb()` value, not a hex literal — so it can be slotted into `rgba(var(--ink-on-channel), 0.06)` to produce mode-correct overlays from a single declaration.
+这是拱心石原语。它是 **RGB 三元组**——不是 `rgb()` 值，也不是 hex 字面量——因此可嵌入 `rgba(var(--ink-on-channel), 0.06)`，用单一声明产生模式正确的叠层。
 
 ```css
 body {
-  --ink-on-channel: 0, 0, 0; /* light mode → black overlays */
+  --ink-on-channel: 0, 0, 0; /* 浅色模式 → 黑色叠层 */
 }
 body.isDarkTheme {
-  --ink-on-channel: 255, 255, 255; /* dark mode → white overlays */
+  --ink-on-channel: 255, 255, 255; /* 深色模式 → 白色叠层 */
 }
 ```
 
-### `--state-*-alpha` and the legacy bridge
+### `--state-*-alpha` 与遗留桥接
 
-Older themes historically declared `--hover-bg-opacity`, `--focus-bg-opacity`, `--pressed-bg-opacity`, and `--disabled-opacity` directly. The base declares the canonical names with those legacy names as `var()` fallbacks:
+旧主题历史上直接声明 `--hover-bg-opacity`、`--focus-bg-opacity`、`--pressed-bg-opacity` 与 `--disabled-opacity`。基础层用这些遗留名作为 `var()` 回退声明规范名：
 
 ```css
 :where(body, body.isDarkTheme) {
@@ -96,36 +96,36 @@ Older themes historically declared `--hover-bg-opacity`, `--focus-bg-opacity`, `
 }
 ```
 
-If your theme already uses the legacy names, they continue to work — you do not need to rename. New themes should prefer the `--state-*-alpha` names.
+若主题已使用遗留名，它们继续有效——无需重命名。新主题应优先使用 `--state-*-alpha` 名。
 
-## Selector contract
+## 选择器契约
 
-This part is load-bearing. Read it before debugging "my theme works in light mode but not dark."
+这部分是承重结构。在调试「我的主题浅色有效深色无效」前请阅读。
 
-| Layer                                               | Where it lives                            | Specificity                                          |
+| 层                                                  | 所在位置                                  | 特异性                                               |
 | --------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| Primitives (e.g. `--surface-1`, `--ink-on-channel`) | `body` (light), `body.isDarkTheme` (dark) | (0,0,1) and (0,1,1)                                  |
-| Semantic aliases (e.g. `--bg`, `--card-bg`)         | `:where(body, body.isDarkTheme)`          | (0,0,0) — `:where()` is the zero-specificity wrapper |
-| Category-B tokens (per-mode)                        | `body` (light), `body.isDarkTheme` (dark) | (0,0,1) and (0,1,1)                                  |
+| 原语（如 `--surface-1`、`--ink-on-channel`）        | `body`（浅）、`body.isDarkTheme`（深）    | (0,0,1) 与 (0,1,1)                                   |
+| 语义别名（如 `--bg`、`--card-bg`）                  | `:where(body, body.isDarkTheme)`          | (0,0,0) — `:where()` 是零特异性包装                  |
+| Category-B token（按模式）                          | `body`（浅）、`body.isDarkTheme`（深）    | (0,0,1) 与 (0,1,1)                                   |
 
-**Themes overriding primitives MUST use `body` and/or `body.isDarkTheme` selectors.** A declaration at `:root` is inherited by `body`, but the base declares the same property directly on `body`. A direct declaration always wins over an inherited value; selector specificity is never compared across those two elements. A `:root`-only primitive therefore has no effect on the body in either mode.
+**覆盖原语的主题必须使用 `body` 和/或 `body.isDarkTheme` 选择器。** 声明在 `:root` 会被 `body` 继承，但基础层在 `body` 上直接声明同一属性。直接声明始终胜过继承值；选择器特异性从不跨这两个元素比较。因此仅在 `:root` 的原语在两种模式下对 body 都无效。
 
-Always declare light primitives under `body` and dark primitives under `body.isDarkTheme`.
+始终在 `body` 下声明浅色原语，在 `body.isDarkTheme` 下声明深色原语。
 
-**Themes overriding semantic aliases** should use the same body selectors. Aliases live at `:where(...)` (specificity 0,0,0), so a later `body` or `body.isDarkTheme` rule wins normally. A `:root` alias remains inherited and cannot replace an alias declared directly on the body.
+**覆盖语义别名的主题**应使用相同的 body 选择器。别名位于 `:where(...)`（特异性 0,0,0），因此稍后的 `body` 或 `body.isDarkTheme` 规则会正常胜出。`:root` 别名仍是继承的，不能替换直接声明在 body 上的别名。
 
-The validator's warning pass is **presence-only** in v1: it does not parse selectors. A theme that declares `--surface-1` only at `:root` will pass validation even though that declaration is ineffective on the body. Selector-aware warnings are a tracked follow-up.
+校验器的警告通道在 v1 中**仅检查存在性**：不解析选择器。仅在 `:root` 声明 `--surface-1` 的主题会通过校验，即便该声明对 body 无效。选择器感知警告是已跟踪的后续项。
 
-## Forking instructions
+## Fork 说明
 
-1. Pick the closest shipped theme as a starting point: `src/assets/themes/{arc,catppuccin-mocha,cybr,dark-base,dracula,everforest,glass,lines,liquid-glass,nord-polar-night,nord-snow-storm,plainspace,rainbow,velvet,zen}.css`.
-2. Copy it to a new file. Rename `.css` to whatever you want — the picker uses the filename slug as the theme id.
-3. Edit the primitive declarations under `body` and `body.isDarkTheme`. Start with `--surface-1`, `--surface-2`, `--ink`, `--ink-on-channel`. Leave everything else default.
-4. Drop the file into Settings → Theme → "Install theme…". The file lives in IndexedDB; nothing leaves your machine.
+1. 选最接近的已发布主题作起点：`src/assets/themes/{arc,catppuccin-mocha,cybr,dark-base,dracula,everforest,glass,lines,liquid-glass,nord-polar-night,nord-snow-storm,plainspace,rainbow,velvet,zen}.css`。
+2. 复制到新文件。将 `.css` 重命名为任意名——选择器用文件名 slug 作为主题 id。
+3. 编辑 `body` 与 `body.isDarkTheme` 下的原语声明。从 `--surface-1`、`--surface-2`、`--ink`、`--ink-on-channel` 开始。其余保持默认。
+4. 将文件拖入 设置 → 主题 →「Install theme…」。文件存在 IndexedDB；不会离开你的机器。
 
-## Examples
+## 示例
 
-### Minimal six-line theme
+### 最小六行主题
 
 ```css
 body {
@@ -136,7 +136,7 @@ body {
 }
 ```
 
-### Tuning state alphas
+### 调节状态 alpha
 
 ```css
 body {
@@ -144,13 +144,13 @@ body {
   --surface-2: #fff;
   --ink: rgb(44, 44, 44);
   --ink-on-channel: 0, 0, 0;
-  /* Subtler hover, more dramatic pressed */
+  /* 更弱的悬停，更强的按下 */
   --state-hover-alpha: 0.04;
   --state-pressed-alpha: 0.18;
 }
 ```
 
-### Light + dark pair
+### 浅色 + 深色成对
 
 ```css
 body {
@@ -171,30 +171,30 @@ body.isDarkTheme {
 }
 ```
 
-## Validation rules
+## 校验规则
 
-The validator (`src/app/core/theme/validate-theme-css.util.ts`) runs at install time. Warnings are persisted alongside the theme in IndexedDB so the picker can display them without another read. Stored CSS is also re-validated before every load; a theme accepted by an older client therefore cannot bypass newer safety rules. Contract warnings remain the snapshot from installation until the user re-uploads the file.
+校验器（`src/app/core/theme/validate-theme-css.util.ts`）在安装时运行。警告与主题一并持久化到 IndexedDB，以便选择器无需再次读取即可显示。存储的 CSS 在每次加载前也会重新校验；因此被旧客户端接受的主题无法绕过更新的安全规则。契约警告保持安装时的快照，直到用户重新上传文件。
 
-**Hard rejects (theme will not install):**
+**硬拒绝（主题不会安装）：**
 
-- `url(...)` arguments that resolve to a remote URL (`http:`, `https:`, `//host/...`, `data:` URIs, schemeless absolute, or any other protocol)
-- Relative `url(...)` paths (no bundled assets in v1)
-- `src(...)` arguments (CSS Fonts L4 form) — same rules as `url(...)`
-- Any `@import` rule
-- Advanced image functions: any `image(...)` or `image-set(...)`
-- Files larger than 500 KB
-- Unterminated `/* comments` (malformed CSS)
+- 解析为远程 URL 的 `url(...)` 参数（`http:`、`https:`、`//host/...`、`data:` URI、无 scheme 的绝对路径，或其他协议）
+- 相对 `url(...)` 路径（v1 无打包资源）
+- `src(...)` 参数（CSS Fonts L4 形式）——规则同 `url(...)`
+- 任何 `@import` 规则
+- 高级图像函数：任何 `image(...)` 或 `image-set(...)`
+- 大于 500 KB 的文件
+- 未终止的 `/* comments`（畸形 CSS）
 
-**Soft warnings (theme installs, snackbar shown):**
+**软警告（主题安装，显示 snackbar）：**
 
-- Any required or recommended token missing — the snackbar lists token names. Optional tokens are not warned about (they always inherit from the base layer).
+- 缺少任何必填或推荐 token——snackbar 列出 token 名。可选 token 不警告（它们始终从基础层继承）。
 
-The validator handles `\xx`-escape attempts on keywords (`u\72l(`, `\55RL(`, `s\72\63(`, `--surf\61ce-1`, etc.) and `/* */` injection inside string literals or `url-tokens` — see `validate-theme-css.util.spec.ts` for the full attack-surface test list.
+校验器处理关键字上的 `\xx` 转义尝试（`u\72l(`、`\55RL(`、`s\72\63(`、`--surf\61ce-1` 等）以及字符串字面量或 `url-tokens` 内的 `/* */` 注入——完整攻击面测试列表见 `validate-theme-css.util.spec.ts`。
 
-Security keywords are matched conservatively. `url(` and `src(` are scanned on the raw (decoded) source, so they are rejected even inside a comment or CSS string — a disguised token must never be able to hide a later live fetch. The keyword-presence bans (`@import`, `image(`, `image-set(`) are scanned on the comment-stripped source instead: they are **allowed inside comments** (a theme may document the restriction) but still rejected inside CSS string values, since blanking strings safely is not possible after escape decoding. Avoid these literal sequences in theme string values and generated labels.
+安全关键字匹配偏保守。`url(` 与 `src(` 在原始（解码后）源上扫描，因此即使在注释或 CSS 字符串内也会被拒绝——伪装 token 绝不能隐藏后续真实请求。关键字存在禁令（`@import`、`image(`、`image-set(`）改为在去注释源上扫描：它们**允许出现在注释内**（主题可记录该限制），但仍拒绝 CSS 字符串值内的出现，因为转义解码后无法安全清空字符串。避免在主题字符串值与生成的标签中使用这些字面序列。
 
-## Legacy migration note
+## 遗留迁移说明
 
-If you already have a theme that worked before the token-model refactor, nothing is required. The validator's warning pass is non-blocking, and the 15 built-in CSS themes provide examples that satisfy the minimum contract. If your theme used the legacy names (`--hover-bg-opacity`, `--focus-bg-opacity`, `--pressed-bg-opacity`, `--disabled-opacity`), they continue to work through the `var()` fallback bridge in the base.
+若你已有在 token 模型重构前可用的主题，无需任何操作。校验器的警告通道不阻塞，15 个内置 CSS 主题提供满足最低契约的示例。若主题使用遗留名（`--hover-bg-opacity`、`--focus-bg-opacity`、`--pressed-bg-opacity`、`--disabled-opacity`），它们通过基础层的 `var()` 回退桥继续有效。
 
-If you want the contract warnings to be quiet, declare the four required tokens (`--surface-1`, `--surface-2`, `--ink`, `--ink-on-channel`) under `body` (and `body.isDarkTheme` if your theme has a dark mode). The recommended tokens are nice-to-have but not required.
+若希望契约警告安静，在 `body`（若主题有深色模式则还有 `body.isDarkTheme`）下声明四个必填 token（`--surface-1`、`--surface-2`、`--ink`、`--ink-on-channel`）。推荐 token 是加分项但非必需。

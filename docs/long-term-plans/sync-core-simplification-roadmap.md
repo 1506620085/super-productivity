@@ -1,77 +1,77 @@
-# Sync Core Simplification Roadmap
+# 同步核心简化路线图
 
-> **Status: Planned**
+> **状态：已规划**
 
-**Goal:** Reduce cognitive load and architectural coupling in the sync stack without destabilizing behavior.
+**目标：** 在不破坏行为稳定性的前提下，降低同步栈的认知负担与架构耦合。
 
-**Primary focus:** Client-side sync orchestration.
+**主要焦点：** 客户端同步编排。
 
-**Why now:** The sync implementation is feature-rich and well-tested, but many edge cases accumulated in the orchestration layer. The highest-value work is to simplify control flow and boundaries before doing broader protocol or server refactors.
-
----
-
-## Target Architecture
-
-1. `SyncWrapperService` remains the application/UI boundary.
-2. Sync results use discriminated unions instead of flag bags.
-3. Full-state flows are separated from incremental operation sync.
-4. Provider capabilities are explicit and narrower.
+**为何现在做：** 同步实现功能丰富且测试充分，但编排层积累了许多边界情况。最高价值的工作是在做更广的协议或服务器重构之前，先简化控制流与边界。
 
 ---
 
-## Priorities
+## 目标架构
 
-1. Replace flag bags with discriminated unions
-2. Extract full-state sync flow from incremental sync
-3. Decompose conflict resolution
-4. Simplify provider capabilities/contracts (only if warranted)
-5. Consider shared protocol schemas only if drift becomes a real maintenance problem
+1. `SyncWrapperService` 仍作为应用/UI 边界。
+2. 同步结果使用判别联合类型，而非标志位集合。
+3. 全量状态流程与增量操作同步分离。
+4. 提供方能力显式且更窄。
 
 ---
 
-## Phase 0: Safety Rails
+## 优先级
 
-**Purpose:** Establish a stable baseline before behavior-preserving refactors.
+1. 用判别联合类型替换标志位集合
+2. 从增量同步中抽出全量状态同步流程
+3. 分解冲突解决
+4. 简化提供方能力/契约（仅在确有必要时）
+5. 仅在漂移成为真实维护问题时才考虑共享协议 schema
 
-**Required deliverables:** This phase should produce concrete artifacts, not just exploratory notes.
+---
 
-### Checklist
+## 阶段 0：安全护栏
 
-- [ ] Identify the smallest high-signal unit/integration suites for:
+**目的：** 在行为保持型重构之前建立稳定基线。
+
+**必需交付物：** 本阶段应产出具体产物，而非仅探索性笔记。
+
+### 检查清单
+
+- [ ] 识别信号最强的最小单元/集成测试套件，覆盖：
   - `src/app/imex/sync/sync-wrapper.service.ts`
   - `src/app/op-log/sync/operation-log-sync.service.ts`
   - `src/app/op-log/sync/remote-ops-processing.service.ts`
   - `src/app/op-log/sync/conflict-resolution.service.ts`
-  - SuperSync integration scenarios
-  - file-based sync integration scenarios
-- [ ] Inventory all current sync result shapes and control flags from:
+  - SuperSync 集成场景
+  - 基于文件的同步集成场景
+- [ ] 盘点所有当前同步结果形态与控制标志，来源：
   - `src/app/op-log/core/types/sync-results.types.ts`
   - `src/app/op-log/sync/operation-log-download.service.ts`
   - `src/app/op-log/sync/operation-log-upload.service.ts`
   - `src/app/op-log/sync/operation-log-sync.service.ts`
   - `src/app/imex/sync/sync-wrapper.service.ts`
-- [ ] Write a short design note or ADR for the intended boundary:
-  - full-state sync handled separately from incremental sync
-  - result types use discriminated unions, not flag bags
-- [ ] Produce a markdown table listing every flag/optional field currently used in sync result types and orchestration handoffs
-- [ ] Draft a first-pass discriminated union design for incremental sync results
+- [ ] 为预期边界撰写简短设计说明或 ADR：
+  - 全量状态同步与增量同步分开处理
+  - 结果类型使用判别联合类型，而非标志位集合
+- [ ] 产出 markdown 表格，列出同步结果类型与编排交接中当前使用的每个标志/可选字段
+- [ ] 起草增量同步结果的第一版判别联合类型设计
 
-### Exit Criteria
+### 退出标准
 
-- [ ] Agreed list of current sync outcomes and control flags
-- [ ] Markdown table of current flags/optional result fields
-- [ ] Draft discriminated union design reviewed and accepted as a starting point
-- [ ] Agreed execution order for the refactor phases
+- [ ] 就当前同步结果与控制标志达成一致清单
+- [ ] 当前标志/可选结果字段的 markdown 表格
+- [ ] 判别联合类型草稿经评审并接受为起点
+- [ ] 就各重构阶段的执行顺序达成一致
 
 ---
 
-## Phase 1: Replace Flag Bags With Discriminated Unions
+## 阶段 1：用判别联合类型替换标志位集合
 
-**Purpose:** Reduce branching complexity and make control flow exhaustive and explicit.
+**目的：** 降低分支复杂度，使控制流穷尽且显式。
 
-**Scope constraint:** This phase applies to the incremental sync path only. Full-state result modeling should be finalized in Phase 2 when those flows are extracted.
+**范围约束：** 本阶段仅适用于增量同步路径。全量状态结果建模应在阶段 2 抽出这些流程时最终确定。
 
-### Scope
+### 范围
 
 - `src/app/op-log/core/types/sync-results.types.ts`
 - `src/app/op-log/sync/operation-log-download.service.ts`
@@ -79,43 +79,43 @@
 - `src/app/op-log/sync/operation-log-sync.service.ts`
 - `src/app/imex/sync/sync-wrapper.service.ts`
 
-### Checklist
+### 检查清单
 
-- [ ] Define separate result types for:
-  - transport-level download results
-  - transport-level upload results
-  - incremental orchestration step results
-  - incremental sync session results
-- [ ] Replace optional fields and combined state flags such as:
+- [ ] 为以下内容定义独立结果类型：
+  - 传输层下载结果
+  - 传输层上传结果
+  - 增量编排步骤结果
+  - 增量同步会话结果
+- [ ] 替换如下可选字段与组合状态标志：
   - `cancelled`
   - `serverMigrationHandled`
   - `needsFullStateUpload`
   - `localWinOpsCreated`
   - `snapshotVectorClock`
   - `hasMorePiggyback`
-- [ ] Convert wrapper/orchestrator branching to `switch` on `kind`
-- [ ] Remove ambiguous combinations of booleans where more than one interpretation is possible
-- [ ] Add exhaustiveness checks where practical
+- [ ] 将 wrapper/编排器分支改为对 `kind` 的 `switch`
+- [ ] 移除可能有多种解释的模糊布尔组合
+- [ ] 在可行处加入穷尽性检查
 
-### Suggested Result Shapes
+### 建议的结果形态
 
 - `DownloadTransportResult`
 - `UploadTransportResult`
 - `IncrementalSyncStepResult`
 - `IncrementalSyncSessionResult`
 
-### Exit Criteria
+### 退出标准
 
-- [ ] Wrapper and orchestrator code branch on tagged results instead of boolean combinations
-- [ ] Result types encode mutually exclusive states directly
+- [ ] Wrapper 与编排器代码按带标签的结果分支，而非布尔组合
+- [ ] 结果类型直接编码互斥状态
 
 ---
 
-## Phase 2: Extract Full-State Sync Flow
+## 阶段 2：抽出全量状态同步流程
 
-**Purpose:** Remove `SYNC_IMPORT` and related special cases from the incremental op-sync path.
+**目的：** 从增量 op-sync 路径中移除 `SYNC_IMPORT` 及相关特殊情况。
 
-### Scope
+### 范围
 
 - `src/app/op-log/sync/operation-log-sync.service.ts`
 - `src/app/op-log/sync/operation-log-download.service.ts`
@@ -123,159 +123,159 @@
 - `src/app/op-log/sync/server-migration.service.ts`
 - `src/app/op-log/sync/sync-import-filter.service.ts`
 
-### New Modules
+### 新模块
 
 - [ ] `src/app/op-log/sync/full-state-sync.service.ts`
 - [ ] `src/app/op-log/sync/full-state-sync.types.ts`
 
-### Checklist
+### 检查清单
 
-- [ ] Move full-state responsibilities behind a dedicated service:
+- [ ] 将全量状态职责移到专用服务之后：
   - `SYNC_IMPORT`
   - `BACKUP_IMPORT`
   - `REPAIR`
-  - server migration bootstrap
-  - provider-switch bootstrap
-  - clean-slate flows for encryption/reset cases
-- [ ] Centralize the "meaningful local data" checks used for full-state conflict decisions
-- [ ] Centralize full-state conflict preparation and resolution input data
-- [ ] Keep incremental sync focused on:
-  - download ops
-  - process ops
-  - upload ops
-  - retry local-win ops
-- [ ] Preserve existing behavior for fresh client, migration, and file-based bootstrap scenarios
+  - 服务器迁移引导
+  - 提供方切换引导
+  - 加密/重置场景的干净起步流程
+- [ ] 集中用于全量状态冲突决策的「有意义本地数据」检查
+- [ ] 集中全量状态冲突准备与解决输入数据
+- [ ] 使增量同步专注于：
+  - 下载操作
+  - 处理操作
+  - 上传操作
+  - 重试本地胜出操作
+- [ ] 保持新客户端、迁移与基于文件的引导场景的现有行为
 
-### Exit Criteria
+### 退出标准
 
-- [ ] `OperationLogSyncService` no longer owns most full-state branching
-- [ ] Full-state behavior is implemented behind a dedicated service boundary
+- [ ] `OperationLogSyncService` 不再拥有大部分全量状态分支
+- [ ] 全量状态行为实现在专用服务边界之后
 
 ---
 
-## Phase 3: Decompose Conflict Resolution
+## 阶段 3：分解冲突解决
 
-**Purpose:** Reduce the size and policy density of the conflict-resolution layer.
+**目的：** 降低冲突解决层的体量与策略密度。
 
-**Risk:** Highest-risk phase in this roadmap. `ConflictResolutionService` is tightly coupled to the entity registry, vector-clock utilities, store selectors, and operation application flow. This phase may need its own sub-plan before implementation starts.
+**风险：** 本路线图中风险最高的阶段。`ConflictResolutionService` 与实体注册表、向量时钟工具、store 选择器及操作应用流程紧耦合。实现开始前本阶段可能需要自己的子计划。
 
-### Scope
+### 范围
 
 - `src/app/op-log/sync/conflict-resolution.service.ts`
 - `src/app/op-log/sync/remote-ops-processing.service.ts`
 
-### New Modules
+### 新模块
 
 - [ ] `src/app/op-log/sync/conflict-strategies/`
 
-### Checklist
+### 检查清单
 
-- [ ] Extract entity-specific LWW merge logic into separate strategy modules
-- [ ] Keep the main conflict-resolution service responsible for:
-  - orchestration
-  - retries
-  - persistence updates
-  - batch application coordination
-- [ ] Add focused tests per strategy instead of expanding one giant spec file further
+- [ ] 将实体特定的 LWW 合并逻辑抽到独立策略模块
+- [ ] 使主冲突解决服务负责：
+  - 编排
+  - 重试
+  - 持久化更新
+  - 批量应用协调
+- [ ] 为每个策略增加聚焦测试，而非继续扩大单一巨型 spec 文件
 
-### Exit Criteria
+### 退出标准
 
-- [ ] `ConflictResolutionService` is primarily a coordinator
-- [ ] Entity-specific merge behavior is isolated and easier to test
-- [ ] A dedicated sub-plan exists if dependency extraction turns out to be larger than expected
+- [ ] `ConflictResolutionService` 主要是协调器
+- [ ] 实体特定合并行为被隔离且更易测试
+- [ ] 若依赖抽取大于预期，则存在专用子计划
 
 ---
 
-## Phase 4: Simplify Provider Capabilities
+## 阶段 4：简化提供方能力
 
-**Purpose:** Reconsider provider contract simplification after the higher-value refactors are complete.
+**目的：** 在更高价值重构完成后，再考虑简化提供方契约。
 
-**Status:** Optional reconsideration phase, not a committed refactor. Only pursue this if Phases 1-3 show that the current provider contract is materially contributing to complexity.
+**状态：** 可选的再评估阶段，非已承诺的重构。仅当阶段 1–3 表明当前提供方契约实质性加剧复杂度时再推进。
 
-### Scope
+### 范围
 
 - `src/app/op-log/sync-providers/provider.interface.ts`
 - `src/app/op-log/sync-providers/file-based/file-based-sync-adapter.service.ts`
 - `src/app/op-log/sync-providers/wrapped-provider.service.ts`
 
-### Checklist
+### 检查清单
 
-- [ ] Review whether `OperationSyncCapable` should be split into smaller capabilities such as:
-  - op transport
-  - snapshot transport
-  - remote reset capability
-  - sequence cursor storage
-- [ ] Avoid forcing file-based sync to mimic server-backed sync where the abstraction adds complexity rather than clarity
-- [ ] Keep file-based support behaviorally identical while narrowing contracts
-- [ ] Re-evaluate whether wrapper/adaptation boundaries can be simplified after Phase 2
+- [ ] 评估是否应将 `OperationSyncCapable` 拆为更小能力，例如：
+  - 操作传输
+  - 快照传输
+  - 远端重置能力
+  - 序列游标存储
+- [ ] 避免强迫基于文件的同步模仿服务端同步——若抽象增加复杂度而非清晰度
+- [ ] 在收窄契约的同时保持基于文件的支持行为一致
+- [ ] 在阶段 2 之后重新评估 wrapper/适配边界能否简化
 
-### Exit Criteria
+### 退出标准
 
-- [ ] Provider contracts reflect actual responsibilities more closely
-- [ ] File-based sync is less coupled to SuperSync-style semantics at the type level
-
----
-
-## Deferred Work
-
-### Shared Client/Server Schemas
-
-Useful, but lower priority than the client orchestration cleanup.
-
-- [ ] Revisit only if response/request drift starts causing real bugs or recurring maintenance pain
-
-### Server Decomposition
-
-Useful later, but not the main bottleneck today.
-
-- [ ] Revisit only if server complexity or deployment needs materially change
+- [ ] 提供方契约更贴近实际职责
+- [ ] 基于文件的同步在类型层面与 SuperSync 风格语义的耦合更少
 
 ---
 
-## Recommended Execution Order
+## 延后工作
 
-1. Phase 0
-2. Phase 1
-3. Review checkpoint
-4. Phase 2
-5. Phase 3
-6. Reconsider whether Phase 4 is worth doing at all
+### 共享客户端/服务器 Schema
 
----
+有用，但优先级低于客户端编排清理。
 
-## Review Checkpoints
+- [ ] 仅当请求/响应漂移开始造成真实 bug 或反复维护痛点时再重新评估
 
-### Checkpoint A: After Phase 1
+### 服务器分解
 
-- [ ] Confirm result types are simpler to reason about
-- [ ] Confirm no ambiguous result combinations remain
+以后有用，但不是今天的主要瓶颈。
 
-### Checkpoint B: After Phase 2
-
-- [ ] Confirm incremental sync path is visibly simpler
-- [ ] Confirm full-state flows are centralized and easier to audit
+- [ ] 仅当服务器复杂度或部署需求实质性变化时再重新评估
 
 ---
 
-## Validation Strategy
+## 建议执行顺序
 
-- [ ] Run focused unit tests after each phase for touched services
-- [ ] Run op-log sync integration tests after Phases 1 and 2
-- [ ] Run targeted SuperSync and file-based E2E scenarios after Phase 2:
-  - fresh client
-  - provider switch
-  - sync import
-  - encryption change
-  - conflict resolution
+1. 阶段 0
+2. 阶段 1
+3. 评审检查点
+4. 阶段 2
+5. 阶段 3
+6. 重新考虑阶段 4 是否值得做
 
 ---
 
-## First Implementation Slice
+## 评审检查点
 
-If work starts immediately, begin with **Phase 1**.
+### 检查点 A：阶段 1 之后
 
-Reason:
+- [ ] 确认结果类型更易推理
+- [ ] 确认不再有模糊的结果组合
 
-- It delivers the biggest cognitive load reduction (flag bags → exhaustive switches)
-- It naturally surfaces where control flow is entangled with result interpretation
-- It makes the full-state extraction (Phase 2) easier to design cleanly
+### 检查点 B：阶段 2 之后
+
+- [ ] 确认增量同步路径明显更简单
+- [ ] 确认全量状态流程已集中且更易审计
+
+---
+
+## 验证策略
+
+- [ ] 每个阶段后对触及的服务运行聚焦单元测试
+- [ ] 阶段 1 与 2 之后运行 op-log 同步集成测试
+- [ ] 阶段 2 之后运行针对性的 SuperSync 与基于文件的 E2E 场景：
+  - 新客户端
+  - 提供方切换
+  - 同步导入
+  - 加密变更
+  - 冲突解决
+
+---
+
+## 首个实现切片
+
+若立即开工，从**阶段 1**开始。
+
+原因：
+
+- 它带来最大的认知负担降低（标志位集合 → 穷尽 switch）
+- 它自然暴露控制流与结果解释纠缠之处
+- 它使全量状态抽取（阶段 2）更易干净设计

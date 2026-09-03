@@ -1,11 +1,11 @@
-# How to generate a GitHub Access Token with Privileges
+# 如何生成带权限的 GitHub Access Token
 
-To generate a GitHub Personal Access Token:
+生成 GitHub Personal Access Token：
 
-1. Navigate to GitHub's [Personal Access Tokens (Classic)](https://github.com/settings/tokens) page
-   - Note: Fine-grained tokens may work but classic tokens are recommended and tested
-2. Click "Generate new token (classic)"
-3. Select the `repo` scope to grant access to private repositories
-4. Click "Generate token" and securely store the token value
+1. 前往 GitHub 的 [Personal Access Tokens (Classic)](https://github.com/settings/tokens) 页面
+   - 注意：细粒度 token 可能可用，但推荐并已测试经典 token
+2. 点击 "Generate new token (classic)"
+3. 选择 `repo` 范围以授予私有仓库访问权限
+4. 点击 "Generate token" 并安全保存 token 值
 
-[=> for GitLab Access Token go here](./gitlab-access-token-instructions.md)
+[=> GitLab Access Token 说明见此](./gitlab-access-token-instructions.md)

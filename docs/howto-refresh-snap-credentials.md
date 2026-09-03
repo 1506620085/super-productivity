@@ -1,6 +1,6 @@
-# How to refresh Snap Store credentials
+# 如何刷新 Snap Store 凭证
 
-The Snap Store credentials used by GitHub Actions to publish new releases expire periodically. When they expire, the CI publish step will fail. Follow these steps to generate fresh credentials and update the GitHub Actions secret.
+GitHub Actions 用于发布新版本的 Snap Store 凭证会定期过期。过期后，CI 发布步骤会失败。按以下步骤生成新凭证并更新 GitHub Actions secret。
 
-1. Run `snapcraft export-login --snaps superproductivity -`
-2. Copy the output value to `SNAPCRAFT_STORE_CREDENTIALS` in GitHub Actions settings (Settings > Secrets and variables > Actions).
+1. 运行 `snapcraft export-login --snaps superproductivity -`
+2. 将输出值复制到 GitHub Actions 设置中的 `SNAPCRAFT_STORE_CREDENTIALS`（Settings > Secrets and variables > Actions）。

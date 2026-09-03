@@ -1,204 +1,91 @@
-# Migration authoring rules
+# 迁移编写规则
 
-Prisma 5.x wraps every migration in a transaction. PostgreSQL forbids
-`CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY` inside a transaction
-block, so a CONCURRENTLY migration always fails the normal
-`prisma migrate deploy` path (P3018 / SQLSTATE 25001).
+Prisma 5.x 将每次迁移包在事务中。PostgreSQL 禁止在事务块内执行
+`CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`，因此 CONCURRENTLY 迁移总是使正常的
+`prisma migrate deploy` 路径失败（P3018 / SQLSTATE 25001）。
 
-`scripts/migrate-deploy.sh` recovers from this generically: on that specific
-failure it reads the failing migration's name from Prisma's output, runs _that
-migration's own `migration.sql`_ out-of-band (no transaction,
-statement-by-statement), marks it applied, and retries. It has a second recovery
-for the lock-bounded `ALTER INDEX` shape described below. **It hardcodes no
-migration name, index name, or SQL text** — a migration opts into a recovery
-path by its _shape_ alone. Naming nothing has been the design goal since this
-logic moved in-image: the _host_ copy went stale against the migrations it knew
-about and broke a deploy. This copy is version-locked to `prisma/migrations` by
-the image build, so a name here would not go stale the same way, but it is still
-a silent coupling. Recovery is exercised by
-`tests/migrate-deploy-script.spec.ts` (behavioral, end-to-end) and
-`tests/migration-sql.spec.ts` (the migration SQL shapes the recovery relies on,
-and the no-hardcoded-names invariant itself).
+`scripts/migrate-deploy.sh` 对此做通用恢复：在该特定失败时，它从 Prisma 输出读取失败迁移的名称，带外（无事务、逐语句）运行*该迁移自己的 `migration.sql`*，标记为已应用，然后重试。它对下文描述的锁有界 `ALTER INDEX` 形态有第二种恢复。**它不硬编码任何迁移名、索引名或 SQL 文本**——迁移仅凭其*形态*选择进入某条恢复路径。自该逻辑移入镜像以来，命名为零一直是设计目标：*主机*副本对其所知的迁移会过时并破坏部署。本副本通过镜像构建与 `prisma/migrations` 版本锁定，因此此处的名称不会以同样方式过时，但仍是静默耦合。恢复由
+`tests/migrate-deploy-script.spec.ts`（行为性、端到端）与
+`tests/migration-sql.spec.ts`（恢复所依赖的迁移 SQL 形态，以及无硬编码名称不变量本身）演练。
 
-## Prefer migrations that don't need recovery
+## 优先编写不需要恢复的迁移
 
-Recovery is a safety net, not the happy path. Prefer, in order:
+恢复是安全网，而非快乐路径。按优先级：
 
-1. **No CONCURRENTLY** if the table is small enough that a brief lock is fine.
-2. **A single CONCURRENTLY statement per migration file.** Prisma issues a
-   single-statement migration as one query, which Postgres does _not_ wrap in
-   an implicit transaction, so `prisma migrate deploy` applies it natively with
-   no recovery needed. (Do not retro-split already-applied migrations — see
-   "Never edit an applied migration" below.)
+1. **无 CONCURRENTLY**，若表足够小以至于短暂锁可接受。
+2. **每个迁移文件仅一条 CONCURRENTLY 语句。** Prisma 将单语句迁移作为一次查询发出，Postgres *不会*将其包在隐式事务中，因此 `prisma migrate deploy` 可原生应用，无需恢复。（不要回溯拆分已应用的迁移——见下文「永不编辑已应用的迁移」。）
 
-Out-of-band recovery cost scales with the number of consecutive pending
-CONCURRENTLY migrations and the number of statements in each (one Prisma
-process per statement), so a large backlog deploy is intentionally slower.
+带外恢复成本随连续待定 CONCURRENTLY 迁移的数量及各自语句数（每语句一个 Prisma 进程）缩放，因此大量积压的部署有意更慢。
 
-## Rules for a lock-bounded `ALTER INDEX` migration
+## 锁有界 `ALTER INDEX` 迁移的规则
 
-DDL that needs an `ACCESS EXCLUSIVE` lock on a hot object must bound its own
-lock wait. `20260720000000_disable_operation_entity_ids_gin_fastupdate` is the
-worked example:
+需要对热对象持有 `ACCESS EXCLUSIVE` 锁的 DDL 必须限制其自身的锁等待。`20260720000000_disable_operation_entity_ids_gin_fastupdate` 是已验证的例子：
 
 ```sql
 SET LOCAL lock_timeout = '1s';
 ALTER INDEX "operations_entity_ids_gin" SET (fastupdate = off);
 ```
 
-**Never raise the timeout to make such a migration succeed.** A waiting
-`ACCESS EXCLUSIVE` request queues every _new_ query on the table behind it —
-measured, a trivial reader went from 79 ms to 8005 ms while one waited. That is
-the shape of a prior outage. The fix for losing the race is many short attempts,
-never one long wait.
+**永不要通过提高超时使此类迁移成功。** 等待中的 `ACCESS EXCLUSIVE` 请求会将该表上的每个*新*查询排在其后——实测中，一个平凡读在有人等待时从 79 ms 变为 8005 ms。那是先前故障的形态。输掉竞态的修复是多次短尝试，而不是一次长等待。
 
-Note the lock is contended more easily than it looks: the planner takes
-`AccessShareLock` on **every** index of a table for any query that plans against
-it, held to end of transaction — so a single slow query touching the table
-starves the window, even one that uses no index at all.
+注意锁的争用比看起来更容易：规划器对任何针对该表规划的查询，会对该表的**每一个**索引取 `AccessShareLock`，持有至事务结束——因此单个触及该表的慢查询就会饿死窗口，即使它完全不使用任何索引。
 
-A migration is retried natively **only if** it has exactly two statements — a
-`SET LOCAL lock_timeout` of at most a few seconds, then a single
-`ALTER INDEX ... SET (...)`. Four properties are what make retrying safe:
+迁移仅在**恰好两条语句**时原生重试——最多几秒的 `SET LOCAL lock_timeout`，然后单条 `ALTER INDEX ... SET (...)`。使重试安全的四项属性是：
 
-1. **A short bound**: at most 5 seconds (`1ms`-`5000ms` or `1s`-`5s`). Anything longer is refused,
-   and so is `'0'` — which in PostgreSQL means _no_ timeout, i.e. wait forever.
-   Retrying an unbounded wait is the outage this whole section exists to avoid.
-2. **Exactly two statements**, so Postgres wraps them in an implicit
-   transaction and a lock timeout rolls the migration back with nothing
-   partially applied.
-3. **`ALTER INDEX ... SET (reloption)`**, which is idempotent on re-run.
-4. **No `CONCURRENTLY`.** A _single_-statement migration gets no implicit
-   transaction, so a lock timeout mid-build leaves an `INVALID` index that a
-   retry cannot clear. Those stay fail-loud (see the bare-CREATE section below).
+1. **短边界**：最多 5 秒（`1ms`-`5000ms` 或 `1s`-`5s`）。更长的被拒绝，
+   `'0'` 亦然——在 PostgreSQL 中表示*无*超时，即永远等待。
+   重试无界等待正是本节要避免的故障。
+2. **恰好两条语句**，因此 Postgres 将它们包在隐式事务中，锁超时会回滚迁移且无部分应用。
+3. **`ALTER INDEX ... SET (reloption)`**，在重跑时幂等。
+4. **无 `CONCURRENTLY`。** *单*语句迁移无隐式事务，因此构建中途的锁超时会留下 `INVALID` 索引，重试无法清除。那些保持失败即响（见下文裸 CREATE 节）。
 
-Note rule 2 is not enough on its own: the splitter breaks on `;` at _end of
-line_, so a second statement sharing the `ALTER`'s line would still end in `);`.
-What actually excludes that is the `ALTER` pattern being fully anchored with a
-**paren-free** option list — the `ALTER`'s own `)` always lands inside the span,
-so nothing can follow it.
+注意仅规则 2 不够：分割器在*行末*的 `;` 处断开，因此与 `ALTER` 同行的第二条语句仍会以 `);` 结束。真正排除它的是 `ALTER` 模式以**无括号**选项列表完全锚定——`ALTER` 自己的 `)` 总是落在跨度内，因此其后不能有任何内容。
 
-Spacing and keyword case are not load-bearing — the gate matches with
-`grep -Ei`, like the CONCURRENTLY gates.
+空格与关键字大小写不是承重的——门控用 `grep -Ei` 匹配，如同 CONCURRENTLY 门控。
 
-`SET LOCAL` and the `ALTER` must stay in the same Prisma transaction, so such a
-migration must never be split or executed out-of-band.
+`SET LOCAL` 与 `ALTER` 必须留在同一 Prisma 事务中，因此此类迁移永不可拆分或带外执行。
 
-A lock timeout leaves a failed Prisma migration record; a later deploy then sees
-only Prisma's cause-free `P3009`. The deploy script handles either state by
-marking the failed attempt rolled back and retrying through
-`prisma migrate deploy`, up to 10 attempts (one retry is not
-enough — production lost a whole deploy to exactly that in July 2026). After the
-last attempt the migration is left **rolled back**, so re-running the deploy is
-always safe. Any different Prisma error fails loudly without being
-auto-resolved, and the script never marks such a migration applied itself.
+锁超时会留下失败的 Prisma 迁移记录；之后的部署只会看到 Prisma 无因的 `P3009`。部署脚本通过将失败尝试标记为已回滚并经 `prisma migrate deploy` 重试来处理任一状态，最多 10 次（一次重试不够——生产在 2026 年 7 月正是因此丢失了整次部署）。最后一次尝试后迁移留为**已回滚**，因此重新运行部署总是安全的。任何不同的 Prisma 错误会响亮失败且不自动 resolve，脚本也永不会自行将此类迁移标记为已应用。
 
-The following migration calls `gin_clean_pending_list` in a separate
-transaction, capped by a five-minute `statement_timeout`. Keep it separate so
-the index lock from the reloption change is released before cleanup starts. If
-cleanup times out, inspect database load, mark only that cleanup migration
-rolled back, and re-run the deploy; the cleanup call is safe to repeat.
+随后的迁移在单独事务中调用 `gin_clean_pending_list`，由五分钟 `statement_timeout` 封顶。保持分离，以便在清理开始前释放 reloption 变更带来的索引锁。若清理超时，检查数据库负载，仅将该清理迁移标记为已回滚，并重新运行部署；清理调用可安全重复。
 
-## Rules for a recoverable CONCURRENTLY index migration
+## 可恢复 CONCURRENTLY 索引迁移的规则
 
-A migration is **auto-recovered only if** its SQL contains BOTH a
-`DROP INDEX CONCURRENTLY` and a `CREATE INDEX CONCURRENTLY` (the idempotent
-drop-then-create shape). Anything else falls through to a loud failure with
-copy-pasteable manual steps and is **never** auto-marked-applied.
+迁移**仅在**其 SQL 同时包含 `DROP INDEX CONCURRENTLY` 与 `CREATE INDEX CONCURRENTLY`（幂等的先删后建形态）时自动恢复。其他任何情况落入带可复制粘贴手动步骤的响亮失败，且**永不**自动标记为已应用。
 
-1. **Drop-then-create, idempotent.** A re-run after a partial/interrupted
-   concurrent build (which leaves an `INVALID` index) must succeed:
+1. **先删后建，幂等。** 部分/中断的并发构建（留下 `INVALID` 索引）之后的重跑必须成功：
 
    ```sql
    DROP INDEX CONCURRENTLY IF EXISTS "my_idx";
    CREATE INDEX CONCURRENTLY "my_idx" ON "operations"(...) WHERE ...;
    ```
 
-   Do **not** use `CREATE INDEX CONCURRENTLY IF NOT EXISTS` instead — a leftover
-   `INVALID` index has the right name but is unusable, so `IF NOT EXISTS` would
-   skip rebuilding it.
+   **不要**改用 `CREATE INDEX CONCURRENTLY IF NOT EXISTS`——残留的 `INVALID` 索引有正确名称但不可用，因此 `IF NOT EXISTS` 会跳过重建。
 
-2. **One statement per logical block, terminated by `;` at end of line.** The
-   out-of-band splitter ends a statement when a line ends with `;`. Multi-line
-   statements are fine (collapsed to one line before execution — safe for index
-   DDL).
+2. **每个逻辑块一条语句，以行末 `;` 终止。** 带外分割器在行以 `;` 结束时结束语句。多行语句可以（执行前折叠为一行——对索引 DDL 安全）。
 
-3. **Full-line `--` comments only.** Trailing/inline comments after SQL on the
-   same line are not stripped.
+3. **仅整行 `--` 注释。** 同行 SQL 后的尾随/行内注释不会被剥离。
 
-4. **No `;` inside string literals.** The splitter treats any end-of-line `;`
-   as a statement terminator. (True for all index DDL; the `WHERE op_type IN
-('A', 'B')` form is fine — no semicolons.)
+4. **字符串字面量内无 `;`。** 分割器将任何行末 `;` 视为语句终止符。（对所有索引 DDL 成立；`WHERE op_type IN ('A', 'B')` 形式可以——无分号。）
 
-5. **No `BEGIN` / `COMMIT` / `DROP TABLE`.**
+5. **无 `BEGIN` / `COMMIT` / `DROP TABLE`。**
 
-Before running the out-of-band `DROP`, recovery first terminates any **orphaned**
-`CONCURRENTLY` build left running by an interrupted prior deploy — PostgreSQL
-does not notice a client disconnect mid-statement, so the abandoned build keeps
-its table lock and the `DROP` would wedge on `statement_timeout` on every retry.
-The termination is scoped to this pipeline's own migrator identity in the
-current database and role, an `active` session, and a `CONCURRENTLY` query; the
-full predicate, its rationale, and its limits live on
-`terminate_orphaned_concurrently_backends` in `scripts/migrate-deploy.sh` — the
-canonical write-up, update it there first. It lets raising `MIGRATION_TIMEOUT`
-and re-running a deploy that timed out mid-build self-heal instead of needing a
-manual `pg_terminate_backend`. Migrator connections also set
-`client_connection_check_interval` (PostgreSQL 14+/Linux required, see the
-server README) so a freshly-abandoned build cancels itself within seconds; the
-termination covers pre-existing orphans and half-open connections the GUC
-cannot detect.
+在运行带外 `DROP` 之前，恢复首先终止任何由先前中断部署留下的**孤儿** `CONCURRENTLY` 构建——PostgreSQL 不会注意到客户端在语句中途断开，因此被放弃的构建会保持其表锁，`DROP` 会在每次重试时卡在 `statement_timeout`。终止范围限定为本流水线在当前数据库与角色中的迁移者身份、`active` 会话，以及 `CONCURRENTLY` 查询；完整谓词、其理由与限制位于 `scripts/migrate-deploy.sh` 中的 `terminate_orphaned_concurrently_backends`——权威撰写处，先在那里更新。它使提高 `MIGRATION_TIMEOUT` 并重新运行在构建中途超时的部署能够自愈，而无需手动 `pg_terminate_backend`。迁移者连接还设置 `client_connection_check_interval`（需要 PostgreSQL 14+/Linux，见服务器 README），以便新近放弃的构建在数秒内自行取消；终止覆盖 GUC 无法检测的既有孤儿与半开连接。
 
-Racing recoveries (e.g. multiple Helm init-containers rolling out together)
-are serialized under a **dedicated recovery advisory lock**, key `72707370` —
-distinct from Prisma's own migrate lock `72707369` (#9781). A recovery that
-finds the lock held fails loudly with diagnosis guidance instead of mistaking
-the holder's **live build** for an orphan; re-running the deploy after the
-holder finishes succeeds (orchestrator restarts do this naturally). The wait
-is `MIGRATE_RECOVERY_LOCK_TIMEOUT` seconds (default 30). Residual unlocked
-windows — a pre-lock migrator version racing a current one, an operator
-running the printed manual recovery statements, or a run that degraded to
-unlocked after a lock-helper failure (it warns loudly) — can still abort a
-live peer build; the fleet then converges via the idempotent drop-then-create
-at the cost of a wasted rebuild. That trade is why the `P1002` advisory-lock
-path still refuses to auto-kill.
+竞态恢复（例如多个 Helm init-container 同时滚动）在**专用恢复咨询锁**下串行化，键 `72707370`——有别于 Prisma 自己的 migrate 锁 `72707369`（#9781）。发现锁被持有的恢复会响亮失败并给出诊断指引，而不是将持有者的**在建构建**误认为孤儿；持有者完成后重新运行部署会成功（编排器重启自然如此）。等待为 `MIGRATE_RECOVERY_LOCK_TIMEOUT` 秒（默认 30）。残留的无锁窗口——前锁迁移者版本与当前版本竞态、运维者运行打印的手动恢复语句，或在锁助手失败后降级为无锁的运行（它会响亮警告）——仍可能中止对等方的在建构建；舰队随后通过幂等的先删后建收敛，代价是一次浪费的重建。该权衡正是为何 `P1002` 咨询锁路径仍拒绝自动杀死。
 
-Enforced by `tests/migrate-deploy-script.spec.ts` (the termination SQL and its
-ordering) and
-`tests/integration/migrate-deploy-orphan-cleanup.integration.spec.ts` (real
-`pg_terminate_backend` targeting).
+由 `tests/migrate-deploy-script.spec.ts`（终止 SQL 及其顺序）与
+`tests/integration/migrate-deploy-orphan-cleanup.integration.spec.ts`（真实的 `pg_terminate_backend` 定向）强制执行。
 
-## Intentional exception: bare `CREATE INDEX CONCURRENTLY`
+## 有意例外：裸 `CREATE INDEX CONCURRENTLY`
 
-`20260511000000_add_entity_sequence_index` is a deliberately bare
-`CREATE INDEX CONCURRENTLY` with **no** `DROP`. Its own comment is explicit: an
-interrupted build leaving an `INVALID` index "should fail loudly instead of
-being marked as an applied migration." The recovery guard requires the
-drop-then-create shape precisely so this (and any future bare-CREATE) is **not**
-auto-recovered — it fails loudly by gate, deterministically, which is the
-intended behavior. This is enforced by `tests/migration-sql.spec.ts` (the
-migration has no `DROP`) and `tests/migrate-deploy-script.spec.ts` (a bare
-CREATE is refused, never marked applied).
+`20260511000000_add_entity_sequence_index` 是故意的裸
+`CREATE INDEX CONCURRENTLY`，**无** `DROP`。其自身注释明确：中断构建留下 `INVALID` 索引「应响亮失败，而不是被标记为已应用的迁移」。恢复守卫要求先删后建形态，正是为了使这个（以及任何未来的裸 CREATE）**不被**自动恢复——它按门控响亮失败，确定性，这是预期行为。由 `tests/migration-sql.spec.ts`（迁移无 `DROP`）与 `tests/migrate-deploy-script.spec.ts`（裸 CREATE 被拒绝，永不标记为已应用）强制执行。
 
-**Bare vs drop-then-create for a _new_ index.** Reserve the bare fail-loud
-shape for a _correctness-critical_ index, where an interrupted build should
-halt the deploy for a human rather than silently retry. For a
-_performance-only_ index that has a correct fallback path — e.g.
-`operations_entity_ids_gin`, whose conflict lookups fall back to the scalar
-`entity_id` — prefer the auto-recoverable drop-then-create shape so an
-interrupted build self-heals on the next deploy instead of wedging it and
-requiring manual recovery. Do **not** retro-convert an already-applied bare
-CREATE — see below.
+**新索引的裸 vs 先删后建。** 将裸的失败即响形态保留给*正确性关键*索引，其中中断构建应为人停止部署，而非静默重试。对于有正确回退路径的*仅性能*索引——例如 `operations_entity_ids_gin`，其冲突查找回退到标量 `entity_id`——优先可自动恢复的先删后建形态，使中断构建在下次部署时自愈，而不是卡住并需要手动恢复。**不要**回溯转换已应用的裸 CREATE——见下文。
 
-## Never edit an applied migration
+## 永不编辑已应用的迁移
 
-Not because `migrate deploy` catches it. **It does not**: verified against
-PostgreSQL 16 with Prisma 5.22.0, `migrate deploy` never re-reads an applied
-migration's file, reports "No pending migrations to apply." and exits 0 even
-when that file was replaced with `DROP TABLE`. `migrate status` is silent too;
-only `migrate dev` notices, by replaying against a shadow database.
+不是因为 `migrate deploy` 会抓住它。**它不会**：在 PostgreSQL 16 与 Prisma 5.22.0 上验证，`migrate deploy` 永不重读已应用迁移的文件，报告「No pending migrations to apply.」并以 0 退出，即使该文件被替换为 `DROP TABLE`。`migrate status` 也沉默；只有 `migrate dev` 通过在影子数据库上重放才会注意到。
 
-Edit one anyway and: every install that already applied it **never executes the
-new SQL**, so a fix retrofitted there reaches nobody who already ran it; the
-recorded `checksum` permanently disagrees with the file; and contributors
-running `migrate dev` hit a shadow-database replay of the new content. Ship a
-new migration instead.
+无论如何编辑一个：每个已应用它的安装**永不执行新 SQL**，因此改装在那里的修复不会到达已运行过它的人；记录的 `checksum` 永久与文件不一致；运行 `migrate dev` 的贡献者会碰到新内容的影子数据库重放。改为发布新迁移。

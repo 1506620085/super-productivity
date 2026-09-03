@@ -1,59 +1,33 @@
-# Persisted-Model Fields: Adding a Field Without Breaking Existing Installs
+# 持久化模型字段：在不破坏现有安装的前提下添加字段
 
-**The invariant (AGENTS.md, sync rule 11): a new REQUIRED field on a persisted
-model breaks every existing install — type it optional (`?`) plus a runtime
-default.** This document carries the full failure analysis behind the rule; the
-short form lives in [AGENTS.md](../../AGENTS.md).
+**不变量（AGENTS.md，同步规则 11）：在持久化模型上新增 REQUIRED 字段会破坏每一个现有安装 — 请将其类型设为可选（`?`）并加上运行时默认值。** 本文档承载该规则背后的完整失败分析；简短形式见 [AGENTS.md](../../AGENTS.md)。
 
-Origin: #9125, #9124 (audit of the #8965 → v18.15.0 boot-to-empty-store
-incident). File-level specifics below were verified 2026-07 — re-check the
-named source files before relying on the exact counts.
+来源：#9125、#9124（对 #8965 → v18.15.0 启动变为空存储事件的审计）。下方文件级细节经 2026-07 核实 — 依赖确切计数前请重新检查所列源文件。
 
-## Why a required field breaks installs
+## 为何必需字段会破坏安装
 
-Data already on users' disks lacks the new field, and typia validation rejects
-the stored snapshot on hydration: the model says the field must exist, the data
-says it doesn't. Prefer `?` plus a runtime default. A backfill migration is the
-exception, not the alternative — it costs a schema bump, and rule 10 (AGENTS.md)
-explains why a bump is near-irreversible and defaults to "no".
+用户磁盘上已有的数据缺少新字段，而 typia 校验在 hydration 时会拒绝已存储的快照：模型要求该字段必须存在，数据却没有。应优先使用 `?` 加上运行时默认值。回填迁移是例外，而非替代方案 — 它需要 schema 升级，而规则 10（AGENTS.md）说明了为何升级近乎不可逆，默认应为「否」。
 
-## Why TypeScript will not warn you
+## 为何 TypeScript 不会警告你
 
-TypeScript guards only _new_ data: a required field errors until you add it to
-the relevant `DEFAULT_*` constant, then compiles clean — while every existing
-install still fails validation against its old snapshot. A green build is no
-evidence the fleet survives.
+TypeScript 只守护*新*数据：必需字段会报错，直到你把它加入相关的 `DEFAULT_*` 常量，然后编译通过 — 而每一个现有安装仍会因旧快照校验失败。绿色构建并不能证明机群能存活。
 
-## Why you cannot assume a heal exists
+## 为何不能假定存在修复路径
 
-There is no blanket "missing field → default" repair on the normal hydration
-path (as of 2026-07):
+在正常 hydration 路径上没有笼统的「缺失字段 → 默认值」修复（截至 2026-07）：
 
-- `loadAllData` merges per-section defaults for only 9 of the 21 `globalConfig`
-  sections (`global-config.reducer.ts`); the remaining sections are a top-level
-  spread, so a stored section wins wholesale and keeps its missing field.
-- Entity slices get only the generic coercions in `auto-fix-typia-errors.ts`:
-  missing boolean → `false`, nullable → `null`.
-- That file's blanket `globalConfig.*` defaulting runs only inside the
-  user-facing `dataRepair` flow — not on normal hydration.
+- `loadAllData` 仅为 21 个 `globalConfig` 分区中的 9 个合并分区级默认值（`global-config.reducer.ts`）；其余分区是顶层展开，因此已存储的分区会整块胜出，并保留其缺失字段。
+- 实体切片只获得 `auto-fix-typia-errors.ts` 中的通用强制转换：缺失布尔值 → `false`，可空 → `null`。
+- 该文件中笼统的 `globalConfig.*` 默认化仅在面向用户的 `dataRepair` 流程内运行 — 不在正常 hydration 上运行。
 
-## Adding a heal correctly
+## 正确添加修复
 
-A per-type heal needs its own branch in `auto-fix-typia-errors.ts`. Do **not**
-add the type to `recreate-fallback.const.ts` instead — membership there also
-opts the type into SPAP-14 disjoint-field auto-merge, which is a sync-behavior
-change, not a repair.
+按类型的修复需要在 `auto-fix-typia-errors.ts` 中有自己的分支。**不要**改为把该类型加入 `recreate-fallback.const.ts` — 该处的成员资格还会把该类型纳入 SPAP-14 不相交字段自动合并，那是同步行为变更，而非修复。
 
-## Why the failure is latent
+## 为何失败是潜伏的
 
-Hydration trusts a snapshot whose schema version matches, so an invalid model
-ships silently and detonates later, when an unrelated schema bump drags stored
-data onto the migration/validation path. #8965 shipped in January 2026 and
-surfaced months later in v18.15.0 as a boot-to-empty-store.
+Hydration 信任 schema 版本匹配的快照，因此无效模型会静默上线，并在之后引爆：当一次无关的 schema 升级把已存储数据拖入迁移/校验路径时。#8965 于 2026 年 1 月上线，数月后在 v18.15.0 以启动变为空存储的形式显现。
 
-## Guard
+## 护栏
 
-`src/app/op-log/validation/frozen-state.spec.ts` validates the current model
-against frozen historical state shapes. If it fails after your change, the
-model is wrong for data already in the field — fix the model, never the
-fixture.
+`src/app/op-log/validation/frozen-state.spec.ts` 用冻结的历史状态形状校验当前模型。若你的更改导致它失败，说明模型对现场已有数据是错误的 — 修复模型，切勿修复 fixture。

@@ -1,65 +1,65 @@
-# Online-Only Mode (Compatibility Mode) Configuration
+# 仅在线模式（兼容模式）配置
 
-**Online-Only Mode (Compatibility Mode)** allows the Super Productivity Android app to connect to the production server, a local development server, or a self-hosted server. This mode requires an internet connection and is compatible with various server setups.
+**仅在线模式（兼容模式）**允许 Super Productivity Android 应用连接到生产服务器、本地开发服务器或自托管服务器。该模式需要互联网连接，并兼容多种服务器配置。
 
-**Note**: While Online-Only Mode offers connectivity to production, local development, or self-hosted servers, it is highly recommended to use the latest **Connectivity-Free Mode** for a more stable and reliable experience. Connectivity-Free Mode allows you to use the app without an internet connection, ensuring uninterrupted productivity, enhanced privacy, and reduced latency.
+**注意**：虽然仅在线模式可连接生产、本地开发或自托管服务器，但强烈建议使用最新的**无网络依赖模式**以获得更稳定可靠的体验。无网络依赖模式可在无互联网的情况下使用应用，确保持续生产力、增强隐私并降低延迟。
 
-For more information, refer to the **[Connectivity-Free Mode Documentation (Recommended)](./README_OFFLINE.md)**.
+更多信息请参阅**[无网络依赖模式文档（推荐）](./README_OFFLINE.md)**。
 
-If you require online features or need to connect to specific servers, proceed with the Online-Only Mode configuration below.
+若你需要在线功能或必须连接到特定服务器，请按下方步骤配置仅在线模式。
 
-## Setting Launch Mode to Online
+## 将启动模式设为在线
 
-To enable Online-Only Mode, set the `LAUNCH_MODE` to `1` or `0` in the `app_config.properties` file.
+要启用仅在线模式，请在 `app_config.properties` 文件中将 `LAUNCH_MODE` 设为 `1` 或 `0`。
 
-- **1**: Force Online-Only Mode (Compatibility Mode)
-- **0**: Default behavior (read from SharedPreferences)
+- **1**：强制仅在线模式（兼容模式）
+- **0**：默认行为（从 SharedPreferences 读取）
 
-**Recommendation**: Set `LAUNCH_MODE` to `0` for default behavior. The app will use the default behavior, which may attempt to read from SharedPreferences and connect to online services if available.
+**建议**：将 `LAUNCH_MODE` 设为 `0` 以使用默认行为。应用将采用默认行为，可能会尝试从 SharedPreferences 读取，并在可用时连接在线服务。
 
-### Configuration Options
+### 配置选项
 
-1. **Launch Mode (`LAUNCH_MODE`)**
+1. **启动模式（`LAUNCH_MODE`）**
 
    ```properties
    LAUNCH_MODE=1
    ```
 
-   - **0**: Default behavior (read from SharedPreferences)
-   - **1**: Force Online-Only Mode (compatible mode)
-   - **2**: Force Connectivity-Free Mode (for offline configuration)
+   - **0**：默认行为（从 SharedPreferences 读取）
+   - **1**：强制仅在线模式（兼容模式）
+   - **2**：强制无网络依赖模式（用于离线配置）
 
-2. **Use Production URL**
+2. **使用生产 URL**
 
-   - **Condition**: Applicable when `LAUNCH_MODE` is set to `1`, or set to `0` and the user has upgraded from a previous version.
-   - **Default**: `https://app.super-productivity.com`
-   - **Configuration**: Ensure `ONLINE_SERVICE_IS_LOCAL` is set to `false`.
+   - **条件**：适用于 `LAUNCH_MODE` 设为 `1`，或设为 `0` 且用户从旧版本升级的情况。
+   - **默认**：`https://app.super-productivity.com`
+   - **配置**：确保 `ONLINE_SERVICE_IS_LOCAL` 设为 `false`。
 
    ```properties
    ONLINE_SERVICE_IS_LOCAL=false
    ```
 
-3. **Use Local Development Server**
+3. **使用本地开发服务器**
 
-   - **Condition**: Applicable when `LAUNCH_MODE` is set to `1`, or set to `0` and the user has upgraded from a previous version.
-   - **Configuration**: Set `ONLINE_SERVICE_IS_LOCAL` to `true` and start the local server.
+   - **条件**：适用于 `LAUNCH_MODE` 设为 `1`，或设为 `0` 且用户从旧版本升级的情况。
+   - **配置**：将 `ONLINE_SERVICE_IS_LOCAL` 设为 `true` 并启动本地服务器。
 
    ```properties
    ONLINE_SERVICE_IS_LOCAL=true
    ```
 
-   - **Start Local Server**
+   - **启动本地服务器**
 
      ```bash
      ng serve --disable-host-check --host 0.0.0.0 --port 4200 --live-reload --watch
      ```
 
-   - **Access URL**: `http://10.0.2.2:4200` (accessible from the Android Studio emulator and emulator's Chrome browser).
+   - **访问 URL**：`http://10.0.2.2:4200`（可从 Android Studio 模拟器及模拟器内的 Chrome 浏览器访问）。
 
-4. **Use a Self-Hosted Server**
+4. **使用自托管服务器**
 
-   - **Condition**: Applicable when `LAUNCH_MODE` is set to `1`, or set to `0` and the user has upgraded from a previous version.
-   - **Configuration**: Set `ONLINE_SERVICE_IS_LOCAL` to `false` and update `ONLINE_SERVICE_HOST` and `ONLINE_SERVICE_PROTOCOL`.
+   - **条件**：适用于 `LAUNCH_MODE` 设为 `1`，或设为 `0` 且用户从旧版本升级的情况。
+   - **配置**：将 `ONLINE_SERVICE_IS_LOCAL` 设为 `false`，并更新 `ONLINE_SERVICE_HOST` 与 `ONLINE_SERVICE_PROTOCOL`。
 
    ```properties
    ONLINE_SERVICE_IS_LOCAL=false
@@ -67,28 +67,28 @@ To enable Online-Only Mode, set the `LAUNCH_MODE` to `1` or `0` in the `app_conf
    ONLINE_SERVICE_PROTOCOL=https
    ```
 
-## How to Modify the URL
+## 如何修改 URL
 
-You can edit the URL that the web view loads by modifying the `app_config.properties` file located in the project's root directory. This allows you to easily switch between a production server, a local development server, or a self-hosted server.
+你可以通过修改项目根目录下的 `app_config.properties` 文件来编辑 web view 加载的 URL。这样即可在生产服务器、本地开发服务器或自托管服务器之间轻松切换。
 
-### Relevant Settings
+### 相关设置
 
-- **`LAUNCH_MODE`**:
+- **`LAUNCH_MODE`**：
 
-  - `0`: Default behavior (read from SharedPreferences)
-  - `1`: Force Online-Only Mode
-  - `2`: Force Connectivity-Free Mode
+  - `0`：默认行为（从 SharedPreferences 读取）
+  - `1`：强制仅在线模式
+  - `2`：强制无网络依赖模式
 
-- **When `LAUNCH_MODE` is `1` or `0` (with upgrade)**:
-  - **`ONLINE_SERVICE_IS_LOCAL`**:
-    - `true`: Load from local development server (`http://10.0.2.2:4200`).
-    - `false`: Load from production or self-hosted server.
-  - **`ONLINE_SERVICE_HOST`**:
-    - Defines the server's address.
-  - **`ONLINE_SERVICE_PROTOCOL`**:
-    - `http` or `https`.
+- **当 `LAUNCH_MODE` 为 `1` 或 `0`（且已升级）时**：
+  - **`ONLINE_SERVICE_IS_LOCAL`**：
+    - `true`：从本地开发服务器加载（`http://10.0.2.2:4200`）。
+    - `false`：从生产或自托管服务器加载。
+  - **`ONLINE_SERVICE_HOST`**：
+    - 定义服务器地址。
+  - **`ONLINE_SERVICE_PROTOCOL`**：
+    - `http` 或 `https`。
 
-## Important Notes
+## 重要说明
 
-- **Local Modifications**: The `app_config.properties` file is intended for local modifications only. **DO NOT COMMIT** this file unless you are absolutely sure of the changes.
-- **Switching Servers**: By configuring these properties, you can seamlessly switch between default, online, and offline launch behaviors without making direct changes to your Kotlin source files, improving your development workflow and offering flexibility in deployment.
+- **本地修改**：`app_config.properties` 文件仅供本地修改。**请勿提交**该文件，除非你对更改有十足把握。
+- **切换服务器**：通过配置这些属性，你可以在默认、在线与离线启动行为之间无缝切换，而无需直接修改 Kotlin 源文件，从而改善开发流程并提供部署灵活性。

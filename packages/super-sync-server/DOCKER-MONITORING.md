@@ -1,13 +1,13 @@
-# Production Docker Monitoring Guide
+# 生产环境 Docker 监控指南
 
-Quick reference for monitoring your SuperSync production Docker container.
+用于监控 SuperSync 生产 Docker 容器的快速参考。
 
-## Prerequisites
+## 前置条件
 
-- Docker container running (default name: `supersync-server`)
-- If using custom container name: `export SUPERSYNC_CONTAINER=your-container-name`
+- Docker 容器正在运行（默认名称：`supersync-server`）
+- 若使用自定义容器名：`export SUPERSYNC_CONTAINER=your-container-name`
 
-## Quick Start
+## 快速开始
 
 ```bash
 cd packages/super-sync-server
@@ -22,9 +22,9 @@ npm run docker:monitor:all
 npm run docker:shell
 ```
 
-## Common Commands
+## 常用命令
 
-### Basic Health Checks
+### 基础健康检查
 
 ```bash
 # System vitals (CPU, memory, disk, DB)
@@ -44,9 +44,9 @@ npm run docker:shell
 ./scripts/docker-monitor.sh logs --error
 ```
 
-### Investigate Specific Users
+### 调查特定用户
 
-Based on your production data, investigate the anomalies:
+根据你的生产数据，调查异常情况：
 
 ```bash
 # User #29 with 28k operations (171 bytes avg)
@@ -61,7 +61,7 @@ Based on your production data, investigate the anomalies:
 ./scripts/docker-monitor.sh analyze compare-users 27 29
 ```
 
-### Analysis Commands
+### 分析命令
 
 ```bash
 # Operation size distribution
@@ -87,7 +87,7 @@ Based on your production data, investigate the anomalies:
 ./scripts/docker-monitor.sh analyze export-ops --user 29 --limit 1000
 ```
 
-### Complete Monitoring Suite
+### 完整监控套件
 
 ```bash
 # Run all checks (takes 1-3 minutes)
@@ -103,7 +103,7 @@ Based on your production data, investigate the anomalies:
 ./scripts/docker-monitor.sh monitor-all --user 29 --save
 ```
 
-### Get Reports from Container
+### 从容器获取报告
 
 ```bash
 # Copy all reports from container to host
@@ -115,9 +115,9 @@ Based on your production data, investigate the anomalies:
 # - usage-history.jsonl (usage tracking over time)
 ```
 
-## Direct Docker Commands
+## 直接使用 Docker 命令
 
-If you prefer not to use the wrapper script:
+若你更倾向不使用封装脚本：
 
 ```bash
 # Basic monitoring (uses compiled JS)
@@ -138,9 +138,9 @@ tsx scripts/analyze-storage.ts --help
 node dist/scripts/monitor.js --help
 ```
 
-## Automated Monitoring
+## 自动化监控
 
-Set up cron jobs on the Docker host:
+在 Docker 宿主机上设置 cron 任务：
 
 ```bash
 # Add to host crontab
@@ -156,18 +156,18 @@ crontab -e
 0 * * * * cd /path/to/super-productivity/packages/super-sync-server && ./scripts/docker-monitor.sh analyze rapid-fire >> /var/log/supersync-rapid-fire.log 2>&1
 ```
 
-## Recommended Investigation Workflow
+## 推荐调查流程
 
-Based on your current production findings:
+基于你当前的生产发现：
 
-### Step 1: Get the big picture
+### 步骤 1：把握整体情况
 
 ```bash
 ./scripts/docker-monitor.sh monitor-all --save
 ./scripts/docker-monitor.sh get-reports ./investigation-$(date +%Y%m%d)
 ```
 
-### Step 2: Investigate User #29 (28k tiny ops)
+### 步骤 2：调查用户 #29（2.8 万条微小操作）
 
 ```bash
 ./scripts/docker-monitor.sh analyze user-deep-dive --user 29
@@ -175,14 +175,14 @@ Based on your current production findings:
 ./scripts/docker-monitor.sh analyze operation-timeline --user 29
 ```
 
-### Step 3: Investigate User #27 (huge ops)
+### 步骤 3：调查用户 #27（超大操作）
 
 ```bash
 ./scripts/docker-monitor.sh analyze user-deep-dive --user 27
 ./scripts/docker-monitor.sh analyze large-ops --limit 10
 ```
 
-### Step 4: Export data for deeper analysis
+### 步骤 4：导出数据做更深入分析
 
 ```bash
 ./scripts/docker-monitor.sh analyze export-ops --user 29 --limit 5000
@@ -190,9 +190,9 @@ Based on your current production findings:
 ./scripts/docker-monitor.sh get-reports ./exports
 ```
 
-## Troubleshooting
+## 故障排查
 
-### Container not found
+### 找不到容器
 
 ```bash
 # List running containers
@@ -203,25 +203,25 @@ export SUPERSYNC_CONTAINER=my-container-name
 ./scripts/docker-monitor.sh usage
 ```
 
-### tsx not found (first time)
+### 找不到 tsx（首次使用）
 
-The script automatically installs `tsx` globally in the container on first use. This persists until the container is recreated.
+脚本会在首次使用时自动在容器内全局安装 `tsx`。该安装会持续到容器被重建为止。
 
-To manually install:
+手动安装：
 
 ```bash
 docker exec supersync-server npm install -g tsx
 ```
 
-### Permission denied on script
+### 脚本权限被拒绝
 
 ```bash
 chmod +x packages/super-sync-server/scripts/docker-monitor.sh
 ```
 
-### Out of memory in container
+### 容器内存不足
 
-Increase Docker memory limit or reduce analysis scope:
+提高 Docker 内存限制，或缩小分析范围：
 
 ```bash
 # Reduce limits
@@ -229,59 +229,53 @@ Increase Docker memory limit or reduce analysis scope:
 ./scripts/docker-monitor.sh analyze export-ops --user 29 --limit 100
 ```
 
-### Reports not found when getting
+### 获取报告时找不到文件
 
-Run a command with `--save` first:
+请先运行带 `--save` 的命令：
 
 ```bash
 ./scripts/docker-monitor.sh monitor-all --save
 ./scripts/docker-monitor.sh get-reports .
 ```
 
-## Performance Notes
+## 性能说明
 
-Timings depend on the instance and are not currently measured — the 2026-08-07
-production run took 363.8s and six of ten reports failed outright. What is
-specified is the _shape_ of the cost, not a duration: see
-[How the operations reports stay bounded](scripts/MONITORING-README.md#how-the-operations-reports-stay-bounded).
+耗时取决于具体实例，目前尚未系统测量——2026-08-07 的生产运行耗时 363.8 秒，十份报告中有六份直接失败。文档约定的是成本的*形态*，而非具体时长：参见
+[操作报告如何保持有界](scripts/MONITORING-README.md#how-the-operations-reports-stay-bounded)。
 
-These scripts run under their own statement timeout (`MONITOR_STATEMENT_TIMEOUT_MS`,
-default 300000ms) rather than the one on the operator's `DATABASE_URL`, which is
-sized for the sync request path. If a report still cancels, raise that first:
+这些脚本使用各自的语句超时（`MONITOR_STATEMENT_TIMEOUT_MS`，默认 300000ms），而不是运维人员 `DATABASE_URL` 上的超时——后者是为同步请求路径设定的。若报告仍被取消，应首先提高该值：
 
 ```bash
 docker exec -e MONITOR_STATEMENT_TIMEOUT_MS=600000 supersync-server node dist/scripts/run-all-monitoring.js
 ```
 
-Then check the `payload_bytes` backfill, and only after that lower
+然后检查 `payload_bytes` 回填，之后再降低
 `MONITOR_SCOPE_USERS`
-(`docker exec -e MONITOR_SCOPE_USERS=25 supersync-server node dist/scripts/run-all-monitoring.js`)
-— see the troubleshooting section of that document. Monitoring connections
-identify themselves as `supersync-monitor`, which is how `health-alert.sh` knows
-not to page about a long-running report.
+（`docker exec -e MONITOR_SCOPE_USERS=25 supersync-server node dist/scripts/run-all-monitoring.js`）
+——详见该文档的故障排查章节。监控连接会将自身标识为 `supersync-monitor`，`health-alert.sh` 据此知道不必因长时间运行的报告而告警。
 
-## Security Notes
+## 安全说明
 
-- Scripts run as the `supersync` user inside the container
-- Exported data contains full operation payloads - handle securely
-- User emails are included in reports
-- Clean up old reports periodically to save disk space
+- 脚本在容器内以 `supersync` 用户运行
+- 导出数据包含完整操作载荷——请妥善安全处理
+- 报告中包含用户邮箱
+- 请定期清理旧报告以节省磁盘空间
 
-## File Locations (in container)
+## 文件位置（容器内）
 
-- Monitoring reports: `/app/monitoring-reports/`
-- Analysis exports: `/app/analysis-output/`
-- Usage history: `/app/logs/usage-history.jsonl`
-- Server logs: `/app/logs/app.log`
+- 监控报告：`/app/monitoring-reports/`
+- 分析导出：`/app/analysis-output/`
+- 用量历史：`/app/logs/usage-history.jsonl`
+- 服务器日志：`/app/logs/app.log`
 
-## Next Steps
+## 后续步骤
 
-After gathering data:
+收集数据后：
 
-1. Review the reports
-2. Identify patterns (sync loops, large ops, etc.)
-3. Check client-side logs for affected users
-4. Consider implementing fixes or contacting users
-5. Set up regular monitoring to catch future issues
+1. 审阅报告
+2. 识别模式（同步循环、大操作等）
+3. 检查受影响用户的客户端日志
+4. 考虑实施修复或联系用户
+5. 建立定期监控以捕获未来问题
 
-For detailed command documentation, see [MONITORING-README.md](scripts/MONITORING-README.md).
+详细命令文档见 [MONITORING-README.md](scripts/MONITORING-README.md)。

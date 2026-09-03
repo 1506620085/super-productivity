@@ -1,86 +1,86 @@
-# How to Rate ***Super Productivity***
+# 如何评价 ***Super Productivity***
 
-## How ratings affect app discoverability
+## 评分如何影响应用曝光
 
-App store ranking algorithms favor apps with higher average ratings. For a small project, even a few low ratings can have an outsized effect on the average and on how often the app is recommended or featured.
+应用商店排名算法偏好平均评分更高的应用。对小型项目而言，哪怕少量低分也可能显著拉低平均分，并影响推荐或精选频率。
 
-If you've found Super Productivity useful, an honest rating or short review helps the project reach more people.
+如果你觉得 Super Productivity 有用，诚实的评分或简短评价能帮助项目触达更多人。
 
-## 🪟 Windows (Microsoft Store)
+## 🪟 Windows（Microsoft Store）
 
-1. Go to the [Microsoft Store page](https://apps.microsoft.com/detail/9nhfvg8361tw) OR open the **Microsoft Store** app and search for **Super Productivity**
-2. Scroll to the **Rate and review** section
-3. Click the number of ⭐ stars you want to give
-4. (Optional) Write a review
-5. Click **Submit**
-
----
-
-## 🤖 Android (Google Play Store)
-
-1. Go to the [Play Store page](https://play.google.com/store/apps/details?id=com.superproductivity.superproductivity)
-2. Under **Rate this app**, tap the number of ⭐ stars you want to give
-3. (Optional) Tap **Write a Review**
-4. Tap **Post**
+1. 前往 [Microsoft Store 页面](https://apps.microsoft.com/detail/9nhfvg8361tw)，或打开 **Microsoft Store** 应用并搜索 **Super Productivity**
+2. 滚动到 **Rate and review** 部分
+3. 点击你想给的 ⭐ 星数
+4. （可选）撰写评价
+5. 点击 **Submit**
 
 ---
 
-## 🖥️ macOS (Mac App Store)
+## 🤖 Android（Google Play Store）
 
-1. Open the [App Store page](https://apps.apple.com/app/id1482572463) on your Mac
-2. Scroll to **Ratings & Reviews**
-3. Click the number of ⭐ stars you want to give
-4. (Optional) Write a review
-5. Click **Send**
+1. 前往 [Play Store 页面](https://play.google.com/store/apps/details?id=com.superproductivity.superproductivity)
+2. 在 **Rate this app** 下，点按你想给的 ⭐ 星数
+3. （可选）点按 **Write a Review**
+4. 点按 **Post**
 
 ---
 
-## 🍎 iOS (App Store)
+## 🖥️ macOS（Mac App Store）
 
-1. Open the [App Store page](https://apps.apple.com/app/id1482572463) on your iPhone or iPad
-2. Scroll to **Ratings & Reviews**
-3. Tap the number of ⭐ stars you want to give
-4. (Optional) Tap **Write a Review**
-5. Tap **Send**
+1. 在 Mac 上打开 [App Store 页面](https://apps.apple.com/app/id1482572463)
+2. 滚动到 **Ratings & Reviews**
+3. 点击你想给的 ⭐ 星数
+4. （可选）撰写评价
+5. 点击 **Send**
+
+---
+
+## 🍎 iOS（App Store）
+
+1. 在 iPhone 或 iPad 上打开 [App Store 页面](https://apps.apple.com/app/id1482572463)
+2. 滚动到 **Ratings & Reviews**
+3. 点按你想给的 ⭐ 星数
+4. （可选）点按 **Write a Review**
+5. 点按 **Send**
 
 ---
 
 ## 🐧 Ubuntu Software Center
 
-1. Open **Ubuntu Software**
-2. Search for **Super Productivity**
-3. Click the Super Productivity result to view its page
-4. Under the title, click the number of ⭐ stars you want to give
-5. Sign in with your Ubuntu One account if prompted
-6. (Optional) Write a review
-7. Click **Submit**
+1. 打开 **Ubuntu Software**
+2. 搜索 **Super Productivity**
+3. 点击 Super Productivity 结果查看其页面
+4. 在标题下，点击你想给的 ⭐ 星数
+5. 若提示，使用 Ubuntu One 账户登录
+6. （可选）撰写评价
+7. 点击 **Submit**
 
 ---
 
 ## 🧩 GNOME Software Center
 
-1. Open **GNOME Software**
-2. Search for **Super Productivity**
-3. Click the Super Productivity result to view its page
-4. Tap the number of ⭐ stars you want to give
-5. Authenticate if prompted
-6. (Optional) Write a review
-7. Click **Submit**
+1. 打开 **GNOME Software**
+2. 搜索 **Super Productivity**
+3. 点击 Super Productivity 结果查看其页面
+4. 点按你想给的 ⭐ 星数
+5. 若提示则进行身份验证
+6. （可选）撰写评价
+7. 点击 **Submit**
 
 ---
 
 ## 🌐 alternativeto.net
 
-1. Go to [the AlternativeTo page](https://alternativeto.net/software/super-productivity/about/)
-2. Scroll to "Comments and Reviews"
-3. Click on "Post comment/review"
-4. Write a review
-5. Click **Submit**
+1. 前往 [AlternativeTo 页面](https://alternativeto.net/software/super-productivity/about/)
+2. 滚动到 "Comments and Reviews"
+3. 点击 "Post comment/review"
+4. 撰写评价
+5. 点击 **Submit**
 
 ---
 
-## Other places that help the project
+## 其他有助于项目的地方
 
-- ⭐ Star us on GitHub: https://github.com/super-productivity/super-productivity
+- ⭐ 在 GitHub 上给我们加星：https://github.com/super-productivity/super-productivity
 - https://www.producthunt.com/products/super-productivity
 - https://www.pling.com/p/1352584/

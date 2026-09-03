@@ -1,51 +1,37 @@
-# Location-based reminders
+# 基于位置的提醒
 
-> **Status:** Proposed; no implementation is approved.
+> **状态：** 已提案；尚无获批实现。
 >
-> **Owner:** Unassigned.
+> **负责人：** 未指定。
 >
-> **Tracking:** [GitHub issue #5336](https://github.com/super-productivity/super-productivity/issues/5336).
+> **跟踪：** [GitHub issue #5336](https://github.com/super-productivity/super-productivity/issues/5336)。
 >
-> **Last verified:** 2026-07-29.
+> **上次核实：** 2026-07-29。
 >
-> **Removal condition:** Delete this proposal if the issue is declined or
-> closed without implementation. If accepted, replace it with an implementation
-> plan and move enduring behavior into maintained documentation.
+> **移除条件：** 若该 issue 被拒绝或以未实现方式关闭，则删除本提案。
+> 若被接受，则替换为实现计划，并将持久行为移入维护中的文档。
 
-## User need
+## 用户需求
 
-Users want an opt-in reminder when they arrive at a place so a relevant task or
-list appears at the useful moment. The tracking issue records several distinct
-participants and current workflow examples. That demand justifies retaining the
-proposal, but not the large, implementation-specific design that previously
-lived here.
+用户希望在到达某地时可选地收到提醒，以便在合适的时机出现相关任务或列表。
+跟踪 issue 记录了多位参与者及当前工作流示例。该需求足以保留本提案，
+但不足以保留此前此处冗长、实现细节过多的设计。
 
-## Product and privacy constraints
+## 产品与隐私约束
 
-Any accepted design must:
+任何获批设计必须：
 
-- remain off until a user explicitly configures a location reminder and grants
-  the required platform permission;
-- work locally and offline, without analytics, telemetry, or a remote location
-  service becoming a prerequisite;
-- make any decision to sync coordinates explicit, because saved places are
-  sensitive data and may not belong on every synced device;
-- use platform geofencing or another battery-conscious native mechanism rather
-  than continuous foreground polling;
-- avoid repeated or stale notifications by defining when a reminder fires,
-  expires, and can fire again;
-- degrade calmly on platforms that cannot provide reliable background
-  geofencing; and
-- begin with the smallest useful workflow rather than maps, travel-time
-  prediction, or general location-history features.
+- 默认关闭，直至用户显式配置位置提醒并授予所需平台权限；
+- 在本地与离线环境下工作，不以分析、遥测或远程位置服务为前提；
+- 对是否同步坐标做出显式决策，因为已保存地点属于敏感数据，未必适合出现在每台同步设备上；
+- 使用平台地理围栏或其他省电的原生机制，而非持续前台轮询；
+- 通过定义提醒何时触发、何时过期、何时可再次触发，避免重复或过期通知；
+- 在无法提供可靠后台地理围栏的平台上平静降级；以及
+- 从最小可用工作流起步，而非地图、出行时间预测或通用位置历史功能。
 
-## Decisions still required
+## 仍需决定的事项
 
-The tracking issue must establish the initial reminder scope, supported
-platforms, precision and dwell-time behavior, permission flow, data model,
-sync policy, battery/reliability evidence, and deletion/export behavior before
-implementation starts.
+在开始实现前，跟踪 issue 必须明确：初始提醒范围、支持平台、精度与停留时间行为、权限流程、数据模型、同步策略、电池/可靠性证据，以及删除/导出行为。
 
-The original detailed draft is historical research, not a current
-specification. It remains available in Git history at
-`aff89beafa:docs/long-term-plans/location-based-reminders.md`.
+原先的详细草稿是历史研究，而非当前规范。仍可在 Git 历史中查看：
+`aff89beafa:docs/long-term-plans/location-based-reminders.md`。

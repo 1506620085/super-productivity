@@ -1,206 +1,93 @@
-# Production Capacity and the OpenVZ Constraint
+# 生产能力与 OpenVZ 约束
 
-**Status:** current. **Numbers last verified:** 2026-08-28. Every figure below is
-a point-in-time measurement — re-measure before relying on any of them.
+**状态：** 现行。**数字上次验证：** 2026-08-28。下文每个数字均为某一时点的测量——在依赖其中任何一个之前请重新测量。
 
-## Scope
+## 范围
 
-This documents the **measured limits of the hosted SuperSync deployment** and the
-design decisions those limits have already forced, so that neither has to be
-rediscovered from commit messages and closed issues.
+本文档记录**托管 SuperSync 部署的实测限制**，以及这些限制已经迫使做出的设计决策，以免二者只能从提交信息与已关闭议题中重新发现。
 
-Host names, unix accounts, filesystem paths, and the backup/reboot schedule are
-deliberately **not** here — they live in the operator's private runbook, which is
-also where the 2026-08-25 outage remediation plan went when it was removed from
-this repository. What follows is the part that is safe to keep in the open and
-that contributors need in order to read the code correctly.
+主机名、unix 账户、文件系统路径，以及备份/重启计划被刻意**不放于此**——它们位于运维者的私有运维手册中；2026-08-25 故障补救计划从本仓库移除后也放在那里。下文是可安全公开保留、且贡献者正确阅读代码所需的部分。
 
-## The constraint
+## 约束
 
-| Property                       | Value                                      | Source                         |
+| 属性                           | 值                                         | 来源                           |
 | ------------------------------ | ------------------------------------------ | ------------------------------ |
-| Virtualization                 | OpenVZ / Virtuozzo container               | `systemd-detect-virt` → openvz |
-| Disk throughput limit          | 50 MB/s                                    | Hoster, 2026-08-28             |
-| Disk IOPS limit                | **150**                                    | Hoster, 2026-08-28             |
-| Underlying media               | SSD                                        | Hoster, 2026-08-28             |
-| Host RAM                       | 4 GB                                       | Measured 2026-08-25            |
-| Postgres container `mem_limit` | 1,536 MB                                   | `docker-compose.yml`           |
-| Cold random read latency       | **~9.5 ms per 8 KB block**                 | Measured 2026-08               |
-| Sequential throughput          | ~22 MB/s (fine — the cap is on random I/O) | Measured 2026-08-25            |
+| 虚拟化                         | OpenVZ / Virtuozzo 容器                    | `systemd-detect-virt` → openvz |
+| 磁盘吞吐限制                   | 50 MB/s                                    | 主机商，2026-08-28             |
+| 磁盘 IOPS 限制                 | **150**                                    | 主机商，2026-08-28             |
+| 底层介质                       | SSD                                        | 主机商，2026-08-28             |
+| 主机 RAM                       | 4 GB                                       | 实测 2026-08-25                |
+| Postgres 容器 `mem_limit`      | 1,536 MB                                   | `docker-compose.yml`           |
+| 冷随机读延迟                   | **每 8 KB 块约 9.5 ms**                    | 实测 2026-08                   |
+| 顺序吞吐                       | 约 22 MB/s（尚可——上限在随机 I/O）         | 实测 2026-08-25                |
 
-The IOPS limit is **tariff-bound, not a fault**. The hoster confirmed on
-2026-08-28 that the measured values match the configured limits, that the node is
-SSD-backed, and — importantly — that **migrating the container to another node
-leaves the limits unchanged**. There is no support ticket that fixes this.
+IOPS 限制是**资费绑定，而非故障**。主机商于 2026-08-28 确认：测量值与配置限制匹配，节点以 SSD 为后端，且——重要的是——**将容器迁移到另一节点不会改变这些限制**。没有能修复这一点的支持工单。
 
-### Why 150 IOPS is the binding constraint
+### 为何 150 IOPS 是绑定约束
 
-150 IOPS × 8 KB = **1.2 MB/s of random reads**. Sequential access merges and is
-unaffected, so the ceiling only bites where the workload seeks:
+150 IOPS × 8 KB = **1.2 MB/s 的随机读**。顺序访问会合并且不受影响，因此上限仅在工作负载寻道时咬人：
 
-- The `operations` heap was 6,770 MB / 860,996 pages at 8.6M live rows (2026-08).
-- A **random** page walk over all of it costs ~860,996 ÷ 150 ≈ **96 minutes**.
-  Note this figure applies _only_ to seek-bound access. A sequential pass over
-  the same heap plus its 1,911 MB TOAST relation is ~6.6 minutes at the measured
-  ~22 MB/s, so never quote the 96 minutes for anything that scans in order — the
-  nightly `pg_dump`'s runtime is **not** explained by it, and the likeliest
-  cause there is per-row TOAST detoast fetches, which are random.
-- Under cgroup v2 the page cache is charged to the container, so Postgres reaches
-  at most `mem_limit` of `shared_buffers` + file cache: roughly **1.1 GB of
-  cache**, no matter how much RAM the host has. That is ~16% of the 6.77 GB heap
-  alone, but the same cache also has to hold ~3 GB of indexes and the 1.9 GB
-  TOAST relation, so the real resident fraction of the working set is nearer
-  **9–12%**.
+- `operations` 堆在 860 万存活行时为 6,770 MB / 860,996 页（2026-08）。
+- 对其全部做**随机**页遍历约需 860,996 ÷ 150 ≈ **96 分钟**。
+  注意该数字*仅*适用于寻道受限的访问。对同一堆及其 1,911 MB TOAST 关系做顺序遍历，以实测约 22 MB/s 约需 6.6 分钟，因此切勿对任何按序扫描的操作引用这 96 分钟——夜间 `pg_dump` 的运行时间**不能**用它解释，最可能的原因是按行的 TOAST 解压取数，那是随机的。
+- 在 cgroup v2 下，页缓存计入容器，因此 Postgres 最多达到 `mem_limit` 的 `shared_buffers` + 文件缓存：大约 **1.1 GB 缓存**，无论主机有多少 RAM。那仅是 6.77 GB 堆的约 16%，但同一缓存还须容纳约 3 GB 索引与 1.9 GB TOAST 关系，因此工作集的真实常驻比例更接近 **9–12%**。
 
-The consequence is that anything touching the ~90% that is not resident pays
-~9.5 ms per block. One measured example: the retention cleanup's fleet-wide
-aggregate ran in **80,612 ms cold vs 155 ms warm** on identical block counts — a
-520× difference that is entirely page cache versus disk.
+后果是：任何触及约 90% 非常驻部分的操作，每块支付约 9.5 ms。一个实测例子：保留清理的全舰队聚合在相同块计数上冷跑 **80,612 ms，热跑 155 ms**——520× 的差异完全来自页缓存对比磁盘。
 
-## What this has already cost
+## 这已经付出的代价
 
-Three independent costs trace back to the same hosting choice.
+三项独立成本追溯到同一托管选择。
 
-**1. No encryption at rest.** Both project-managed LUKS and PostgreSQL TDE were
-implemented and then retired as incompatible with the OpenVZ environment. See
+**1. 无静态加密。** 项目自管的 LUKS 与 PostgreSQL TDE 均已实现，随后因与 OpenVZ 环境不兼容而退役。参见
 [`../archive/encryption-attempts-openvz-incompatible/`](../archive/encryption-attempts-openvz-incompatible/)
-and [`encryption-at-rest.md`](encryption-at-rest.md).
+与 [`encryption-at-rest.md`](encryption-at-rest.md)。
 
-**2. Undiagnosable database crashes.** A Postgres backend has been exiting with
-code 2 — the `quickdie` / `SIGQUIT` path — roughly every two weeks for months
-(~45 occurrences, #9695). Note this does **not** by itself mean an external
-sender: when any one backend dies unexpectedly, the postmaster itself `SIGQUIT`s
-every sibling connection and re-runs WAL recovery (`scripts/health-alert.sh`),
-so exit code 2 is the ordinary consequence for the siblings. What the platform
-prevents is identifying the sender for the _first_ victim: `auditd` cannot run in
-an OpenVZ guest, and guest processes are ordinary host-visible PIDs. The cause is
-therefore unattributable from inside the container — that is the finding, not
-that any particular party is responsible.
+**2. 不可诊断的数据库崩溃。** 一个 Postgres 后端大约每两周以退出码 2 退出——`quickdie` / `SIGQUIT` 路径——已持续数月（约 45 次，#9695）。注意这本身**并不**意味着外部发送者：当任一后端意外死亡时，postmaster 本身会对每个兄弟连接发 `SIGQUIT` 并重新运行 WAL 恢复（`scripts/health-alert.sh`），因此退出码 2 对兄弟连接是普通后果。平台所阻止的是识别*第一个*受害者的发送者：`auditd` 无法在 OpenVZ 访客中运行，且访客进程是主机可见的普通 PID。因此原因无法从容器内归因——这就是结论，而非任何特定方应负责。
 
-**3. A permanent tax on query design.** Every mitigation in the next section
-exists only because random reads cost ~9.5 ms here. That is recurring
-engineering time, spent on work that a faster disk would make unnecessary.
+**3. 查询设计上的永久税。** 下一节的每一项缓解措施之所以存在，只因为此处随机读约需 9.5 ms。那是反复的工程时间，花在更快磁盘本会使其不必要的工作上。
 
-## What has been built around it
+## 围绕它已构建的内容
 
-These are responses to the constraint above, not general-purpose optimizations.
-Each one's reasoning lives at its own call site — **pointers, not summaries**, so
-this list cannot drift out of sync with the code it describes:
+这些是对上述约束的响应，而非通用优化。每一项的推理位于其各自调用点——**指针，而非摘要**，因此本列表不会与其描述的代码不同步：
 
-| Mitigation                                                                                           | Where the reasoning lives                                            |
+| 缓解措施                                                                                             | 推理所在位置                                                         |
 | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Windowed retention deletes (stated two-sided `server_seq` range, not a discovered `take`)            | `storage-quota.service.ts`, #9692, #9763                             |
-| Covering `(user_id, received_at, server_seq)` index for the fresh-prefix probe                       | migration `20260828000001`                                           |
-| Causal partial index so the fleet-wide boundary scan runs index-only (additive; the broad one stays) | migration `20260829000000`                                           |
-| Autovacuum **insert** scale factor at 0.02 (and why the other two are deliberately excluded)         | migration `20260828000003`                                           |
-| `POSTGRES_MEM_LIMIT` / `POSTGRES_EFFECTIVE_CACHE_SIZE` kept opt-in                                   | `docker-compose.yml`, `env.example`                                  |
-| Opt-in 60s `statement_timeout` — **off by default**, and only the `DATABASE_URL` form works          | `env.example`, `docker-compose.yml`                                  |
-| Query-plan integration specs against real PostgreSQL                                                 | `tests/integration/old-ops-*-plan.integration.spec.ts`, #9191, #9192 |
+| 窗口化保留删除（陈述的双侧 `server_seq` 范围，而非发现的 `take`）                                    | `storage-quota.service.ts`，#9692，#9763                             |
+| 覆盖 `(user_id, received_at, server_seq)` 索引，用于新鲜前缀探测                                     | 迁移 `20260828000001`                                                |
+| 因果部分索引，使全舰队边界扫描为仅索引扫描（增量；宽索引保留）                                       | 迁移 `20260829000000`                                                |
+| Autovacuum **插入**缩放因子 0.02（以及为何另外两个被刻意排除）                                       | 迁移 `20260828000003`                                                |
+| `POSTGRES_MEM_LIMIT` / `POSTGRES_EFFECTIVE_CACHE_SIZE` 保持可选                                      | `docker-compose.yml`，`env.example`                                  |
+| 可选的 60s `statement_timeout` — **默认关闭**，且仅 `DATABASE_URL` 形式有效                          | `env.example`，`docker-compose.yml`                                  |
+| 针对真实 PostgreSQL 的查询计划集成规格                                                               | `tests/integration/old-ops-*-plan.integration.spec.ts`，#9191，#9192 |
 
-### Operating the autovacuum tuning
+### 运维 autovacuum 调优
 
-`20260828000003` is checksum-frozen once applied, so its evolving guidance lives
-here instead:
+`20260828000003` 一旦应用即校验和冻结，因此其演进中的指引放在此处：
 
-- **Before deploying it**, check `age(relfrozenxid)` on `operations` and its
-  TOAST relation. An ordinary autovacuum yields to the `ALTER` after
-  `deadlock_timeout`; an anti-wraparound one does not, and colliding with one
-  _can_ fail the deploy with `57014`. `migrate-deploy.sh` does not auto-recover
-  that shape — clear it with `prisma migrate resolve --rolled-back` and re-run.
-- **The "~5× or ~0.5× vacuum I/O" question is answered, and it is why only the
-  insert factor ships.** Measured with `VACUUM (VERBOSE)` on PostgreSQL 16
-  against this schema: an insert-triggered pass reports `index scans: 0` and
-  "index scan not needed", touching 16.9% of heap pages — the index pass is
-  skipped outright, not merely LP_DEAD-bypassed. A pass following a `DELETE`
-  reports `index scans: 1` and walks all 8 indexes (~3 GB). The amplification
-  belongs to the **dead-tuple** factor, which is therefore left at its default;
-  on a growing append-only table it is a no-op anyway, since the insert trigger
-  always fires first. Re-measure if the table stops growing.
-- **Do not justify it with the fresh-prefix probe.** That query is immune to
-  visibility-map decay: `server_seq` is the covering index's third column, so it
-  becomes an Index Cond and btree discards non-matching rows before the
-  visibility check ever runs. Measured on PostgreSQL 16 against this schema —
-  2,000 unvacuumed rows, a 38-page map deficit, `Heap Fetches: 0`. The cost
-  lands on index-only scans that **emit** rows over the same window: the same
-  fixture measured ~2,014 heap fetches, 0 after a VACUUM. Both are pinned in
-  `tests/integration/old-ops-probe-plan.integration.spec.ts`. When that was
-  written no production query was both index-only-capable and emitted volume, so
-  the benefit was bounded map sag and freeze debt. Migration `20260829000000`
-  changed that: the fleet-wide boundary scan is now index-only and emits ~3,162
-  rows, so map coverage became a query cost — see below.
-- **Revisit against the monitoring report.** `npm run monitor stats` prints an
-  `operations: visibility map & autovacuum` section — map coverage,
-  `n_ins_since_vacuum`, `n_mod_since_analyze`, autovacuum cadence, the live
-  `reloptions`, and `age(relfrozenxid)` — and warns below 90% coverage.
-  `n_dead_tup` is shown but is not evidence on its own; it oscillates.
-- **During a retention backlog dig-out** (raising
-  `OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN`, see `MONITORING-README.md`) deletes
-  start triggering vacuums, so passes begin walking all 8 indexes. Whether that
-  gets _worse_ per pass depends on which outruns which: a higher delete budget
-  raises dead tuples per pass, a shorter interval lowers them. Do not assume;
-  watch `n_dead_tup` and the autovacuum cadence in the monitoring report.
+- **部署前**，检查 `operations` 及其 TOAST 关系上的 `age(relfrozenxid)`。普通 autovacuum 在 `deadlock_timeout` 后会让步于 `ALTER`；反环绕（anti-wraparound）不会，与其碰撞*可能*使部署以 `57014` 失败。`migrate-deploy.sh` 不会自动恢复该形态——用 `prisma migrate resolve --rolled-back` 清除并重新运行。
+- **「约 5× 或约 0.5× vacuum I/O」问题已有答案，这也是为何只交付插入因子。** 在 PostgreSQL 16 上对本 schema 用 `VACUUM (VERBOSE)` 测量：由插入触发的一遍报告 `index scans: 0` 与「不需要索引扫描」，触及 16.9% 的堆页——索引遍被直接跳过，而非仅绕过 LP_DEAD。跟随 `DELETE` 的一遍报告 `index scans: 1` 并遍历全部 8 个索引（约 3 GB）。放大属于**死元组**因子，因此留在默认；在增长中的仅追加表上它本来也是空操作，因为插入触发总是先开火。若表停止增长请重新测量。
+- **不要用新鲜前缀探测为其辩护。** 该查询对可见性映射衰减免疫：`server_seq` 是覆盖索引的第三列，因此它成为 Index Cond，btree 在可见性检查运行之前就丢弃不匹配行。在 PostgreSQL 16 上对本 schema 测量——2,000 未 vacuum 行、38 页映射赤字、`Heap Fetches: 0`。成本落在在同一窗口上**发出**行的仅索引扫描：同一夹具测得约 2,014 次堆取数，VACUUM 后为 0。两者钉在 `tests/integration/old-ops-probe-plan.integration.spec.ts`。撰写时没有生产查询既具备仅索引能力又发出体量，因此收益是有界的映射下垂与冻结债务。迁移 `20260829000000` 改变了这一点：全舰队边界扫描现在是仅索引且发出约 3,162 行，因此映射覆盖成为查询成本——见下文。
+- **对照监控报告重新审视。** `npm run monitor stats` 打印 `operations: visibility map & autovacuum` 节——映射覆盖、`n_ins_since_vacuum`、`n_mod_since_analyze`、autovacuum 节奏、实时 `reloptions` 与 `age(relfrozenxid)`——并在覆盖低于 90% 时警告。`n_dead_tup` 会显示，但本身不是证据；它会振荡。
+- **在清理保留积压时**（提高 `OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN`，见 `MONITORING-README.md`）删除开始触发 vacuum，因此各遍开始遍历全部 8 个索引。每遍是否*变差*取决于谁跑赢谁：更高的删除预算提高每遍死元组，更短的间隔降低它们。不要假定；观察监控报告中的 `n_dead_tup` 与 autovacuum 节奏。
 
-### Operating the causal boundary index
+### 运维因果边界索引
 
-`20260829000000` is checksum-frozen once applied, so its evolving guidance lives
-here instead:
+`20260829000000` 一旦应用即校验和冻结，因此其演进中的指引放在此处：
 
-- **Set `MIGRATION_TIMEOUT` explicitly for the deploy that applies it.** The
-  default is 900s (`deploy.sh`), and this is the first `CREATE INDEX
-CONCURRENTLY` on `operations` at ~7 GB. What can exceed the budget is not the
-  build — only ~3,162 rows match the predicate, and the two heap passes are
-  sequential — but the two phases where `CONCURRENTLY` **waits for every
-  transaction older than its snapshot to finish**. That wait is unbounded and has
-  nothing to do with disk speed. Check `pg_stat_activity` for long-running
-  transactions first; the sweep and snapshot generation are the usual holders.
-- **Do not size the build from autovacuum's observed rate.** A vacuum on this
-  host was measured at ~163 pages/s (2026-08-29), which would imply hours for two
-  passes over ~861k pages. That rate is `autovacuum_vacuum_cost_delay`
-  throttling, not the disk; `CREATE INDEX CONCURRENTLY` has no such throttle and
-  reads sequentially. Measured on PostgreSQL 16.15 against this schema
-  (2026-08-29): the build took 24 ms over 1,101 pages and 401 ms over 27,524 —
-  linear in pages, so ~13 s at production's ~861k on that hardware. Even an order
-  of magnitude slower leaves it far inside a 1800 s budget. **The build is not
-  the risk. The wait is.**
-- **The win does not decay as the table grows.** Same measurements: a 25x larger
-  table (60k -> 1.5M rows, 1,101 -> 27,524 pages) moved the scan from 12 to 242
-  blocks — tracking the _causal_ row count, which grew 25x too, at a flat
-  ~0.003 blocks per causal row. Production's causal ratio is ~165x _lower_ than
-  that fixture's (~3,162 causal rows in 9.1M), so its scan should land nearer the
-  12 than the 242. Cost belongs to full-state ops, not to the table.
-- **A timed-out build is recoverable, not wedged.** The migration is in
-  `migrate-deploy.sh`'s recoverable-`CONCURRENTLY` list, so a leftover INVALID
-  index is dropped and rebuilt on the next attempt. `deploy.sh` exits 124 and
-  says so. This is the shape #9783/#9787 exist to handle — verify the recovery
-  actually ran rather than assuming it.
-- **The win depends on the visibility map, so it depends on the autovacuum
-  tuning above.** The boundary scan is index-only and emits rows, so map decay
-  costs it one heap fetch per emitted tuple on a non-all-visible page. That cost
-  is proportional to **recent** full-state ops (a handful a day), not to the
-  table, because the index is partial — pinned as a test against an unvacuumed
-  tail in `tests/integration/old-ops-boundary-plan.integration.spec.ts`. If
-  `npm run monitor stats` warns on map coverage, this statement is one of the
-  things paying for it.
-- **After applying it, re-measure.** `EXPLAIN (ANALYZE, BUFFERS)` on the sweep's
-  boundary `groupBy` read 3,930 heap blocks in 33.7s before (2026-08-29, on a run
-  that did not hit the 60s cap; an earlier one did). Everything above is measured
-  on a 60k-row fixture; that one production number is what converts it.
+- **对该迁移的部署显式设置 `MIGRATION_TIMEOUT`。** 默认是 900s（`deploy.sh`），这是在约 7 GB 的 `operations` 上首次 `CREATE INDEX CONCURRENTLY`。可能超出预算的不是构建——仅约 3,162 行匹配谓词，两遍堆扫描是顺序的——而是 `CONCURRENTLY` **等待每个早于其快照的事务完成**的两个阶段。该等待无上界，且与磁盘速度无关。先检查 `pg_stat_activity` 中的长时间运行事务；扫描与快照生成通常是持有者。
+- **不要用 autovacuum 的观测速率估算构建。** 在此主机上 vacuum 测得约 163 页/秒（2026-08-29），对约 861k 页的两遍意味着数小时。该速率是 `autovacuum_vacuum_cost_delay` 节流，而非磁盘；`CREATE INDEX CONCURRENTLY` 无此类节流且顺序读取。在 PostgreSQL 16.15 上对本 schema 测量（2026-08-29）：构建在 1,101 页上耗时 24 ms，在 27,524 页上 401 ms——与页数线性，因此在该硬件上生产约 861k 页约 13 s。即使慢一个数量级也远在 1800 s 预算内。**风险不在构建。风险在等待。**
+- **收益不会随表增长而衰减。** 同一测量：表大 25 倍（60k → 1.5M 行，1,101 → 27,524 页）时，扫描从 12 块移到 242 块——跟踪*因果*行数，它也增长了 25 倍，约每因果行 0.003 块的平坦比率。生产的因果比该夹具*低*约 165 倍（910 万中约 3,162 因果行），因此其扫描应更接近 12 而非 242。成本属于完整状态操作，而非表。
+- **超时的构建可恢复，不会卡死。** 该迁移在 `migrate-deploy.sh` 的可恢复-`CONCURRENTLY` 列表中，因此残留的 INVALID 索引会在下次尝试时被删除并重建。`deploy.sh` 以 124 退出并说明。这正是 #9783/#9787 要处理的形态——验证恢复确实运行，而非假定。
+- **收益依赖可见性映射，因此依赖上文的 autovacuum 调优。** 边界扫描是仅索引且发出行，因此映射衰减在非全可见页上对每个发出元组花费一次堆取数。该成本与**近期**完整状态操作成正比（每天少量），而非与表，因为索引是部分的——钉在 `tests/integration/old-ops-boundary-plan.integration.spec.ts` 中对未 vacuum 尾部的测试。若 `npm run monitor stats` 对映射覆盖告警，该语句是为之付费的之一。
+- **应用后重新测量。** 扫描的边界 `groupBy` 上的 `EXPLAIN (ANALYZE, BUFFERS)` 在之前读了 3,930 堆块、耗时 33.7s（2026-08-29，一次未触及 60s 上限的运行；更早一次触及了）。上文全部在 60k 行夹具上测量；那一个生产数字将其换算。
 
-## The open decision
+## 未决决策
 
-Whether to move the deployment off this platform is tracked in **#9780**, along
-with the arguments either way and the outstanding question to the hoster. It is
-deliberately not restated here: it is an unresolved operator decision, not
-contributor documentation, and a second copy would go stale the moment the
-hoster replies.
+是否将部署迁离此平台跟踪于 **#9780**，连同正反论据以及对主机商的未决问题。此处刻意不再复述：它是未解决的运维者决策，而非贡献者文档，第二份副本会在主机商回复的瞬间过时。
 
-## Guidance for contributors
+## 贡献者指引
 
-- Assume **random reads are expensive and sequential reads are not.** A plan that
-  looks acceptable on a laptop NVMe can be an outage here.
-- Prefer index-only scans, and treat anything that depends on the visibility map
-  as depending on autovacuum actually running.
-- Do not size a query by rows returned; size it by **blocks touched**, and prefer
-  stated ranges over discovered limits.
-- Numbers in this file are dated. Re-measure before relying on them, and see
-  `scripts/MONITORING-README.md` for the tooling.
+- 假定**随机读昂贵而顺序读不昂贵。** 在笔记本 NVMe 上看起来可接受的计划，在这里可能是一次故障。
+- 优先仅索引扫描，并将任何依赖可见性映射的事物视为依赖 autovacuum 实际在运行。
+- 不要按返回行数估算查询；按**触及的块**估算，并优先陈述范围而非发现的限制。
+- 本文件中的数字带日期。依赖前请重新测量，工具见 `scripts/MONITORING-README.md`。

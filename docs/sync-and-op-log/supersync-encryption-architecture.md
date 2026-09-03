@@ -1,13 +1,10 @@
-# SuperSync End-to-End Encryption Architecture
+# SuperSync 端到端加密架构
 
-## Overview
+## 概述
 
-SuperSync uses **AES-256-GCM** encryption with **Argon2id** key derivation for
-end-to-end encryption (E2EE). Operation payload encryption/decryption happens
-client-side. The server still sees the plaintext operation envelope metadata
-described under [Security Properties](#security-properties).
+SuperSync 使用 **AES-256-GCM** 加密与 **Argon2id** 密钥派生实现端到端加密（E2EE）。操作载荷的加密/解密发生在客户端。服务器仍能看到[安全属性](#安全属性)中描述的明文操作信封元数据。
 
-## Encryption Flow Diagram
+## 加密流程图
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -158,177 +155,100 @@ described under [Security Properties](#security-properties).
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Key Components
+## 关键组件
 
 ### 1. OperationEncryptionService
 
 [`OperationEncryptionService`](../../src/app/op-log/sync/operation-encryption.service.ts)
-owns operation and snapshot payload encryption. Its current contract is more
-than an encrypt/decrypt round trip:
+拥有操作与快照载荷加密。其当前契约不止是一次加密/解密往返：
 
-- Upload encrypts the JSON payload and marks the resulting operation encrypted.
-- Download authenticates and decrypts the ciphertext, parses the payload, and
-  then checks the unauthenticated envelope against authenticated payload data
-  before returning an operation for application.
-- LWW target/footprint mismatches and a plaintext `opType` that promotes a
-  non-full-state payload to a full-state operation fail closed. The executable
-  checks live in
-  [`verify-decrypted-op-integrity.ts`](../../src/app/op-log/sync/verify-decrypted-op-integrity.ts);
-  its specs define the accepted legacy and full-state shapes.
+- 上传加密 JSON 载荷，并将结果操作标记为已加密。
+- 下载认证并解密密文，解析载荷，然后在返回供应用的操作之前，用已认证的载荷数据核对未认证的信封。
+- LWW 目标/足迹不匹配，以及把非全状态载荷提升为全状态操作的明文 `opType`，都会失败关闭。可执行检查位于
+  [`verify-decrypted-op-integrity.ts`](../../src/app/op-log/sync/verify-decrypted-op-integrity.ts)；
+  其规范定义了接受的遗留与全状态形状。
 
-### 2. Encryption Algorithm
+### 2. 加密算法
 
-**Location**: `packages/sync-core/src/encryption.ts` and its
-`packages/sync-core/src/encryption/` collaborators.
+**位置**：`packages/sync-core/src/encryption.ts` 及其
+`packages/sync-core/src/encryption/` 协作者。
 
-- **Algorithm**: AES-256-GCM (Galois/Counter Mode)
-- **Key Derivation**: Argon2id (memory-hard, resistant to GPU attacks)
-- **Salt**: Random 16 bytes when a password's session encrypt key is derived;
-  reused with that cached key for the process session
-- **IV**: Fresh random 12 bytes per encrypted payload
-- **Output Format**: `salt || iv || (AES-GCM ciphertext + authTag)` (base64
-  encoded)
+- **算法**：AES-256-GCM（Galois/Counter Mode）
+- **密钥派生**：Argon2id（内存困难，抗 GPU 攻击）
+- **Salt**：派生密码的会话加密密钥时使用随机 16 字节；在进程会话中与该缓存密钥一起复用
+- **IV**：每个加密载荷使用新鲜的随机 12 字节
+- **输出格式**：`salt || iv || (AES-GCM ciphertext + authTag)`（base64 编码）
 
-The session-stable salt amortizes the expensive Argon2id derivation across
-operations. AES-GCM safety under that fixed derived key depends on the fresh IV
-remaining unique for every encrypted payload.
+会话稳定的 salt 将昂贵的 Argon2id 派生摊销到多次操作上。在该固定派生密钥下，AES-GCM 安全性依赖每个加密载荷的新鲜 IV 保持唯一。
 
-### 3. Upload Integration
+### 3. 上传集成
 
 [`OperationLogUploadService`](../../src/app/op-log/sync/operation-log-upload.service.ts)
-gets the key through the provider contract and encrypts operation and snapshot
-payloads before transport. The upload boundary is fail-closed:
+通过提供者契约获取密钥，并在传输前加密操作与快照载荷。上传边界失败关闭：
 
-- A provider that mandates E2EE (SuperSync) cannot upload pending operations or
-  snapshots without a usable key. Pending work remains unsynced for a later
-  encrypted retry, and the result reports that encryption setup is incomplete.
-- A file provider whose configuration says encryption is enabled but whose key
-  is missing throws before upload instead of falling back to plaintext.
-- The file-format encryption chokepoint independently enforces the same
-  no-key/no-upload rule in
-  [`encrypt-and-compress-handler.service.ts`](../../src/app/op-log/encryption/encrypt-and-compress-handler.service.ts).
+- 强制要求 E2EE 的提供者（SuperSync）在没有可用密钥时不能上传待处理操作或快照。待处理工作保持未同步以待稍后加密重试，结果报告加密设置未完成。
+- 配置声称启用加密但缺少密钥的文件提供者，在上传前抛出，而非回退到明文。
+- 文件格式加密瓶颈在
+  [`encrypt-and-compress-handler.service.ts`](../../src/app/op-log/encryption/encrypt-and-compress-handler.service.ts)
+  中独立强制执行相同的无密钥/无上传规则。
 
-Regression coverage lives in
+回归覆盖位于
 [`operation-log-upload.service.spec.ts`](../../src/app/op-log/sync/operation-log-upload.service.spec.ts)
-and
-[`encrypt-and-compress-handler.service.spec.ts`](../../src/app/op-log/encryption/encrypt-and-compress-handler.service.spec.ts).
+与
+[`encrypt-and-compress-handler.service.spec.ts`](../../src/app/op-log/encryption/encrypt-and-compress-handler.service.spec.ts)。
 
-### 4. Download Integration
+### 4. 下载集成
 
 [`OperationLogDownloadService`](../../src/app/op-log/sync/operation-log-download.service.ts)
-screens downloaded operations before application; the upload service applies
-the same inbound checks to piggybacked operations:
+在应用前筛查已下载操作；上传服务对捎带操作应用相同的入站检查：
 
-- If SuperSync configuration expects encryption, any plaintext inbound
-  operation rejects its batch. This prevents a forged
-  `isPayloadEncrypted=false` flag from bypassing decryption and all
-  post-decrypt checks; the focused owner is
-  [`assert-ops-encryption-expected.ts`](../../src/app/op-log/sync/assert-ops-encryption-expected.ts).
-- Encrypted input without a key raises the password-recovery error; it is never
-  treated as plaintext.
-- Successful AES-GCM authentication is followed by payload parsing and the
-  metadata/full-state checks described above. Decrypted operations are not
-  released to the apply pipeline first.
+- 若 SuperSync 配置期望加密，任何明文入站操作都会拒绝其批次。这防止伪造的
+  `isPayloadEncrypted=false` 标志绕过解密与所有解密后检查；聚焦所有者是
+  [`assert-ops-encryption-expected.ts`](../../src/app/op-log/sync/assert-ops-encryption-expected.ts)。
+- 无密钥的加密输入会引发密码恢复错误；绝不会被当作明文处理。
+- 成功的 AES-GCM 认证之后是载荷解析与上述元数据/全状态检查。解密后的操作不会先释放给应用管道。
 
-## Configuration Storage
+## 配置存储
 
-The encryption password/key is stored only in provider **private config**; it is
-not part of synced application state and is never sent to the server. Encryption
-intent is also stored in private config, but is mirrored to
-`globalConfig.sync.isEncryptionEnabled` so the sync pipeline can fail closed.
-That intent bit may travel inside an operation or snapshot payload, but remote
-values are non-authoritative: hydration reapplies the device's local value. The
-credential store and provider expose intent separately from key presence so a
-dropped key cannot silently turn an encrypted configuration into a plaintext
-one. Follow
-[`credential-store.service.ts`](../../src/app/op-log/sync-providers/credential-store.service.ts),
-[`provider-types.ts`](../../packages/sync-providers/src/provider-types.ts), and
-the concrete
-[`SuperSyncProvider`](../../packages/sync-providers/src/super-sync/super-sync.ts)
-instead of copying the private-config shape into new code.
+加密密码/密钥仅存储在提供者的**私有配置**中；它不属于已同步的应用状态，也绝不会发送到服务器。加密意图也存储在私有配置中，但会镜像到
+`globalConfig.sync.isEncryptionEnabled`，以便同步管道可以失败关闭。该意图位可能出现在操作或快照载荷内，但远程值非权威：hydration 会重新应用设备的本地值。凭据存储与提供者将意图与密钥存在性分开暴露，因此丢失的密钥不能静默地把加密配置变成明文配置。请遵循
+[`credential-store.service.ts`](../../src/app/op-log/sync-providers/credential-store.service.ts)、
+[`provider-types.ts`](../../packages/sync-providers/src/provider-types.ts) 以及具体的
+[`SuperSyncProvider`](../../packages/sync-providers/src/super-sync/super-sync.ts)，
+而不是把私有配置形状复制到新代码中。
 
-## Security Properties
+## 安全属性
 
-| Property              | Guarantee                                                          |
+| 属性              | 保证                                                          |
 | --------------------- | ------------------------------------------------------------------ |
-| **Confidentiality**   | Server cannot read operation payloads                              |
-| **Payload integrity** | GCM auth tag detects tampering of the encrypted payload            |
-| **Key security**      | Argon2id makes password brute-force attempts expensive             |
-| **Nonce uniqueness**  | Each encrypted payload uses a fresh random IV under the cached key |
-| **Forward secrecy**   | Not provided; IV uniqueness is not forward secrecy                 |
-| **Wrong password**    | Decryption fails and the operation is rejected                     |
+| **机密性**   | 服务器无法读取操作载荷                              |
+| **载荷完整性** | GCM 认证标签检测加密载荷的篡改            |
+| **密钥安全**      | Argon2id 使密码暴力尝试昂贵             |
+| **Nonce 唯一性**  | 每个加密载荷在缓存密钥下使用新鲜随机 IV |
+| **前向保密**   | 不提供；IV 唯一性不是前向保密                 |
+| **错误密码**    | 解密失败且操作被拒绝                     |
 
-> **Integrity scope (important).** Only `op.payload` is encrypted and covered by
-> the AES-GCM authentication tag. Every other operation field — `actionType`,
-> `opType`, `entityType`, `entityId`, `entityIds`, `vectorClock`, `timestamp`,
-> `schemaVersion`, `syncImportReason`, **and the `isPayloadEncrypted` flag
-> itself** — travels as **plaintext** and is **not** bound as Additional
-> Authenticated Data (AAD), so a malicious/compromised sync server or a TLS MITM
-> can tamper with it. As **defense-in-depth**, the client fails closed on four
-> tamper vectors:
+> **完整性范围（重要）。** 仅 `op.payload` 被加密并由 AES-GCM 认证标签覆盖。每一个其他操作字段——`actionType`、`opType`、`entityType`、`entityId`、`entityIds`、`vectorClock`、`timestamp`、`schemaVersion`、`syncImportReason`，**以及 `isPayloadEncrypted` 标志本身**——都以**明文**传输，且**未**作为 Additional Authenticated Data（AAD）绑定，因此恶意/被攻破的同步服务器或 TLS MITM 可以篡改它。作为**纵深防御**，客户端在四个篡改向量上失败关闭：
 >
-> - **Plaintext-injection downgrade:** a forged op with `isPayloadEncrypted=false`
->   would skip decryption _and_ the payload check and be applied as-is — arbitrary
->   op forgery on an encryption-mandatory client. `assertOpsEncryptedWhenExpected`
->   rejects any inbound plaintext op (download + piggyback) when encryption is
->   **enabled in config** (`isEncryptionMandatory && isEncryptionEnabled()` —
->   config intent, not key presence, so it also fails closed in the
->   dropped-credential state). Safe because enabling encryption deletes +
->   re-uploads all data encrypted, so no legitimate plaintext op remains — this
->   rests on the server contract that `deleteAllData()` removes every downloadable
->   plaintext op. This is the SuperSync op-level twin of the file-based GHSA-vrc7
->   download guard and the GHSA-9544 _upload_ guard.
-> - **LWW `entityId` retarget:** for adapter-backed LWW updates, where
->   `payload.id` selects the entity the reducer applies, the client rejects an
->   _encrypted_ op whose authenticated `payload.id` does not equal
->   `op.entityId` (`verify-decrypted-op-integrity.ts`). Singleton LWW actions
->   target their registered feature state as a whole, so contextual conflict
->   IDs such as TIME_TRACKING's composite key have no canonical payload `id`.
-> - **Project-move footprint injection:** when an encrypted TASK project-move
->   payload carries `projectMoveSubTaskIds`, the client requires exact-set
->   equality between plaintext `op.entityIds` and the authenticated set
->   `{op.entityId} ∪ projectMoveSubTaskIds`. This prevents a compromised server
->   from appending victim task IDs to an otherwise valid move. Synthetic LWW
->   operations without an authenticated footprint cannot be checked by this
->   interim guard; binding the full envelope as GCM AAD remains the durable fix.
-> - **Full-state `opType` promotion:** after decrypting an operation tagged as
->   `SYNC_IMPORT`, `BACKUP_IMPORT`, or `REPAIR`, the client structurally validates
->   the authenticated payload as complete application data before the metadata can
->   promote it to `loadAllData`. Both direct and `appDataComplete`-wrapped payloads
->   are supported. Supported legacy payloads are migrated on a validation copy;
->   known compatible omissions (pre-section backups and the device-local sync
->   interval stripped from wire snapshots) are restored only on that copy. The
->   original remains unchanged for the existing operation-processing pipeline
->   (`assertDecryptedFullStateOpIntegrity`).
+> - **明文注入降级：** 伪造的、带 `isPayloadEncrypted=false` 的操作会跳过解密_以及_载荷检查并按原样应用——在强制加密的客户端上任意伪造操作。`assertOpsEncryptedWhenExpected` 在加密于配置中**启用**时拒绝任何入站明文操作（下载 + 捎带）（`isEncryptionMandatory && isEncryptionEnabled()` ——配置意图，而非密钥存在性，因此在凭据丢失状态下也会失败关闭）。安全是因为启用加密会删除并以加密形式重新上传所有数据，因此不会留下合法的明文操作——这依赖于 `deleteAllData()` 移除每一个可下载明文操作的服务器契约。这是基于文件的 GHSA-vrc7 下载守卫与 GHSA-9544 _上传_ 守卫在 SuperSync 操作级的孪生。
+> - **LWW `entityId` 重定向：** 对适配器支持的 LWW 更新，其中 `payload.id` 选择 reducer 应用的实体，客户端拒绝已认证的 `payload.id` 不等于 `op.entityId` 的_加密_操作（`verify-decrypted-op-integrity.ts`）。单例 LWW actions 以注册的 feature 状态整体为目标，因此像 TIME_TRACKING 的复合键这类上下文冲突 ID 没有规范的载荷 `id`。
+> - **项目移动足迹注入：** 当加密的 TASK 项目移动载荷携带 `projectMoveSubTaskIds` 时，客户端要求明文 `op.entityIds` 与已认证集合 `{op.entityId} ∪ projectMoveSubTaskIds` 精确集合相等。这防止被攻破的服务器向本应有效的移动追加受害任务 ID。没有已认证足迹的合成 LWW 操作无法被该临时守卫检查；将完整信封绑定为 GCM AAD 仍是持久修复。
+> - **全状态 `opType` 提升：** 在解密标记为 `SYNC_IMPORT`、`BACKUP_IMPORT` 或 `REPAIR` 的操作后，客户端在元数据能把它提升为 `loadAllData` 之前，将已认证载荷结构性校验为完整应用数据。直接与 `appDataComplete` 包装的载荷都支持。支持的遗留载荷在校验副本上迁移；已知兼容的省略（预 section 备份以及从线路快照剥离的设备本地同步间隔）仅在该副本上恢复。原件对既有操作处理管道保持不变（`assertDecryptedFullStateOpIntegrity`）。
 >
-> This is **not** full integrity. Still open pending the durable fix:
+> 这**不是**完整完整性。在持久修复之前仍开放：
 >
-> - Within-LWW `entityType`/`actionType` swap (ids left equal, so it passes).
-> - `vectorClock`/`timestamp` reorder/replay.
-> - The restore-to-point path (`getStateAtSeq` → `importCompleteBackup`) applies
->   server-reconstructed state without this guard; it is server-authored by
->   nature and the server blocks it for encrypted accounts, but E2EE cannot
->   authenticate it.
+> - LWW 内的 `entityType`/`actionType` 交换（id 保持相等，因此会通过）。
+> - `vectorClock`/`timestamp` 重排/重放。
+> - 恢复到时间点路径（`getStateAtSeq` → `importCompleteBackup`）应用服务器重建的状态而无此守卫；它本质上是服务器撰写的，且服务器对加密账户阻止它，但 E2EE 无法认证它。
 >
-> Known limitation: a peer running an app version that predates the GHSA-9544
-> _upload_ guard can still push plaintext ops; a keyed client then fails closed
-> here with the tamper message. Keep older peers offline and update them before
-> they sync again. If an updated client has a verified complete copy, export a
-> backup and use its explicit **Force Overwrite** action to replace the mixed
-> history with an encrypted clean-slate full state. Never run that action from a
-> fresh or incomplete client. If no verified complete client remains, preserve
-> the database and clients for incident recovery; do not skip the row or advance
-> a cursor past it. See
-> [`backup-and-recovery.md`](../../packages/super-sync-server/docs/backup-and-recovery.md#recovering-a-mixed-encryptedplaintext-history).
+> 已知限制：运行早于 GHSA-9544 _上传_ 守卫的应用版本的对等端仍可推送明文操作；有密钥的客户端随后会在此以篡改消息失败关闭。在再次同步之前保持旧对等端离线并更新它们。若已更新的客户端有已验证的完整副本，导出备份并使用其显式的 **Force Overwrite** 动作，用加密的干净石板全状态替换混合历史。绝不要从新鲜或不完整的客户端运行该动作。若没有已验证的完整客户端剩余，保留数据库与客户端以供事件恢复；不要跳过该行或把游标推进越过它。参见
+> [`backup-and-recovery.md`](../../packages/super-sync-server/docs/backup-and-recovery.md#recovering-a-mixed-encryptedplaintext-history)。
 >
-> Full protection — binding the metadata (and the encryption flag) as GCM AAD
-> behind an envelope-version migration, with a monotonic "encryption floor" to
-> block downgrades — is tracked in **GHSA-8pxh-mgc7-gp3g**. Do not treat
-> plaintext metadata as trusted at client decision points.
+> 完整保护——在信封版本迁移背后将元数据（与加密标志）绑定为 GCM AAD，并带有单调「加密地板」以阻止降级——跟踪于 **GHSA-8pxh-mgc7-gp3g**。不要在客户端决策点把明文元数据当作可信。
 
-## Initial Setup — Password Dialog Selection
+## 初始设置 — 密码对话框选择
 
-During initial SuperSync setup, the app determines which encryption dialog to show by **probing the server** before opening any dialog:
+在初始 SuperSync 设置期间，应用通过**探测服务器**决定显示哪个加密对话框，再打开任何对话框：
 
 ```
 DialogSyncInitialCfgComponent.save()
@@ -350,11 +270,11 @@ Probe server: downloadOps(0, undefined, 1)
                                          catches mismatches later)
 ```
 
-This prevents a confusing double-prompt when a second client joins: without the probe, the app would always show "create password", then immediately fail during sync and show "enter password".
+这避免第二个客户端加入时令人困惑的双重提示：没有探测时，应用总会显示「创建密码」，然后在同步期间立即失败并显示「输入密码」。
 
-**Safety nets:** If the probe gives wrong results (e.g. race condition), the existing `_handleMissingPasswordDialog()` and `_promptSuperSyncEncryptionIfNeeded()` in `sync-wrapper.service.ts` will catch mismatches during the subsequent sync.
+**安全网：** 若探测给出错误结果（例如竞态条件），`sync-wrapper.service.ts` 中既有的 `_handleMissingPasswordDialog()` 与 `_promptSuperSyncEncryptionIfNeeded()` 会在后续同步中捕获不匹配。
 
-## Wrong Password Handling
+## 错误密码处理
 
 ```
 Client C (wrong password) tries to sync:
@@ -376,24 +296,17 @@ Operation NOT applied to state
 Sync error shown in UI
 ```
 
-## Snapshot Encryption
+## 快照加密
 
-Full-state operations (backup import and repair) use the snapshot endpoint but
-retain the same fail-closed boundary. The upload service validates the
-full-state structure before transport, encrypts the payload when a key is
-present, and cannot reach the snapshot upload branch for a
-mandatory-encryption provider with pending work but no key. On download, an
-encrypted full-state operation is accepted only after AES-GCM authentication
-and `assertDecryptedFullStateOpIntegrity()` validates it as complete
-application data (including supported legacy migration on a validation copy).
+全状态操作（备份导入与修复）使用快照端点，但保留相同的失败关闭边界。上传服务在传输前校验全状态结构，在有密钥时加密载荷，且对有待处理工作但无密钥的强制加密提供者不能到达快照上传分支。下载时，加密的全状态操作仅在 AES-GCM 认证且 `assertDecryptedFullStateOpIntegrity()` 将其校验为完整应用数据（包括在校验副本上的支持遗留迁移）之后才被接受。
 
-Executable owners:
+可执行所有者：
 
-- Upload routing and mandatory-key guard:
+- 上传路由与强制密钥守卫：
   [`operation-log-upload.service.ts`](../../src/app/op-log/sync/operation-log-upload.service.ts)
-- Payload crypto and post-decrypt dispatch boundary:
+- 载荷加密与解密后分发边界：
   [`operation-encryption.service.ts`](../../src/app/op-log/sync/operation-encryption.service.ts)
-- Full-state integrity validation:
+- 全状态完整性校验：
   [`verify-decrypted-op-integrity.ts`](../../src/app/op-log/sync/verify-decrypted-op-integrity.ts)
-- Full-state regression coverage:
+- 全状态回归覆盖：
   [`verify-decrypted-op-integrity.spec.ts`](../../src/app/op-log/sync/verify-decrypted-op-integrity.spec.ts)

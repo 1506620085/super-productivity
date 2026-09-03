@@ -1,8 +1,8 @@
-# Plugin Message Communication in Super Productivity
+# Super Productivity 中的插件消息通信
 
-## How iframe plugins receive messages
+## iframe 插件如何接收消息
 
-### 1. Plugin registers a message handler in its iframe (index.html):
+### 1. 插件在其 iframe（index.html）中注册消息处理器：
 
 ```javascript
 // In the plugin's index.html
@@ -19,7 +19,7 @@ PluginAPI.onMessage(async (message) => {
 });
 ```
 
-### 2. Host app sends a message to the plugin:
+### 2. 宿主应用向插件发送消息：
 
 ```typescript
 // From anywhere in the Super Productivity app
@@ -31,19 +31,19 @@ const response = await pluginBridge.sendMessageToPlugin('procrastination-buster'
 });
 ```
 
-### 3. Message flow:
+### 3. 消息流程：
 
-1. `PluginBridgeService.sendMessageToPlugin()` is called
-2. It delegates to `PluginRunner.sendMessageToPlugin()`
-3. PluginRunner finds the PluginAPI instance and calls its `__sendMessage()` method
-4. For iframe plugins, this triggers a postMessage to the iframe with type `PLUGIN_MESSAGE`
-5. The iframe's message listener (set up by `onMessage`) handles the message
-6. The response is sent back via postMessage with type `PLUGIN_MESSAGE_RESPONSE`
-7. The promise resolves with the response
+1. 调用 `PluginBridgeService.sendMessageToPlugin()`
+2. 委托给 `PluginRunner.sendMessageToPlugin()`
+3. PluginRunner 找到 PluginAPI 实例并调用其 `__sendMessage()` 方法
+4. 对于 iframe 插件，这会向 iframe 触发类型为 `PLUGIN_MESSAGE` 的 postMessage
+5. iframe 的消息监听器（由 `onMessage` 设置）处理该消息
+6. 响应通过类型为 `PLUGIN_MESSAGE_RESPONSE` 的 postMessage 回传
+7. Promise 以该响应 resolve
 
-### 4. Implementation details:
+### 4. 实现细节：
 
-The iframe message handling is set up in `plugin-iframe.util.ts`:
+iframe 消息处理在 `plugin-iframe.util.ts` 中设置：
 
 ```javascript
 // When onMessage is called in the iframe:
@@ -76,6 +76,6 @@ onMessage: (handler) => {
 };
 ```
 
-However, I notice that the actual sending of `PLUGIN_MESSAGE` to the iframe is not implemented in the current code. The `__sendMessage` method on PluginAPI calls the handler directly for non-iframe plugins, but there's no code to post the message to the iframe.
+不过，我注意到向 iframe 实际发送 `PLUGIN_MESSAGE` 在当前代码中并未实现。PluginAPI 上的 `__sendMessage` 方法对非 iframe 插件会直接调用处理器，但没有向 iframe post 消息的代码。
 
-This appears to be a missing piece in the implementation that would need to be added to complete the message communication system for iframe plugins.
+这看起来是实现中缺失的一环，需要补上才能完整 iframe 插件的消息通信系统。

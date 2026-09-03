@@ -1,167 +1,99 @@
-# SuperSync Server Architecture
+# SuperSync 服务器架构
 
-SuperSync is an authenticated PostgreSQL-backed relay, ordering service, and
-upload-conflict gate for the operation-log protocol. It validates operation
-metadata, detects vector-clock conflicts, assigns a per-user server sequence,
-persists accepted operations, and notifies peer clients. Clients own
-application-state semantics, encryption keys and decryption, and resolution of
-rejected conflicts.
+SuperSync 是一个基于 PostgreSQL、需认证的中继、排序服务，以及操作日志协议的上传冲突门控。它校验操作元数据、检测向量钟冲突、为每个用户分配服务器序列号、持久化已接受的操作，并通知对端客户端。客户端拥有应用状态语义、加密密钥与解密，以及对被拒冲突的解决。
 
-For the client and whole-system context, start with the
-[Sync Architecture Field Guide](../../../docs/sync-and-op-log/sync-architecture.html).
+客户端与整系统上下文请从
+[同步架构实地指南](../../../docs/sync-and-op-log/sync-architecture.html) 开始。
 
-## Ownership and Trust Boundary
+## 所有权与信任边界
 
-- The server is authoritative for each user's retained operation order and
-  accepted upload result, not for the semantic meaning of application state.
-- [`@sp/shared-schema`](../../shared-schema/src/supersync-http-contract.ts) owns
-  the HTTP wire contracts. [`@sp/sync-core`](../../sync-core/src/) owns the
-  vector-clock algorithms shared by client and server.
-- The server validates identifiers, operation types, sizes, timestamps, clocks,
-  schema versions, quotas, and conflict metadata before persistence.
-- Upload conflicts are detected server-side and returned as rejections. The
-  client resolves them by producing or applying subsequent operations.
-- All HTTP sync routes require bearer authentication. The WebSocket endpoint
-  verifies the same full-access, 365-day JWT from the `token` query parameter;
-  it sends only lightweight “new operations available” notifications, while
-  payloads still move over HTTP.
+- 服务器对每个用户保留的操作顺序与已接受的上传结果具有权威性，而非应用状态的语义含义。
+- [`@sp/shared-schema`](../../shared-schema/src/supersync-http-contract.ts) 拥有
+  HTTP 线缆契约。[`@sp/sync-core`](../../sync-core/src/) 拥有
+  客户端与服务器共享的向量钟算法。
+- 服务器在持久化前校验标识符、操作类型、大小、时间戳、时钟、
+  schema 版本、配额与冲突元数据。
+- 上传冲突在服务器侧检测并以拒绝形式返回。客户端通过产生或应用后续操作来解决。
+- 所有 HTTP 同步路由需要 bearer 认证。WebSocket 端点从 `token` 查询参数验证同一完整访问、365 天的 JWT；
+  它仅发送轻量级「有新操作可用」通知，载荷仍通过 HTTP 传输。
 
-Production deployments must expose HTTP and WebSocket traffic only over HTTPS
-and WSS. Every reverse-proxy logging setup must omit sensitive query values and
-token-bearing `Referer` headers from access logs and request failure/error logs,
-and token-bearing login/recovery pages must emit
-`Referrer-Policy: no-referrer`. The
-[bundled Caddy configuration](../Caddyfile) replaces the complete logged query
-suffix, drops `Referer` from both Caddy log paths, and sets that response policy;
-the application error logger also replaces its complete query suffix. See the
-[authentication architecture](./authentication.md) for the token lifecycle and
-risk.
+生产部署必须仅通过 HTTPS 与 WSS 暴露 HTTP 与 WebSocket 流量。每套反向代理日志配置都必须从访问日志与请求失败/错误日志中省略敏感查询值及带 token 的 `Referer` 头，且带 token 的登录/恢复页面必须发出
+`Referrer-Policy: no-referrer`。
+[捆绑的 Caddy 配置](../Caddyfile) 会替换完整的已记录查询后缀，从两条 Caddy 日志路径丢弃 `Referer`，并设置该响应策略；应用错误日志记录器也会替换其完整查询后缀。token 生命周期与风险见
+[认证架构](./authentication.md)。
 
-JWT verification consults a bounded, 30-second process-local cache of account
-verification and token-version state. Auth mutations invalidate the cache in
-the process performing the write, but independent replicas receive no
-invalidation signal. A multi-instance deployment therefore needs shared auth
-invalidation (or must explicitly accept the bounded revocation lag); WebAuthn
-ceremonies additionally need shared challenge storage or sticky routing. The
-bundled Helm chart remains single-replica.
+JWT 校验会查阅进程本地、有界、30 秒的账户校验与 token 版本状态缓存。认证变更会在执行写入的进程中使缓存失效，但独立副本收不到失效信号。因此多实例部署需要共享的认证失效机制（或明确接受有界的吊销延迟）；WebAuthn 仪式还需要共享挑战存储或粘性路由。捆绑的 Helm chart 仍为单副本。
 
-## Stable API Surface
+## 稳定 API 面
 
-Request and response fields belong to the
-[shared wire contract](../../shared-schema/src/supersync-http-contract.ts); do
-not duplicate them here.
+请求与响应字段属于
+[共享线缆契约](../../shared-schema/src/supersync-http-contract.ts)；请勿在此重复。
 
-| Method and path                    | Stable purpose                                                                                             |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `POST /api/sync/ops`               | Validate and upload regular operations; the response may piggyback newer remote operations                 |
-| `GET /api/sync/ops`                | Download retained operations in per-user sequence order with pagination, gap, and full-state metadata      |
-| `POST /api/sync/snapshot`          | Upload a full-state `SYNC_IMPORT`, `BACKUP_IMPORT`, or `REPAIR` operation                                  |
-| `GET /api/sync/status`             | Return diagnostic sequence, device, snapshot-age, and quota information; not used by the production client |
-| `DELETE /api/sync/data`            | Erase the user's sync dataset and reset its sequence state                                                 |
-| `GET /api/sync/restore-points`     | List causal full-state replay boundaries                                                                   |
-| `GET /api/sync/restore/:serverSeq` | Reconstruct plaintext state at a retained sequence                                                         |
-| `GET /api/sync/ws`                 | Notify other clients that operations are available; never stream operation payloads                        |
+| 方法与路径                         | 稳定用途                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `POST /api/sync/ops`               | 校验并上传常规操作；响应可捎带较新的远端操作                                                           |
+| `GET /api/sync/ops`                | 按每用户序列顺序下载保留的操作，含分页、缺口与完整状态元数据                                           |
+| `POST /api/sync/snapshot`          | 上传完整状态的 `SYNC_IMPORT`、`BACKUP_IMPORT` 或 `REPAIR` 操作                                         |
+| `GET /api/sync/status`             | 返回诊断用的序列、设备、快照年龄与配额信息；生产客户端不使用                                           |
+| `DELETE /api/sync/data`            | 擦除用户的同步数据集并重置其序列状态                                                                   |
+| `GET /api/sync/restore-points`     | 列出因果完整状态重放边界                                                                               |
+| `GET /api/sync/restore/:serverSeq` | 在保留的序列处重建明文状态                                                                             |
+| `GET /api/sync/ws`                 | 通知其他客户端有操作可用；永不流式传输操作载荷                                                         |
 
-There is no `GET /api/sync/snapshot` endpoint. The executable route authority
-is [`sync.routes.ts`](../src/sync/sync.routes.ts) and
-[`websocket.routes.ts`](../src/sync/websocket.routes.ts).
+不存在 `GET /api/sync/snapshot` 端点。可执行路由权威为
+[`sync.routes.ts`](../src/sync/sync.routes.ts) 与
+[`websocket.routes.ts`](../src/sync/websocket.routes.ts)。
 
-## Per-User Ordering and Transaction Invariant
+## 每用户排序与事务不变量
 
-`serverSeq` is a total order within one user's current sync dataset. Accepted
-uploads commit inside a PostgreSQL `RepeatableRead` transaction. One atomic
-update of `user_sync_state.lastSeq` per accepted operation reserves its
-sequence number and serializes accepted writers for that user. A concurrent
-transaction that read the same earlier snapshot must fail and retry rather than
-commit conflicting operations. A causal `REPAIR` additionally locks that row
-and must prove `repairBaseServerSeq === lastSeq`. Incoming vector clocks are
-compared before being pruned for storage.
+`serverSeq` 是同一用户当前同步数据集内的全序。已接受的上传在 PostgreSQL `RepeatableRead` 事务内提交。每次接受操作时对 `user_sync_state.lastSeq` 的一次原子更新预留其序列号，并串行化该用户的已接受写入者。读到同一较早快照的并发事务必须失败并重试，而不是提交冲突操作。因果性 `REPAIR` 还会锁定该行，并必须证明 `repairBaseServerSeq === lastSeq`。传入的向量钟在为存储而裁剪之前进行比较。
 
-A regular upload carrying `lastKnownServerSeq` uses the same row lock to compare
-its cursor with `user_sync_state.latestStateReplacementSeq`. A cursor behind
-the latest `SYNC_IMPORT` or `BACKUP_IMPORT` is rejected before any operation is
-inserted, and the replacement is piggybacked without excluding its author. The
-nullable marker is reconciled lazily from retained operations after an upgrade;
-zero records that the reconciliation found no replacement.
+携带 `lastKnownServerSeq` 的常规上传使用同一行锁，将其游标与 `user_sync_state.latestStateReplacementSeq` 比较。落后于最新 `SYNC_IMPORT` 或 `BACKUP_IMPORT` 的游标会在插入任何操作之前被拒绝，且替换会被捎带，不排除其作者。可空标记在升级后从保留的操作中惰性对账；为零表示对账未发现替换。
 
-A clean-slate full-state upload deletes the prior dataset but preserves
-`lastSeq`, preventing sequence reuse visible to existing clients. Only explicit
-`DELETE /api/sync/data` erases the entire dataset and resets the sequence to
-zero.
+干净开局的完整状态上传会删除先前数据集但保留 `lastSeq`，防止对现有客户端可见的序列复用。只有显式的 `DELETE /api/sync/data` 会擦除整个数据集并将序列重置为零。
 
-This serialization mechanism is a load-bearing decision; see
-[ADR #4](../../../ARCHITECTURE-DECISIONS.md#4-upload-conflict-safety-via-the-lastseq-row-lock-under-repeatableread),
-[`sync.service.ts`](../src/sync/sync.service.ts), and
-[`operation-upload.service.ts`](../src/sync/services/operation-upload.service.ts).
+该串行化机制是承重决策；参见
+[ADR #4](../../../ARCHITECTURE-DECISIONS.md#4-upload-conflict-safety-via-the-lastseq-row-lock-under-repeatableread)、
+[`sync.service.ts`](../src/sync/sync.service.ts) 与
+[`operation-upload.service.ts`](../src/sync/services/operation-upload.service.ts)。
 
-## Storage, Retention, Snapshots, and Restore Points
+## 存储、保留、快照与恢复点
 
-- `operations` is append-on-write, not retained forever. Rows are immutable
-  while retained; cleanup, quota recovery, clean-slate replacement, and explicit
-  data deletion can remove them.
-- `user_sync_state` owns `lastSeq`, the optional compressed snapshot cache, the
-  latest causal full-state marker, and the latest explicit state-replacement
-  boundary. `sync_devices` is used only for per-device identity/metadata and
-  last-seen tracking. Its `lastAckedSeq` field is dormant legacy schema state:
-  current sync and retention code neither advances nor reads it.
-- Normal sync bootstraps from operation rows. `GET /ops` can fast-forward to the
-  latest causal full-state operation; clients do not download the server's
-  cached snapshot blob.
-- The snapshot cache is an optional server-replay optimization for plaintext
-  data. Encrypted full-state uploads remain operations but cannot become a
-  server-readable state cache.
-- Restore points are `SYNC_IMPORT`, `BACKUP_IMPORT`, and causal `REPAIR`
-  operations. Markerless legacy repairs cannot authorize fast-forward, restore,
-  or history pruning.
-- Default retention is 45 days. Cleanup removes stale devices and may remove
-  only the old operation prefix before a proven causal full-state boundary,
-  while preserving that boundary and its replay tail. The boundary comes from
-  the operation stream itself — no snapshot cursor is required (#9688), so
-  encrypted-only and snapshotless histories are pruned too. While a cached
-  snapshot BLOB exists, the boundary additionally never passes that row's
-  cursor (protects the cached base's replay tail for restore); a cursor left
-  behind without its blob does not cap. A user's aged prefix is pruned whole
-  or not at all, so the lowest surviving op stays a full-state op. Quota
-  recovery uses a
-  separate bounded cleanup policy.
-- Server-generated restore is unavailable when the required replay range
-  contains encrypted operations.
+- `operations` 为写时追加，并非永久保留。行在保留期间不可变；清理、配额回收、干净开局替换与显式数据删除可移除它们。
+- `user_sync_state` 拥有 `lastSeq`、可选的压缩快照缓存、最新因果完整状态标记，以及最新显式状态替换边界。`sync_devices` 仅用于每设备身份/元数据与最后可见跟踪。其 `lastAckedSeq` 字段为休眠的遗留 schema 状态：当前同步与保留代码既不推进也不读取它。
+- 正常同步从操作行引导。`GET /ops` 可快进到最新因果完整状态操作；客户端不下载服务器缓存的快照 blob。
+- 快照缓存是明文数据的可选服务器重放优化。加密的完整状态上传仍作为操作保留，但不能成为服务器可读的状态缓存。
+- 恢复点是 `SYNC_IMPORT`、`BACKUP_IMPORT` 与因果性 `REPAIR` 操作。无标记的遗留 repair 不能授权快进、恢复或历史修剪。
+- 默认保留期为 45 天。清理会移除陈旧设备，并可能仅移除已证明的因果完整状态边界之前的旧操作前缀，同时保留该边界及其重放尾部。边界来自操作流本身——不需要快照游标（#9688），因此仅加密与无快照的历史也会被修剪。当存在缓存的快照 BLOB 时，边界另外永不越过该行的游标（保护缓存基座的重放尾部以供恢复）；留下而无其 blob 的游标不构成上限。用户的过期前缀整段修剪或完全不修剪，因此最低存活操作保持为完整状态操作。配额回收使用单独的有界清理策略。
+- 当所需重放范围包含加密操作时，服务器生成的恢复不可用。
 
-The persistence authority is
-[`schema.prisma`](../prisma/schema.prisma). Retention and replay live in
-[`cleanup.ts`](../src/sync/cleanup.ts),
-[`storage-quota.service.ts`](../src/sync/services/storage-quota.service.ts),
-[`snapshot.service.ts`](../src/sync/services/snapshot.service.ts), and
-[`op-replay.ts`](../src/sync/op-replay.ts).
+持久化权威为
+[`schema.prisma`](../prisma/schema.prisma)。保留与重放位于
+[`cleanup.ts`](../src/sync/cleanup.ts)、
+[`storage-quota.service.ts`](../src/sync/services/storage-quota.service.ts)、
+[`snapshot.service.ts`](../src/sync/services/snapshot.service.ts) 与
+[`op-replay.ts`](../src/sync/op-replay.ts)。
 
-## E2EE Boundary
+## E2EE 边界
 
-When SuperSync E2EE is enabled, only `operation.payload` is encrypted
-client-side. The server has no key and stores that payload as an opaque value.
-Routing and causality metadata—including operation and client IDs, action and
-operation types, entity IDs, vector clock, timestamps, schema version, import
-reason, and the encryption flag—remains plaintext and is used by validation,
-ordering, and conflict detection.
+启用 SuperSync E2EE 时，仅 `operation.payload` 在客户端加密。服务器没有密钥，并将该载荷存为不透明值。路由与因果元数据——包括操作与客户端 ID、动作与操作类型、实体 ID、向量钟、时间戳、schema 版本、导入原因以及加密标志——保持明文，并由校验、排序与冲突检测使用。
 
-The payload's AES-GCM tag does not authenticate the plaintext metadata. E2EE
-therefore provides payload confidentiality and integrity, not metadata
-confidentiality or end-to-end authenticity of the complete operation. See the
-[encryption architecture](../../../docs/sync-and-op-log/supersync-encryption-architecture.md).
+载荷的 AES-GCM 标签不对明文元数据做认证。因此 E2EE 提供载荷机密性与完整性，而非元数据机密性或完整操作的端到端真实性。参见
+[加密架构](../../../docs/sync-and-op-log/supersync-encryption-architecture.md)。
 
-## Executable Owners and Tests
+## 可执行所有者与测试
 
-| Concern                      | Owner                                                                                                                               |
+| 关注点                       | 所有者                                                                                                                              |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Authentication               | [`api.ts`](../src/api.ts), [`auth.ts`](../src/auth.ts), [`passkey.ts`](../src/passkey.ts), [`auth-cache.ts`](../src/auth-cache.ts)  |
-| Wire protocol                | [`supersync-http-contract.ts`](../../shared-schema/src/supersync-http-contract.ts)                                                  |
-| HTTP and WebSocket routes    | [`sync.routes.ts`](../src/sync/sync.routes.ts), [`websocket.routes.ts`](../src/sync/websocket.routes.ts)                            |
-| Upload transaction and order | [`sync.service.ts`](../src/sync/sync.service.ts), [`operation-upload.service.ts`](../src/sync/services/operation-upload.service.ts) |
-| Conflict lookup              | [`conflict.ts`](../src/sync/conflict.ts)                                                                                            |
-| Download, gap, fast-forward  | [`operation-download.service.ts`](../src/sync/services/operation-download.service.ts)                                               |
-| Snapshot and restore         | [`snapshot.service.ts`](../src/sync/services/snapshot.service.ts), [`op-replay.ts`](../src/sync/op-replay.ts)                       |
-| Retention and quota          | [`cleanup.ts`](../src/sync/cleanup.ts), [`storage-quota.service.ts`](../src/sync/services/storage-quota.service.ts)                 |
-| Persistence                  | [`schema.prisma`](../prisma/schema.prisma)                                                                                          |
+| 认证                         | [`api.ts`](../src/api.ts)、[`auth.ts`](../src/auth.ts)、[`passkey.ts`](../src/passkey.ts)、[`auth-cache.ts`](../src/auth-cache.ts) |
+| 线缆协议                     | [`supersync-http-contract.ts`](../../shared-schema/src/supersync-http-contract.ts)                                                  |
+| HTTP 与 WebSocket 路由       | [`sync.routes.ts`](../src/sync/sync.routes.ts)、[`websocket.routes.ts`](../src/sync/websocket.routes.ts)                            |
+| 上传事务与顺序               | [`sync.service.ts`](../src/sync/sync.service.ts)、[`operation-upload.service.ts`](../src/sync/services/operation-upload.service.ts) |
+| 冲突查找                     | [`conflict.ts`](../src/sync/conflict.ts)                                                                                            |
+| 下载、缺口、快进             | [`operation-download.service.ts`](../src/sync/services/operation-download.service.ts)                                               |
+| 快照与恢复                   | [`snapshot.service.ts`](../src/sync/services/snapshot.service.ts)、[`op-replay.ts`](../src/sync/op-replay.ts)                       |
+| 保留与配额                   | [`cleanup.ts`](../src/sync/cleanup.ts)、[`storage-quota.service.ts`](../src/sync/services/storage-quota.service.ts)                 |
+| 持久化                       | [`schema.prisma`](../prisma/schema.prisma)                                                                                          |
 
-The load-bearing PostgreSQL race coverage is in
-[`tests/integration/`](../tests/integration/), especially the repair-causality,
-clean-slate atomicity, conflict-detection, and snapshot-vector-clock suites.
+承重的 PostgreSQL 竞态覆盖位于
+[`tests/integration/`](../tests/integration/)，尤其是 repair 因果性、干净开局原子性、冲突检测与快照向量钟套件。

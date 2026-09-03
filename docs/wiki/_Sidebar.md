@@ -7,7 +7,7 @@
 
 ## [[2.00-How_To]]
 
-### Using Super-Productivity
+### 使用 Super-Productivity
 
 - [[2.01-Downloads and Install]]
 - [[2.02-Restore-Data-From-Backup]]
@@ -23,7 +23,7 @@
 - [[2.21-Manage-Plugins]]
 - [[2.13-Run-with-Docker]]
 
-### Contributing to Super-Productivity
+### 为 Super-Productivity 做贡献
 
 - [[2.18-Contribute-Translations]]
 - [[2.11-Run-the-Development-Server]]
@@ -47,12 +47,12 @@
 
 ## [[4.00-Concepts]]
 
-### Data-and-Integrations
+### 数据与集成
 
 - [[4.23-Managing-Your-Data]]
 - [[4.24-Integrations]]
 
-### Organizing
+### 组织
 
 - [[4.06-Project-View]]
 - [[4.07-Tag-View]]
@@ -61,7 +61,7 @@
 - [[4.10-Task-Notes]]
 - [[4.11-Subtasks]]
 
-### Planning
+### 规划
 
 - [[4.03-Planner-View]]
 - [[4.04-Schedule-View]]
@@ -69,7 +69,7 @@
 - [[4.13-Repeating-Tasks]]
 - [[4.08-Time-Estimates]]
 
-### Doing
+### 执行
 
 - [[4.01-The-Today-View]]
 - [[4.02-Inbox-View]]
@@ -80,7 +80,7 @@
 - [[4.17-Idle-Time]]
 - [[4.08-Time-Estimates]]
 
-### Reviewing
+### 回顾
 
 - [[4.14-How-Time-Is-Logged]]
 - [[4.08-Time-Estimates]]

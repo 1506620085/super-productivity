@@ -1,121 +1,121 @@
-# General Terms and Conditions (GTC)
+# 一般条款与条件（GTC）
 
 **Super Productivity Sync**
-_Last updated: 25.04.2026_
+_最后更新：2026-04-25_
 
-## 1. Scope and Provider
+## 1. 适用范围与提供方
 
-(1) These General Terms and Conditions ("GTC") govern the use of the service **Super Productivity Sync** ("Service"), operated by **Johannes Millan** ("Provider").
+(1) 本一般条款与条件（「GTC」）规范由 **Johannes Millan**（「提供方」）运营的服务 **Super Productivity Sync**（「服务」）的使用。
 
-(2) By registering for or using the Service, the user ("User") declares their agreement with these GTC.
+(2) 通过注册或使用服务，用户（「用户」）声明同意本 GTC。
 
-(3) The contract language is German. Deviating terms and conditions of the User do not apply unless the Provider expressly agrees to their validity in writing.
+(3) 合同语言为德语。用户的偏离条款与条件不适用，除非提供方书面明确同意其效力。
 
-## 2. Subject of Service
+## 2. 服务标的
 
-(1) The Service enables the cloud-based synchronization of data for the application "Super Productivity".
+(1) 本服务使应用程序「Super Productivity」的数据能够进行基于云的同步。
 
-(2) The Service is provided in its currently available version ("as available"). The Provider may further develop, modify, restrict, or discontinue the Service at any time. There is no claim to a specific technical or functional configuration.
+(2) 本服务以其当前可用版本（「as available」）提供。提供方可随时进一步开发、修改、限制或终止本服务。不存在对特定技术或功能配置的请求权。
 
-## 3. Registration and Requirements for Use
+## 3. 注册与使用前提
 
-(1) Use of the Service requires full legal capacity or effective representation.
+(1) 使用本服务要求具备完全行为能力或有效代理。
 
-(2) The User undertakes to provide accurate information during registration and to keep access data secure.
+(2) 用户承诺在注册时提供准确信息，并安全保管访问凭证。
 
-(3) The User is responsible for all actions taken via their account, insofar as they are responsible for such actions.
+(3) 用户对其账户下发生的所有行为负责，以其应承担责任为限。
 
-## 4. Data Security and Encryption
+## 4. 数据安全与加密
 
-**(1) Standard Security (without Encryption-at-Rest)**
-Data transmission is encrypted (SSL/TLS). However, storage is by default **not** end-to-end encrypted and is without assurance of server-side database encryption ("Encryption at Rest"). The User acknowledges that the Provider and its hosting service providers can theoretically technically access unencrypted database content, insofar as this is technically necessary for maintenance or error analysis.
+**(1) 标准安全（无静态加密）**
+数据传输经加密（SSL/TLS）。但存储默认**不**进行端到端加密，且不保证服务器侧数据库加密（「静态加密」）。用户知悉，提供方及其托管服务提供商在技术上理论上可访问未加密的数据库内容，以为维护或错误分析在技术上所必需为限。
 
-**(2) Optional End-to-End Encryption (E2EE)**
-The User may optionally activate end-to-end encryption. The following conditions apply:
+**(2) 可选端到端加密（E2EE）**
+用户可选择激活端到端加密。适用以下条件：
 
-- The keys are generated and managed exclusively locally by the User.
-- **Warning:** The Provider has absolutely no access to these keys and can **not** recover, unlock, or reset encrypted data.
-- Loss of the key results in the permanent and irrevocable loss of access to the affected data.
-- The E2EE function is provided without assurance of freedom from errors, compatibility, or permanent availability.
+- 密钥仅由用户在本地生成与管理。
+- **警告：** 提供方对这些密钥完全无权访问，且**不能**恢复、解锁或重置加密数据。
+- 密钥丢失导致对受影响数据的访问永久且不可撤销地丧失。
+- E2EE 功能在不保证无错误、兼容性或永久可用性的情况下提供。
 
-**(3) Data Backup**
-Backups are performed by the Provider exclusively on a best-effort basis. There is no guarantee of completeness, integrity, or recoverability. The User is obligated to create reasonable and regular local backup copies of their data.
+**(3) 数据备份**
+备份由提供方仅在尽力而为的基础上执行。不保证完整性、完好性或可恢复性。用户有义务对其数据创建合理且定期的本地备份副本。
 
-## 5. Obligations of the User
+## 5. 用户义务
 
-(1) The User undertakes:
+(1) 用户承诺：
 
-- not to misuse the Service (e.g., attacks, excessive load, circumvention of security mechanisms);
-- not to upload illegal content, malware, or third-party data without authorization;
-- to make the choice of security level (with/without E2EE) independently based on the sensitivity of their data.
+- 不滥用本服务（例如攻击、过度负载、绕过安全机制）；
+- 不上传非法内容、恶意软件，或不经授权的第三方数据；
+- 根据其数据的敏感性，自主选择安全级别（有/无 E2EE）。
 
-**(2) Indemnification**
-If the User culpably violates statutory regulations or these GTC and the Provider is held liable by third parties as a result, the User shall indemnify the Provider against all related claims, insofar as the User is responsible for the violation.
+**(2) 赔偿**
+若用户有过错地违反法律规定或本 GTC，并因此导致提供方被第三方追责，用户应就所有相关主张向提供方作出赔偿，以用户对该违反承担责任为限。
 
-## 6. Availability
+## 6. 可用性
 
-The Provider strives for high availability but does not guarantee uninterrupted use. Maintenance work, technical faults, failures at hosting providers, or force majeure may lead to restrictions.
+提供方力求高可用性，但不保证不间断使用。维护工作、技术故障、托管提供商处的中断或不可抗力可能导致限制。
 
-## 7. Liability
+## 7. 责任
 
-(1) The Provider is liable without limitation in cases of intent, gross negligence, and culpable injury to life, body, or health.
+(1) 提供方在故意、重大过失以及有过错地侵害生命、身体或健康的情况下承担无限责任。
 
-(2) In cases of slight negligence, the Provider is only liable for the breach of essential contractual obligations (**Cardinal Obligations**). In these cases, liability is limited to the foreseeable damage typical for the contract.
+(2) 在轻微过失情况下，提供方仅对违反本质合同义务（**主要义务**）承担责任。在这些情况下，责任限于合同典型的、可预见的损害。
 
-(3) **Data Loss:** Liability for data loss is limited to the effort that would have been required for recovery assuming proper, reasonable, and regular data backup by the User. If the User has not created sufficient backups, liability is excluded insofar as the damage would have been avoidable through backups.
+(3) **数据丢失：** 对数据丢失的责任限于在用户进行适当、合理且定期数据备份的前提下恢复所需的努力。若用户未创建充分备份，则在损害本可通过备份避免的范围内排除责任。
 
-(4) **E2EE Data:** The Provider is not liable for data loss, data corruption, or inaccessibility attributable to key loss, incorrect key management by the User, or use of the optional E2EE function.
+(4) **E2EE 数据：** 提供方对可归因于密钥丢失、用户错误的密钥管理或使用可选 E2EE 功能的数据丢失、数据损坏或不可访问性不承担责任。
 
-(5) The above limitations of liability also apply in favor of the Provider's vicarious agents.
+(5) 上述责任限制亦惠及提供方的履行辅助人。
 
-## 8. Prices and Payment Terms
+## 8. 价格与支付条款
 
-(1) Paid features and their prices are determined by the respective order process. All prices are final prices including statutory VAT, where applicable.
+(1) 付费功能及其价格由相应订购流程确定。所有价格为含法定增值税（如适用）的最终价格。
 
-(2) The term, billing cycle, and notice period for paid plans are determined by the conditions stated in the order process.
+(2) 付费套餐的期限、计费周期与通知期由订购流程中所述条件确定。
 
-## 9. Term and Termination
+## 9. 期限与终止
 
-(1) The User may delete their account at any time and thereby terminate the contract.
+(1) 用户可随时删除其账户并据此终止合同。
 
-(2) The Provider may terminate the contractual relationship at any time with a notice period of two (2) weeks (for free services) or block or terminate the contract without notice for good cause.
+(2) 提供方可随时以两（2）周通知期终止合同关系（针对免费服务），或因正当理由立即封锁或终止合同。
 
-(3) For paid services, the notice periods stated in the order process apply.
+(3) 对付费服务，适用订购流程中所述的通知期。
 
-(4) **Inactive Accounts:** Accounts without any user activity (in particular no login and no synchronization) for a period of three (3) months are considered inactive. The Provider is entitled to delete such inactive accounts, including all associated synchronized data, without further prior notice. The User is responsible for maintaining regular local backups of their data (see Section 4 Paragraph 3).
+(4) **不活跃账户：** 在三（3）个月内无任何用户活动（特别是无登录且无同步）的账户视为不活跃。提供方有权在无进一步事先通知的情况下删除此类不活跃账户，包括所有相关的已同步数据。用户负责维护其数据的定期本地备份（见第 4 条第 3 款）。
 
-## 10. Amendments to the GTC
+## 10. GTC 的修订
 
-(1) The Provider may amend these GTC if necessary to adapt to:
+(1) 若有必要适应以下情况，提供方可修订本 GTC：
 
-- technical developments,
-- changes in legal frameworks,
-- new functions, security requirements, or business models.
+- 技术发展，
+- 法律框架的变化，
+- 新功能、安全要求或商业模式。
 
-(2) Amendments will be communicated to the User in text form at least six (6) weeks before they take effect. The notification will include a reference to:
+(2) 修订将在生效前至少六（6）周以文本形式告知用户。通知将包含对以下事项的提示：
 
-- the User's right to object,
-- the right to terminate the contract for good cause,
-- the consequences of silence (failure to object).
+- 用户的异议权，
+- 因正当理由终止合同的权利，
+- 沉默（未异议）的后果。
 
-(3) If the User does not object within the period, the amendments are deemed accepted.
+(3) 若用户未在期限内异议，修订视为被接受。
 
-(4) If the User objects, the Provider may terminate the contractual relationship with a notice period of two (2) weeks, provided that adhering to the contract under the old conditions is unreasonable.
+(4) 若用户异议，提供方可在继续按旧条件履行合同不合理的情况下，以两（2）周通知期终止合同关系。
 
-## 11. Right of Withdrawal for Consumers
+## 11. 消费者撤回权
 
-If the User is a consumer pursuant to § 13 BGB (German Civil Code) and concludes a paid contract, they are entitled to a statutory right of withdrawal. Details are regulated in the separate cancellation policy.
+若用户为根据《德国民法典》第 13 条意义上的消费者并订立付费合同，其享有法定撤回权。细节由单独的撤回说明规范。
 
-## 12. Data Protection
+## 12. 数据保护
 
-The processing of personal data takes place in accordance with the Privacy Policy for Super Productivity Sync.
+个人数据的处理依照 Super Productivity Sync 的隐私政策进行。
 
-## 13. Final Provisions
+## 13. 最终条款
 
-(1) The law of the Federal Republic of Germany applies, excluding the UN Sales Convention (CISG).
+(1) 适用德意志联邦共和国法律，排除《联合国国际货物销售合同公约》（CISG）。
 
-(2) If the User is a merchant, a legal entity under public law, or a special fund under public law, **Leipzig** is the exclusive place of jurisdiction. Statutory places of jurisdiction apply to consumers.
+(2) 若用户为商人、公法法人或公法特别财产，**莱比锡**为专属管辖地。对消费者适用法定管辖地。
 
-(3) **Severability Clause:** Should individual provisions of these GTC be or become invalid, the validity of the remaining provisions remains unaffected. The statutory provisions shall take the place of the invalid regulation.
+(3) **可分性条款：** 若本 GTC 的个别条款无效或变为无效，其余条款的效力不受影响。法定规定取代无效条款。
 
-(4) Platform of the EU Commission for Online Dispute Resolution: [https://ec.europa.eu/consumers/odr/](https://ec.europa.eu/consumers/odr/). The Provider is not obligated and not willing to participate in dispute resolution proceedings before a consumer arbitration board.
+(4) 欧盟委员会在线争议解决平台：[https://ec.europa.eu/consumers/odr/](https://ec.europa.eu/consumers/odr/)。提供方无义务且无意参与消费者仲裁机构前的争议解决程序。

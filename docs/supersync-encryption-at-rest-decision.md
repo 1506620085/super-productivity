@@ -1,63 +1,41 @@
-# SuperSync database encryption at rest
+# SuperSync 数据库静态加密
 
-> **Status:** Accepted
+> **状态：** 已采纳
 >
-> **Decision date:** 2026-01
+> **决策日期：** 2026-01
 >
-> **Last verified:** 2026-07-29
+> **最后核实：** 2026-07-29
 
-## Decision
+## 决策
 
-The current SuperSync deployment operates without project-managed encryption of
-the PostgreSQL database files. The repository does not provide or support a LUKS
-or PostgreSQL transparent-data-encryption deployment path.
+当前 SuperSync 部署在不对 PostgreSQL 数据库文件做项目托管加密的情况下运行。仓库不提供或不支持 LUKS 或 PostgreSQL 透明数据加密部署路径。
 
-The previously implemented LUKS tooling requires `dm-crypt` and other host kernel
-capabilities that are unavailable in the production OpenVZ environment. The
-PostgreSQL TDE experiment was also not viable in that environment. Both attempts
-were retired rather than leaving an untestable security mechanism in the active
-deployment path.
+先前实现的 LUKS 工具需要 `dm-crypt` 及其他在生产 OpenVZ 环境中不可用的主机内核能力。PostgreSQL TDE 实验在该环境中也不可行。两次尝试均已退役，而不是在活跃部署路径中留下不可测试的安全机制。
 
-The retirement summary and implementation-history pointers remain under
+退役摘要与实现历史指针仍保留在
 [`packages/super-sync-server/archive/encryption-attempts-openvz-incompatible/`](../packages/super-sync-server/archive/encryption-attempts-openvz-incompatible/)
-as historical evidence. The executable files and runbooks were removed so they
-cannot be mistaken for a supported production path.
+作为历史证据。可执行文件与操作手册已移除，以免被误认为受支持的生产路径。
 
-## Security boundary
+## 安全边界
 
-- PostgreSQL files and ordinary database dumps are not encrypted by SuperSync.
-  Protect the host, database credentials, filesystem, snapshots, and backup
-  locations accordingly.
-- SuperSync end-to-end encryption is a separate client-side feature. When it is
-  enabled, operation payloads are encrypted before upload, but routing and causal
-  metadata remain plaintext. It does not encrypt the PostgreSQL volume.
-- An encrypted database-backup stream is also separate from live database-file
-  encryption. See the server's
-  [backup and recovery guide](../packages/super-sync-server/docs/backup-and-recovery.md)
-  for the maintained recovery procedure.
-- Do not describe the archived LUKS design as production-ready or as proof of
-  regulatory compliance.
+- PostgreSQL 文件与普通数据库转储不由 SuperSync 加密。请相应保护主机、数据库凭证、文件系统、快照与备份位置。
+- SuperSync 端到端加密是单独的客户端功能。启用时，操作载荷在上传前加密，但路由与因果元数据仍为明文。它不加密 PostgreSQL 卷。
+- 加密的数据库备份流也与实时数据库文件加密分开。维护中的恢复流程见服务器的
+  [备份与恢复指南](../packages/super-sync-server/docs/backup-and-recovery.md)。
+- 不要将已归档的 LUKS 设计描述为生产就绪或作为监管合规证明。
 
-## Consequences
+## 后果
 
-The deployment relies on access controls and the hosting environment for
-database-file protection. Users who need server-blind content confidentiality
-should enable SuperSync E2EE. Operators whose threat model requires encrypted
-storage must supply that property at the infrastructure layer and verify backup
-and restore behavior themselves.
+部署依赖访问控制与托管环境保护数据库文件。需要服务端盲内容机密性的用户应启用 SuperSync E2EE。威胁模型要求加密存储的运维方必须在基础设施层提供该属性，并自行核实备份与恢复行为。
 
-## Revisit conditions
+## 重新审视条件
 
-Reconsider this decision only with an operations-owned proposal that includes:
+仅在有运维方拥有的提案时重新考虑本决策，且提案须包含：
 
-1. a deployment environment that supports the chosen mechanism;
-2. a tested migration and rollback on the current Compose/database layout;
-3. boot, key rotation, backup, and disaster-recovery procedures;
-4. monitoring and an exercised restore test; and
-5. an updated threat model that clearly separates payload E2EE, database-file
-   encryption, and backup encryption.
+1. 支持所选机制的部署环境；
+2. 在当前 Compose/数据库布局上经过测试的迁移与回滚；
+3. 启动、密钥轮换、备份与灾难恢复流程；
+4. 监控与已演练的恢复测试；以及
+5. 更新后的威胁模型，清晰区分载荷 E2EE、数据库文件加密与备份加密。
 
-Viable future directions include moving to a KVM host with infrastructure-managed
-disk encryption or a managed PostgreSQL service that provides encryption at rest.
-The retired implementation in Git history is a research input, not a shortcut
-to approval.
+可行的未来方向包括迁到带基础设施托管磁盘加密的 KVM 主机，或提供静态加密的托管 PostgreSQL 服务。Git 历史中的退役实现是研究输入，不是通往批准的捷径。

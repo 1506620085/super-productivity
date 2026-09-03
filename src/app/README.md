@@ -1,10 +1,10 @@
-# `src/app` — layer map
+# `src/app` — 分层地图
 
-Where things live and which way the dependencies point. This is a **routing table, not a specification**: code, tests, and [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md) override anything written here. For the sync subsystem in depth, start at [`docs/sync-and-op-log/README.md`](../../docs/sync-and-op-log/README.md).
+事物所在位置以及依赖箭头指向何方。这是一张**路由表，而非规范**：代码、测试与 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md) 优先于此处任何文字。深入了解同步子系统，请从 [`docs/sync-and-op-log/README.md`](../../docs/sync-and-op-log/README.md) 开始。
 
-## One user intent, end to end
+## 一个用户意图，端到端
 
-Operation capture is **Phase 1 of the meta-reducer registry — the outermost wrapper**, so it reads state _before_ any reducer mutates it. It is not a step after the reducers; it brackets them.
+操作捕获是**元 reducer 注册表的第 1 阶段——最外层包装**，因此它在任何 reducer 变更状态_之前_读取状态。它不是 reducer 之后的步骤；它包住它们。
 
 ```
              persistent NgRx action
@@ -29,28 +29,28 @@ Operation capture is **Phase 1 of the meta-reducer registry — the outermost wr
                           (SuperSync | file-based)
 ```
 
-A **remote** operation runs this in reverse: `op-log/apply` converts it back into actions and replays them through the identical reducers. That is why effects must inject `LOCAL_ACTIONS` and not `Actions` — otherwise a replayed remote change re-fires local side effects (sync rule 1).
+**远程**操作以相反方向运行：`op-log/apply` 将其转换回 action，并通过相同的 reducer 重放。这就是为什么 effect 必须注入 `LOCAL_ACTIONS` 而非 `Actions`——否则重放的远程变更会再次触发本地副作用（同步规则 1）。
 
-## Start here
+## 从这里开始
 
-| You want to…                                          | Start at                                                                                                                                                        |
+| 你想要…                                          | 从这里开始                                                                                                                                                        |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Change one feature's behavior                         | `features/<name>/` — `tasks/` is the hot core                                                                                                                   |
-| Change state spanning more than one entity type       | `root-store/meta/task-shared-meta-reducers/` — one reducer pass = one op (sync rule 3)                                                                          |
-| Understand or reorder meta-reducers                   | [`root-store/meta/meta-reducer-registry.ts`](root-store/meta/meta-reducer-registry.ts) — documents phases 1, 2, 2.5, 3, 3.5, 4–8 and throws in dev on violation |
-| Know how a change becomes durable and syncable        | `op-log/capture/`, then `op-log/persistence/operation-log-store.service.ts`                                                                                     |
-| Trace how a remote change is applied                  | `op-log/apply/operation-applier.service.ts`                                                                                                                     |
-| Change where bytes actually land                      | `op-log/persistence/` — `indexed-db-op-log-adapter.ts` / `sqlite-op-log-adapter.ts`, both behind `op-log-db-adapter.token.ts`                                   |
-| Work on sync transport, conflicts, or a provider      | `op-log/sync/`, `op-log/sync-providers/`, plus `packages/sync-core` and `packages/sync-providers`                                                               |
-| Change import/export, backup, or the sync setup UI    | `imex/`                                                                                                                                                         |
-| Add a reusable, feature-agnostic widget               | `ui/`                                                                                                                                                           |
-| Change app chrome (header, nav, layout, shortcuts)    | `core-ui/`                                                                                                                                                      |
-| Add a cross-cutting service (platform, theme, notify) | `core/`                                                                                                                                                         |
-| Add a route or a top-level screen                     | `routes/`, `pages/`, `config/`                                                                                                                                  |
-| Work on the plugin API                                | `plugins/` plus `packages/plugin-api`                                                                                                                           |
-| Add a pure helper                                     | `util/`                                                                                                                                                         |
+| 更改某一功能的行为                         | `features/<name>/` — `tasks/` 是热核心                                                                                                                   |
+| 更改跨越多种实体类型的状态       | `root-store/meta/task-shared-meta-reducers/` — 一次 reducer 遍历 = 一次操作（同步规则 3）                                                                          |
+| 理解或重排 meta-reducer                   | [`root-store/meta/meta-reducer-registry.ts`](root-store/meta/meta-reducer-registry.ts) — 记录阶段 1、2、2.5、3、3.5、4–8，并在开发模式下违反时抛错 |
+| 了解变更如何变得持久且可同步        | `op-log/capture/`，然后 `op-log/persistence/operation-log-store.service.ts`                                                                                     |
+| 追踪远程变更如何被应用                  | `op-log/apply/operation-applier.service.ts`                                                                                                                     |
+| 更改字节实际落地的位置                      | `op-log/persistence/` — `indexed-db-op-log-adapter.ts` / `sqlite-op-log-adapter.ts`，二者都在 `op-log-db-adapter.token.ts` 之后                                   |
+| 处理同步传输、冲突或某个提供者      | `op-log/sync/`、`op-log/sync-providers/`，以及 `packages/sync-core` 与 `packages/sync-providers`                                                               |
+| 更改导入/导出、备份或同步设置 UI    | `imex/`                                                                                                                                                         |
+| 添加可复用、与功能无关的小组件               | `ui/`                                                                                                                                                           |
+| 更改应用外壳（页头、导航、布局、快捷键）    | `core-ui/`                                                                                                                                                      |
+| 添加横切服务（平台、主题、通知） | `core/`                                                                                                                                                         |
+| 添加路由或顶层屏幕                     | `routes/`、`pages/`、`config/`                                                                                                                                  |
+| 处理插件 API                                | `plugins/` 以及 `packages/plugin-api`                                                                                                                           |
+| 添加纯辅助函数                                     | `util/`                                                                                                                                                         |
 
-## Which way the arrows point
+## 箭头指向何方
 
 ```
 core-ui/ · pages/ · routes/     the shell — composes features
@@ -62,18 +62,18 @@ core-ui/ · pages/ · routes/     the shell — composes features
   core/ · ui/ · util/           shared services, widgets, helpers
 ```
 
-**Enforced:** nothing in `core/`, `ui/`, or `util/` may import from `features/`, statically or via dynamic `import()`. See the rule and its reasoning in [`eslint.config.js`](../../eslint.config.js) (search `FEATURE_LAYER_FENCE`).
+**已强制：** `core/`、`ui/` 或 `util/` 中的任何内容都不得从 `features/` 导入，无论静态还是动态 `import()`。规则及其理由见 [`eslint.config.js`](../../eslint.config.js)（搜索 `FEATURE_LAYER_FENCE`）。
 
-**What "enforced" does and does not mean.** A new violation fails CI everywhere in those three directories **except** the files listed in that config block, which warn instead. Grandfathering is keyed by file, so a listed file can accumulate further feature imports without failing. That list may only shrink — it is at 36 and has already come down from 38.
+**「已强制」意味着什么、不意味着什么。** 新违规会在这三个目录中处处导致 CI 失败，**但**该配置块中列出的文件除外，它们只发出警告。祖父条款按文件键控，因此已列出的文件可以继续累积更多 feature 导入而不失败。该列表只能缩小——目前为 36，已从 38 降下来。
 
-**Not enforced, and currently untrue — do not read the diagram as a guarantee.** The bottom row is one box because its members are entangled, not because they are peers:
+**未强制，且目前不成立——不要把图示当成保证。** 底行放在一个框里是因为它们彼此纠缠，而非因为它们是对等层：
 
-- `core/` and `ui/` are mutually dependent: 22 files `ui → core`, 4 files `core → ui`.
-- `util/` is not a leaf: it imports upward in ~29 non-spec files (19 → `core/`, 4 → `op-log/`, 1 → `ui/`, plus the 5 `→ features/` now fenced).
-- `core/` reaches up into `core-ui/` in 2 files and into `op-log/` in 7.
+- `core/` 与 `ui/` 相互依赖：22 个文件 `ui → core`，4 个文件 `core → ui`。
+- `util/` 不是叶子：约 29 个非规格文件向上导入（19 → `core/`，4 → `op-log/`，1 → `ui/`，外加现已隔离的 5 个 `→ features/`）。
+- `core/` 在 2 个文件中向上到达 `core-ui/`，在 7 个文件中到达 `op-log/`。
 
-## Legacy
+## 遗留
 
-`pfapi/` is dead code, not a live layer. It is four compiled `.js` files from the pre-op-log sync system, its own header reads `LEGACY CODE — do not modify`, and **nothing imports it** — every `pfapi` mention in `.ts` sources is a comment or a string describing the legacy on-disk `__meta_` format written by v16.x clients. It cannot even load (`api/index.js` requires modules absent from the tree) and is excluded from the TS build, so it ships in no bundle. Despite the name it is **not** the current persistence layer; that is `op-log/persistence/`.
+`pfapi/` 是死代码，不是存活层。它是 pre-op-log 同步系统留下的四个已编译 `.js` 文件，其自身页头写着 `LEGACY CODE — do not modify`，且**没有任何东西导入它**——`.ts` 源中每一处 `pfapi` 提及都是注释或描述 v16.x 客户端写入的遗留磁盘 `__meta_` 格式的字符串。它甚至无法加载（`api/index.js` 需要树中不存在的模块），并被排除在 TS 构建之外，因此不会出现在任何打包产物中。尽管名称如此，它**不是**当前持久化层；当前层是 `op-log/persistence/`。
 
-Note that `core/persistence/legacy-pf-db.service.ts` is unrelated to it — that service reads the legacy `pf` IndexedDB directly and is live migration code.
+注意 `core/persistence/legacy-pf-db.service.ts` 与它无关——该服务直接读取遗留 `pf` IndexedDB，是存活的迁移代码。

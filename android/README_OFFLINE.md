@@ -1,20 +1,20 @@
-# Connectivity-Free Mode Configuration
+# 无网络依赖模式配置
 
-**Connectivity-Free Mode** allows you to use the Super Productivity Android app without an internet connection. This mode is recommended for users who prefer local usage.
+**无网络依赖模式**允许你在无互联网连接的情况下使用 Super Productivity Android 应用。该模式推荐给偏好本地使用的用户。
 
-## Setting Launch Mode to Connectivity-Free
+## 将启动模式设为无网络依赖
 
-To enable Connectivity-Free Mode, set the `LAUNCH_MODE` to `0` (Default for new installation) or `2` in the `app_config.properties` file.
+要启用无网络依赖模式，请在 `app_config.properties` 文件中将 `LAUNCH_MODE` 设为 `0`（新安装的默认值）或 `2`。
 
-For users performing a **new installation**, setting `LAUNCH_MODE` to `2` ensures that the app starts in Connectivity-Free Mode by default. This avoids any attempts to connect to online services, providing a seamless offline experience from the outset.
+对于**全新安装**的用户，将 `LAUNCH_MODE` 设为 `2` 可确保应用默认以无网络依赖模式启动。这样可避免任何连接在线服务的尝试，从一开始就提供流畅的离线体验。
 
-**Important**: If you set `LAUNCH_MODE` to `0`, the app will use the default behavior, which may attempt to read from SharedPreferences and connect to online services if available. To maintain a purely offline experience, always set `LAUNCH_MODE` to `2` for new installations.
+**重要**：若将 `LAUNCH_MODE` 设为 `0`，应用将使用默认行为，可能会尝试从 SharedPreferences 读取，并在可用时连接在线服务。为保持纯离线体验，新安装时请始终将 `LAUNCH_MODE` 设为 `2`。
 
-## Building and Running super-productivity-android Locally
+## 在本地构建并运行 super-productivity-android
 
-### 1. Clone the Repository
+### 1. 克隆仓库
 
-To set up the project, clone the `super-productivity` repository instead of directly cloning the `super-productivity-android` repository. This ensures that all submodules, including the Android project, are properly initialized.
+要设置项目，请克隆 `super-productivity` 仓库，而不是直接克隆 `super-productivity-android` 仓库。这样可确保包括 Android 项目在内的所有子模块都正确初始化。
 
 ```bash
 git clone https://github.com/super-productivity/super-productivity.git
@@ -23,58 +23,58 @@ git submodule init
 git submodule update
 ```
 
-### 2. Compile the Node.js Project
+### 2. 编译 Node.js 项目
 
-Ensure you have Node.js and npm installed. Navigate to the root directory of the `super-productivity` project and install the necessary dependencies.
+确保已安装 Node.js 和 npm。进入 `super-productivity` 项目的根目录并安装必要依赖。
 
 ```bash
 npm install
 ```
 
-### 3. Compile the Android Project
+### 3. 编译 Android 项目
 
-From the root directory, compile the Android project using the following commands:
+在根目录下，使用以下命令编译 Android 项目：
 
-- **For Testing Builds:**
+- **测试构建：**
 
   ```bash
   npm run dist:android
   ```
 
-- **For Production Builds:**
+- **生产构建：**
 
   ```bash
   npm run dist:android:prod
   ```
 
-### 4. Installation
+### 4. 安装
 
-You can install the compiled Android application using either Android Studio or npm scripts.
+你可以使用 Android Studio 或 npm 脚本安装已编译的 Android 应用。
 
-- **Using Android Studio:**
+- **使用 Android Studio：**
 
-  1. Open Android Studio.
-  2. Select `Open an existing project`.
-  3. Navigate to the `android` directory within the cloned repository.
-  4. Follow the prompts to build and run the application on your device or emulator.
+  1. 打开 Android Studio。
+  2. 选择 `Open an existing project`。
+  3. 导航到已克隆仓库中的 `android` 目录。
+  4. 按提示在设备或模拟器上构建并运行应用。
 
-- **Using NPM Scripts:**
+- **使用 NPM 脚本：**
 
-  - **For Testing Installation:**
+  - **测试安装：**
 
     ```bash
     npm run install:android
     ```
 
-  - **For Production Installation:**
+  - **生产安装：**
 
     ```bash
     npm run install:android:prod
     ```
 
-## Additional Notes
+## 补充说明
 
-- **Local Modifications**: The `app_config.properties` file is intended for local modifications only. **DO NOT COMMIT** this file unless you are absolutely sure of the changes.
-- **No Additional Configuration**: Connectivity-Free Mode does not require further configuration beyond setting the `LAUNCH_MODE` to `0` or `2`.
+- **本地修改**：`app_config.properties` 文件仅供本地修改。**请勿提交**该文件，除非你对更改有十足把握。
+- **无需额外配置**：无网络依赖模式除将 `LAUNCH_MODE` 设为 `0` 或 `2` 外，无需进一步配置。
 
-For more information, refer to the [main README](./README.md).
+更多信息请参阅[主 README](./README.md)。

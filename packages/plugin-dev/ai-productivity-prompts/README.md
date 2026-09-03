@@ -1,18 +1,18 @@
-# Procrastination Buster Plugin
+# Procrastination Buster 插件
 
-A Super Productivity plugin that helps identify procrastination blockers and provides tailored strategies to overcome them.
+一款 Super Productivity 插件，帮助识别拖延障碍，并提供针对性策略加以克服。
 
-## Features
+## 功能
 
-- 🎯 Identify 8 different procrastination types
-- 💡 Get tailored strategies for each type
-- ⏱️ Start Pomodoro timer directly from strategies
-- ➕ Add strategies as tasks
-- 🌓 Dark mode support using CSS variables
+- 🎯 识别 8 种不同的拖延类型
+- 💡 为每种类型提供针对性策略
+- ⏱️ 可直接从策略启动番茄钟计时器
+- ➕ 将策略添加为任务
+- 🌓 使用 CSS 变量支持深色模式
 
-## Installation
+## 安装
 
-### Development
+### 开发
 
 ```bash
 # Install dependencies
@@ -28,45 +28,45 @@ npm run build
 npm run package
 ```
 
-### Use in Super Productivity
+### 在 Super Productivity 中使用
 
-1. Run `npm run build`
-2. Upload the generated `dist/plugin.zip` in Super Productivity
-3. Or copy the `dist` folder to `src/assets/procrastination-buster/`
+1. 运行 `npm run build`
+2. 在 Super Productivity 中上传生成的 `dist/plugin.zip`
+3. 或将 `dist` 文件夹复制到 `src/assets/procrastination-buster/`
 
-## Usage
+## 用法
 
-1. **Shortcut**: Use keyboard shortcut for quick access
-2. **Side Panel**: Open the plugin via the side panel
-3. **Automatic**: After 15 minutes of inactivity on a task
+1. **快捷键**：使用键盘快捷键快速打开
+2. **侧栏**：通过侧栏打开插件
+3. **自动**：在某个任务上闲置 15 分钟后
 
-## Procrastination Types
+## 拖延类型
 
-1. **Overwhelm** - "Too much at once"
-2. **Perfectionism** - "It's not perfect enough"
-3. **Unclear** - "I don't know what to do"
-4. **Boredom** - "It's boring"
-5. **Fear** - "I might fail"
-6. **Low Energy** - "I'm too tired"
-7. **Distraction** - "Other things are more interesting"
-8. **Resistance** - "I don't want to do this"
+1. **Overwhelm** - 「一下子太多了」
+2. **Perfectionism** - 「还不够完美」
+3. **Unclear** - 「不知道该做什么」
+4. **Boredom** - 「太无聊了」
+5. **Fear** - 「可能会失败」
+6. **Low Energy** - 「我太累了」
+7. **Distraction** - 「别的事情更有趣」
+8. **Resistance** - 「我不想做这个」
 
-## Technology
+## 技术
 
-- **SolidJS** for reactive UI
-- **Vite** for fast development and builds
-- **TypeScript** for type safety
+- **SolidJS** 用于响应式 UI
+- **Vite** 用于快速开发与构建
+- **TypeScript** 用于类型安全
 - **Super Productivity Plugin API**
-- **CSS Variables** for theme integration
+- **CSS Variables** 用于主题集成
 
-## Development
+## 开发
 
-The plugin consists of two parts:
+插件由两部分组成：
 
-1. **plugin.ts** - Backend logic that communicates with Super Productivity
-2. **SolidJS App** - Frontend UI in iframe
+1. **plugin.ts** - 与 Super Productivity 通信的后端逻辑
+2. **SolidJS App** - iframe 中的前端 UI
 
-### Project Structure
+### 项目结构
 
 ```
 procrastination-buster/
@@ -81,23 +81,23 @@ procrastination-buster/
 └── vite.config.ts      # Build configuration
 ```
 
-## Customization
+## 自定义
 
-### Add New Strategies
+### 添加新策略
 
-Edit `src/types.ts` and add new strategies to the appropriate types.
+编辑 `src/types.ts`，向相应类型添加新策略。
 
-### Styling Customization
+### 样式自定义
 
-Edit `src/App.css` for visual adjustments. The plugin uses CSS variables for seamless theme integration:
+编辑 `src/App.css` 调整外观。插件使用 CSS 变量以实现无缝主题集成：
 
-- `--primary-color` - Main theme color
-- `--text-color` - Primary text
-- `--background-color` - Background
-- `--card-background` - Card backgrounds
-- `--border-radius` - Standard radius
-- And many more...
+- `--primary-color` - 主主题色
+- `--text-color` - 主文本色
+- `--background-color` - 背景
+- `--card-background` - 卡片背景
+- `--border-radius` - 标准圆角
+- 以及更多……
 
-## License
+## 许可证
 
 MIT

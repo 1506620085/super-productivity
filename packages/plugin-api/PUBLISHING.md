@@ -1,60 +1,60 @@
-# Publishing @super-productivity/plugin-api
+# 发布 @super-productivity/plugin-api
 
-## Overview
+## 概述
 
-This package provides TypeScript definitions for Super Productivity plugin development. It's published to npm as `@super-productivity/plugin-api`.
+本包为 Super Productivity 插件开发提供 TypeScript 类型定义，并以 `@super-productivity/plugin-api` 发布到 npm。
 
-## Publishing Process
+## 发布流程
 
-### 1. Update Version
+### 1. 更新版本
 
-Update the version in `package.json`:
+更新 `package.json` 中的版本号：
 
 ```bash
 cd packages/plugin-api
 npm version patch   # or minor/major
 ```
 
-### 2. Build the Package
+### 2. 构建包
 
 ```bash
 npm run build
 ```
 
-### 3. Test the Build
+### 3. 测试构建
 
 ```bash
 npm pack --dry-run
 ```
 
-### 4. Publish to npm
+### 4. 发布到 npm
 
-For stable releases:
+稳定版发布：
 
 ```bash
 npm publish --access public
 ```
 
-For beta releases:
+Beta 版发布：
 
 ```bash
 npm publish --tag beta --access public
 ```
 
-## Project Integration
+## 项目集成
 
-### Updating the Main Project
+### 更新主项目
 
-When updating the plugin API types, you need to:
+更新插件 API 类型时，需要：
 
-1. **Update this package** with new types/interfaces
-2. **Rebuild the package**: `npm run build`
-3. **Update the main project** to use the new types from this package instead of local definitions
-4. **Test the integration** to ensure everything works
+1. **更新本包**，加入新的类型/接口
+2. **重新构建包**：`npm run build`
+3. **更新主项目**，改用本包中的新类型，替代本地定义
+4. **测试集成**，确保一切正常
 
-### Using in the Main Project
+### 在主项目中使用
 
-The main project should import types from this package:
+主项目应从本包导入类型：
 
 ```typescript
 // Instead of local imports:
@@ -64,7 +64,7 @@ The main project should import types from this package:
 import type { PluginManifest } from '@super-productivity/plugin-api';
 ```
 
-## Package Structure
+## 包结构
 
 ```
 packages/plugin-api/
@@ -79,13 +79,13 @@ packages/plugin-api/
 └── .npmignore        # Files to exclude from npm
 ```
 
-## Maintenance
+## 维护
 
-- Keep types in sync with the main project's plugin system
-- Update documentation when adding new features
-- Follow semantic versioning for releases
-- Test changes with actual plugin development
+- 保持类型与主项目的插件系统同步
+- 添加新功能时更新文档
+- 发布遵循语义化版本
+- 用实际插件开发验证变更
 
-## Version History
+## 版本历史
 
-- `1.0.0` - Initial release with core plugin API types
+- `1.0.0` - 首个版本，包含核心插件 API 类型

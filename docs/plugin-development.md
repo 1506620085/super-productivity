@@ -1,34 +1,34 @@
-# Super Productivity Plugin Development Guide
+# Super Productivity 插件开发指南
 
-This is a comprehensive documentation of the Super Productivity Plugin System. This guide covers everything you need to know about creating plugins for Super Productivity.
+本文是 Super Productivity 插件系统的完整文档。本指南涵盖创建 Super Productivity 插件所需了解的全部内容。
 
-These docs might not always be perfectly up to date. You find the latest typescript interfaces here:
+这些文档可能并非始终完全最新。最新的 TypeScript 接口见：
 [types.ts](../packages/plugin-api/src/types.ts)
 
-Personally I think the best way to figure out how to write a plugin is to check out the example plugins:
+个人认为弄清如何编写插件的最佳方式是查看示例插件：
 
 - [yesterday-tasks-plugin](../packages/plugin-dev/yesterday-tasks-plugin)
 - [procrastination-buster](../packages/plugin-dev/procrastination-buster)
 - [api-test-plugin](../packages/plugin-dev/api-test-plugin)
 
-If you want to build a sophisticated UI there is a boilerplate available for solidjs:
+若要构建复杂 UI，有可用的 SolidJS 样板：
 [boilerplate-solid-js](../packages/plugin-dev/boilerplate-solid-js)
 
 ---
 
-## Table of Contents
+## 目录
 
-- [Quick Start](#quick-start)
-- [Plugin Manifest](#plugin-manifest)
-- [Plugin Types](#plugin-types)
-- [Available API Methods](#available-api-methods)
-- [Best Practices](#best-practices)
-- [Security Considerations](#security-considerations)
-- [Testing Your Plugin](#testing-your-plugin)
+- [快速开始](#快速开始)
+- [插件清单](#插件清单)
+- [插件类型](#插件类型)
+- [可用 API 方法](#可用-api-方法)
+- [最佳实践](#最佳实践)
+- [安全注意事项](#安全注意事项)
+- [测试你的插件](#测试你的插件)
 
-## Quick Start
+## 快速开始
 
-### 1. Basic Plugin Structure
+### 1. 基本插件结构
 
 ```
 my-plugin/
@@ -38,14 +38,11 @@ my-plugin/
 └── icon.svg           # Plugin icon (optional)
 ```
 
-`plugin.js` is required for plugins that need host-side setup at plugin load time,
-shortcuts, header buttons, background behavior, or host-side API handlers. A UI-only
-iframe plugin can ship only `manifest.json` and `index.html` when the manifest sets
-`iFrame: true`.
+需要在插件加载时进行宿主侧初始化、快捷键、页眉按钮、后台行为或宿主侧 API 处理程序的插件必须提供 `plugin.js`。仅 UI 的 iframe 插件在清单设置 `iFrame: true` 时可只附带 `manifest.json` 与 `index.html`。
 
-### 2. Minimal Example
+### 2. 最小示例
 
-**manifest.json:**
+**manifest.json：**
 
 ```json
 {
@@ -60,7 +57,7 @@ iframe plugin can ship only `manifest.json` and `index.html` when the manifest s
 }
 ```
 
-**plugin.js:**
+**plugin.js：**
 
 ```javascript
 console.log('Hello World plugin loaded!');
@@ -86,18 +83,18 @@ PluginAPI.registerHeaderButton({
 });
 ```
 
-## Plugin Manifest
+## 插件清单
 
-The `manifest.json` file is required for all plugins and defines the plugin's metadata and configuration.
+所有插件都需要 `manifest.json` 文件，用于定义插件的元数据与配置。
 
-Use
+请以
 [`PluginManifest`](../packages/plugin-api/src/types.ts)
-as the authoritative field contract. In particular, `hooks` and `permissions`
-are required arrays (use `[]` when unused), while `description` is optional.
-Do not rely on the installer's deliberately minimal runtime checks to infer the
-TypeScript contract.
+作为权威字段约定。特别地，`hooks` 与 `permissions`
+是必填数组（未使用时用 `[]`），而 `description` 是可选的。
+不要依赖安装程序刻意极简的运行时检查来推断
+TypeScript 约定。
 
-### Complete Manifest Example
+### 完整清单示例
 
 ```json
 {
@@ -115,23 +112,22 @@ TypeScript contract.
 }
 ```
 
-## Plugin Types
+## 插件类型
 
-### 1. JavaScript Plugins (`plugin.js`)
+### 1. JavaScript 插件（`plugin.js`）
 
-Pure JavaScript plugins with full API access. **These run in the host app's own
-renderer** (via `new Function`), not in a sandbox — plugin code shares the page's
-context and can reach privileged host APIs, so only install plugins whose source you
-trust (see [Security Considerations](#security-considerations)).
+纯 JavaScript 插件，拥有完整 API 访问权限。**它们运行在宿主应用自身的
+renderer（渲染进程）中**（通过 `new Function`），而非沙箱——插件代码与页面共享上下文，并可触及特权宿主 API，因此仅安装你信任其源码的插件
+（见[安全注意事项](#安全注意事项)）。
 
-**Use when:**
+**适用场景：**
 
-- For setup background stuff that is to be executed even when the plugin ui (iFrame) is not shown
-- For registering and handling keyboard shortcuts
-- You want to listen to app hooks/events
-- You need programmatic interaction with tasks/projects
+- 需要在插件 UI（iFrame）未显示时仍执行的后台初始化
+- 注册与处理键盘快捷键
+- 需要监听应用 hooks/事件
+- 需要以编程方式与任务/项目交互
 
-**Example:**
+**示例：**
 
 ```javascript
 // Register multiple UI elements
@@ -149,30 +145,25 @@ PluginAPI.registerHook(PluginAPI.Hooks.TASK_COMPLETE, (taskId) => {
 });
 ```
 
-### 2. HTML/Iframe Plugins (`index.html`)
+### 2. HTML/Iframe 插件（`index.html`）
 
-Plugins that render custom UI in an iframe. The iframe sandbox attribute limits
-some browser capabilities, but `allow-same-origin` means it is not a security
-boundary from the host app.
+在 iframe 中渲染自定义 UI 的插件。iframe 的 sandbox 属性会限制
+部分浏览器能力，但 `allow-same-origin` 意味着它相对宿主应用并非安全边界。
 
-**Use when:**
+**适用场景：**
 
-- You need custom UI/visualizations
-- You want to display charts, forms, or complex interfaces
+- 需要自定义 UI/可视化
+- 需要展示图表、表单或复杂界面
 
-Iframe-only plugins do not need a `plugin.js` file if all plugin behavior lives inside
-`index.html`. Super Productivity automatically adds the default menu or side-panel entry
-from the manifest when the plugin is loaded.
+若所有插件行为都在 `index.html` 内，仅 iframe 的插件可不需要 `plugin.js`。插件加载时，Super Productivity 会根据清单自动添加默认菜单或侧栏入口。
 
-**Important:** Iframe plugins are served through `srcdoc` and receive a filtered
-Plugin API message bridge as their supported interface. Because the iframe is
-same-origin, plugin code can also reach the parent directly; do not treat the
-bridge as enforced isolation. Inline CSS, JavaScript, and small assets directly
-in `index.html`; arbitrary extra files from the ZIP are not served to the iframe.
-External URLs can work when the app/runtime CSP allows them, but they are not part
-of the portable plugin contract.
+**重要：** Iframe 插件通过 `srcdoc` 提供，并接收经过过滤的
+Plugin API 消息桥作为受支持接口。由于 iframe 是
+同源的，插件代码也可直接访问父页面；不要将桥接视为强制隔离。请将内联 CSS、JavaScript 与小型资源直接写在
+`index.html` 中；ZIP 中的任意额外文件不会提供给 iframe。
+在应用/运行时 CSP 允许时外部 URL 可能可用，但它们不属于可移植插件约定的一部分。
 
-**Example index.html:**
+**示例 index.html：**
 
 ```html
 <!DOCTYPE html>
@@ -243,94 +234,94 @@ of the portable plugin contract.
 </html>
 ```
 
-### Theme Variables & UI Kit
+### 主题变量与 UI Kit
 
-Iframe plugins automatically receive:
+Iframe 插件会自动获得：
 
-1. **CSS variables** — All theme variables (colors, spacing, shadows, transitions) are injected as CSS custom properties on `:root`. Use `var(--c-primary)`, `var(--bg)`, `var(--text-color)`, etc.
+1. **CSS 变量** — 所有主题变量（颜色、间距、阴影、过渡）会作为 CSS 自定义属性注入到 `:root`。使用 `var(--c-primary)`、`var(--bg)`、`var(--text-color)` 等。
 
-2. **UI Kit CSS reset** — By default, basic HTML elements (`button`, `input`, `select`, `textarea`, `table`, `a`, `h1`–`h6`, `p`, `code`, `pre`, `hr`, etc.) are styled to match the app's look. This is injected before your plugin's own styles, so your CSS always wins.
+2. **UI Kit CSS reset** — 默认情况下，基础 HTML 元素（`button`、`input`、`select`、`textarea`、`table`、`a`、`h1`–`h6`、`p`、`code`、`pre`、`hr` 等）会样式化为与应用外观一致。注入发生在插件自有样式之前，因此你的 CSS 始终优先。
 
-   To disable the UI Kit, add `"uiKit": false` to your manifest.
+   要禁用 UI Kit，请在清单中添加 `"uiKit": false`。
 
-**Button variants:**
+**按钮变体：**
 
-- Default `<button>` — Neutral card-background button with border
-- `<button class="btn-primary">` — Filled primary-color button (white text)
-- `<button class="btn-outline">` — Transparent button with primary-color border and text, fills on hover
+- 默认 `<button>` — 带边框的中性卡片背景按钮
+- `<button class="btn-primary">` — 填充主色按钮（白色文字）
+- `<button class="btn-outline">` — 透明按钮，主色边框与文字，悬停时填充
 
-**Card component:**
+**卡片组件：**
 
-- `<div class="card">` — Card with background, shadow, rounded corners, and border
-- `<div class="card card-clickable">` — Adds hover lift effect and primary border highlight
+- `<div class="card">` — 带背景、阴影、圆角与边框的卡片
+- `<div class="card card-clickable">` — 增加悬停抬起效果与主色边框高亮
 
-**Utility classes:**
+**工具类：**
 
-- `.text-muted` — Muted text color (`var(--text-color-muted)`)
-- `.text-primary` — Primary theme color (`var(--c-primary)`)
-- `.page-fade` — Fade-in animation (0.3s ease)
+- `.text-muted` — 弱化文字颜色（`var(--text-color-muted)`）
+- `.text-primary` — 主题主色（`var(--c-primary)`）
+- `.page-fade` — 淡入动画（0.3s ease）
 
-**Key CSS variables:**
+**关键 CSS 变量：**
 
-- `--bg`, `--bg-darker` — Background colors
-- `--text-color`, `--text-color-muted` — Text colors
-- `--c-primary`, `--c-accent`, `--c-warn` — Theme colors
-- `--card-bg`, `--card-shadow`, `--card-border-radius` — Card styling
-- `--divider-color` — Border/divider color
-- `--s`, `--s2`, `--s3`, `--s4`, `--s-half`, `--s-quarter` — Spacing scale
-- `--transition-standard` — Standard transition
-- `--font-primary-stack` — App font stack
-- `--whiteframe-shadow-1dp` through `--whiteframe-shadow-24dp` — Elevation shadows
-- `--is-dark-theme` — `1` if dark theme, `0` if light
+- `--bg`、`--bg-darker` — 背景色
+- `--text-color`、`--text-color-muted` — 文字颜色
+- `--c-primary`、`--c-accent`、`--c-warn` — 主题色
+- `--card-bg`、`--card-shadow`、`--card-border-radius` — 卡片样式
+- `--divider-color` — 边框/分隔线颜色
+- `--s`、`--s2`、`--s3`、`--s4`、`--s-half`、`--s-quarter` — 间距刻度
+- `--transition-standard` — 标准过渡
+- `--font-primary-stack` — 应用字体栈
+- `--whiteframe-shadow-1dp` 至 `--whiteframe-shadow-24dp` — 海拔阴影
+- `--is-dark-theme` — 深色主题为 `1`，浅色为 `0`
 
-## Available API Methods
+## 可用 API 方法
 
-### Data Operations
+### 数据操作
 
-#### Tasks
+#### 任务（Tasks）
 
-- `getTasks()` - Get all active tasks
-- `getArchivedTasks()` - Get archived tasks
-- `getCurrentContextTasks()` - Get tasks in current context
-- `getSelectedTask()` - Get the task selected in the task detail panel, or `null`
-- `getFocusedTask()` - Get the currently focused task row, or `null`. Task-row focus is cleared when focus moves elsewhere, including into iframe side panels; use `getSelectedTask()` for persistent side-panel task context.
-- `addTask(task)` - Create a new task
-- `updateTask(taskId, updates)` - Update existing task
+- `getTasks()` - 获取所有活动任务
+- `getArchivedTasks()` - 获取已归档任务
+- `getCurrentContextTasks()` - 获取当前上下文中的任务
+- `getSelectedTask()` - 获取任务详情面板中选中的任务，或 `null`
+- `getFocusedTask()` - 获取当前聚焦的任务行，或 `null`。焦点移到别处（包括 iframe 侧栏）时任务行焦点会清除；侧栏中需要持久任务上下文时请使用 `getSelectedTask()`。
+- `addTask(task)` - 创建新任务
+- `updateTask(taskId, updates)` - 更新已有任务
 
-#### Application State
+#### 应用状态
 
-- `getAppState()` - Get the current application state (read-only; returns `PluginAppState`). An overview of the data returned is the JSON file exported via `Settings > Sync & Backup > Import/Export > Export data`. Example: `const state = await PluginAPI.getAppState();`
+- `getAppState()` - 获取当前应用状态（只读；返回 `PluginAppState`）。返回数据概览可见通过 `Settings > Sync & Backup > Import/Export > Export data` 导出的 JSON 文件。示例：`const state = await PluginAPI.getAppState();`
 
-#### Projects
+#### 项目（Projects）
 
-- `getAllProjects()` - Get all projects
-- `addProject(project)` - Create new project
-- `updateProject(projectId, updates)` - Update project
+- `getAllProjects()` - 获取所有项目
+- `addProject(project)` - 创建新项目
+- `updateProject(projectId, updates)` - 更新项目
 
-#### Tags
+#### 标签（Tags）
 
-- `getAllTags()` - Get all tags
-- `addTag(tag)` - Create new tag
-- `updateTag(tagId, updates)` - Update tag
+- `getAllTags()` - 获取所有标签
+- `addTag(tag)` - 创建新标签
+- `updateTag(tagId, updates)` - 更新标签
 
-#### Simple Counters
+#### 简单计数器（Simple Counters）
 
-Simple counters let you track lightweight metrics (e.g., daily clicks or habits) that persist and sync with your data. There are two levels: **basic** (key-value pairs for today's count) and **full model** (full CRUD on `SimpleCounter` entities with date-specific values).
+简单计数器用于跟踪轻量指标（例如每日点击或习惯），会持久化并随你的数据同步。有两个层级：**basic**（今日计数的键值对）与 **full model**（对带日期特定值的 `SimpleCounter` 实体的完整 CRUD）。
 
-##### Basic Counters
+##### 基础计数器
 
-These treat counters as a simple `{ [id: string]: number }` map for today's values (auto-upserts via NgRx).
+将计数器视为今日值的简单 `{ [id: string]: number }` 映射（通过 NgRx 自动 upsert）。
 
 | Method                                  | Description                                                                      | Example                                                                               |
 | --------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `getAllCounters()`                      | Get all counters as `{ [id: string]: number }`                                   | `const counters = await PluginAPI.getAllCounters(); console.log(counters['my-key']);` |
-| `getCounter(id)`                        | Get today's value for a counter (returns `null` if unset)                        | `const val = await PluginAPI.getCounter('daily-commits');`                            |
-| `setCounter(id, value)`                 | Set today's value (non-negative number; validates id regex `/^[A-Za-z0-9_-]+$/`) | `await PluginAPI.setCounter('daily-commits', 5);`                                     |
-| `incrementCounter(id, incrementBy = 1)` | Increment and return new value (floors at 0)                                     | `const newVal = await PluginAPI.incrementCounter('daily-commits', 2);`                |
-| `decrementCounter(id, decrementBy = 1)` | Decrement and return new value (floors at 0)                                     | `const newVal = await PluginAPI.decrementCounter('daily-commits');`                   |
-| `deleteCounter(id)`                     | Delete the counter                                                               | `await PluginAPI.deleteCounter('daily-commits');`                                     |
+| `getAllCounters()`                      | 获取所有计数器，形式为 `{ [id: string]: number }`                                   | `const counters = await PluginAPI.getAllCounters(); console.log(counters['my-key']);` |
+| `getCounter(id)`                        | 获取某计数器的今日值（未设置则返回 `null`）                        | `const val = await PluginAPI.getCounter('daily-commits');`                            |
+| `setCounter(id, value)`                 | 设置今日值（非负数字；校验 id 正则 `/^[A-Za-z0-9_-]+$/`） | `await PluginAPI.setCounter('daily-commits', 5);`                                     |
+| `incrementCounter(id, incrementBy = 1)` | 递增并返回新值（下限为 0）                                     | `const newVal = await PluginAPI.incrementCounter('daily-commits', 2);`                |
+| `decrementCounter(id, decrementBy = 1)` | 递减并返回新值（下限为 0）                                     | `const newVal = await PluginAPI.decrementCounter('daily-commits');`                   |
+| `deleteCounter(id)`                     | 删除该计数器                                                               | `await PluginAPI.deleteCounter('daily-commits');`                                     |
 
-**Example:**
+**示例：**
 
 ```javascript
 // Track daily commits
@@ -342,22 +333,22 @@ PluginAPI.showSnack({
 });
 ```
 
-##### Full SimpleCounter Model
+##### 完整 SimpleCounter 模型
 
-For advanced use: Full CRUD on counters with metadata (title, enabled state, date-specific values via `countOnDay: { [date: string]: number }`).
+高级用途：对带元数据的计数器进行完整 CRUD（标题、启用状态、通过 `countOnDay: { [date: string]: number }` 的日期特定值）。
 
 | Method                                   | Description                                                                       | Example                                                               |
 | ---------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `getAllSimpleCounters()`                 | Get all as `SimpleCounter[]`                                                      | `const all = await PluginAPI.getAllSimpleCounters();`                 |
-| `getSimpleCounter(id)`                   | Get one by id (returns `undefined` if not found)                                  | `const counter = await PluginAPI.getSimpleCounter('my-id');`          |
-| `updateSimpleCounter(id, updates)`       | Partial update (e.g., `{ title: 'New Title', countOnDay: { '2025-11-17': 10 } }`) | `await PluginAPI.updateSimpleCounter('my-id', { isEnabled: false });` |
-| `toggleSimpleCounter(id)`                | Toggle `isOn` state (throws if not found)                                         | `await PluginAPI.toggleSimpleCounter('my-id');`                       |
-| `setSimpleCounterEnabled(id, isEnabled)` | Set enabled state                                                                 | `await PluginAPI.setSimpleCounterEnabled('my-id', true);`             |
-| `deleteSimpleCounter(id)`                | Delete by id                                                                      | `await PluginAPI.deleteSimpleCounter('my-id');`                       |
-| `setSimpleCounterToday(id, value)`       | Set today's value (YYYY-MM-DD)                                                    | `await PluginAPI.setSimpleCounterToday('my-id', 10);`                 |
-| `setSimpleCounterDate(id, date, value)`  | Set value for specific date (validates YYYY-MM-DD)                                | `await PluginAPI.setSimpleCounterDate('my-id', '2025-11-16', 5);`     |
+| `getAllSimpleCounters()`                 | 获取全部，类型为 `SimpleCounter[]`                                                      | `const all = await PluginAPI.getAllSimpleCounters();`                 |
+| `getSimpleCounter(id)`                   | 按 id 获取一个（未找到则返回 `undefined`）                                  | `const counter = await PluginAPI.getSimpleCounter('my-id');`          |
+| `updateSimpleCounter(id, updates)`       | 部分更新（例如 `{ title: 'New Title', countOnDay: { '2025-11-17': 10 } }`） | `await PluginAPI.updateSimpleCounter('my-id', { isEnabled: false });` |
+| `toggleSimpleCounter(id)`                | 切换 `isOn` 状态（未找到则抛错）                                         | `await PluginAPI.toggleSimpleCounter('my-id');`                       |
+| `setSimpleCounterEnabled(id, isEnabled)` | 设置启用状态                                                                 | `await PluginAPI.setSimpleCounterEnabled('my-id', true);`             |
+| `deleteSimpleCounter(id)`                | 按 id 删除                                                                      | `await PluginAPI.deleteSimpleCounter('my-id');`                       |
+| `setSimpleCounterToday(id, value)`       | 设置今日值（YYYY-MM-DD）                                                    | `await PluginAPI.setSimpleCounterToday('my-id', 10);`                 |
+| `setSimpleCounterDate(id, date, value)`  | 为特定日期设置值（校验 YYYY-MM-DD）                                | `await PluginAPI.setSimpleCounterDate('my-id', '2025-11-16', 5);`     |
 
-**Example:**
+**示例：**
 
 ```javascript
 // Create/update a habit counter
@@ -372,9 +363,9 @@ const counter = await PluginAPI.getSimpleCounter('habit-streak');
 console.log(`Streak on: ${counter.isOn}`);
 ```
 
-### UI Operations
+### UI 操作
 
-#### Notifications
+#### 通知
 
 ```javascript
 // Show snackbar notification
@@ -394,7 +385,7 @@ PluginAPI.notify({
 });
 ```
 
-#### Dialogs
+#### 对话框
 
 ```javascript
 // Open a dialog
@@ -409,26 +400,15 @@ if (result === 'Yes') {
 }
 ```
 
-`openDialog()` resolves with the clicked button label. If the user dismisses
-the dialog without clicking a button, it resolves with `undefined`. The legacy
-`content`, `okBtnLabel`, and `cancelBtnLabel` fields are still accepted, but new
-plugins should use `htmlContent` and `buttons`.
+`openDialog()` 以被点击按钮的 label 完成解析。若用户未点击按钮即关闭对话框，则解析为 `undefined`。仍接受旧版字段 `content`、`okBtnLabel` 与 `cancelBtnLabel`，但新插件应使用 `htmlContent` 与 `buttons`。
 
-The host sanitizes `htmlContent` before rendering it, rebuilding the markup from
-an allowlist. Semantic HTML, native form controls (including their `id`s and
-values), `class`, `data-*`, `aria-*`, and inline layout styles are preserved.
-Removed are scripts, event-handler attributes, unsafe URLs, inline `<svg>`, and
-any `style` attribute containing `url(`, since dialog layout never needs to load
-a resource. Elements outside the allowlist are unwrapped, so their text stays
-visible while the tag itself is dropped.
+宿主在渲染前会净化 `htmlContent`，按白名单重建标记。语义 HTML、原生表单控件（包括其 `id` 与值）、`class`、`data-*`、`aria-*` 以及内联布局样式会保留。会移除脚本、事件处理属性、不安全 URL、内联 `<svg>`，以及任何包含 `url(` 的 `style` 属性，因为对话框布局从不需要加载资源。白名单外的元素会被解包，因此其文本仍可见而标签本身被丢弃。
 
-Escape untrusted values before interpolating them into the HTML string: the
-sanitizer is a safety net for the host, not a substitute for escaping in your
-plugin. Use `content` when plain text is sufficient.
+将不可信值插值进 HTML 字符串前请先转义：净化器是宿主的安全网，不能替代插件内的转义。纯文本足够时请使用 `content`。
 
-### Registration Methods (plugin.js only)
+### 注册方法（仅 plugin.js）
 
-#### Header Button
+#### 页眉按钮
 
 ```javascript
 PluginAPI.registerHeaderButton({
@@ -441,7 +421,7 @@ PluginAPI.registerHeaderButton({
 });
 ```
 
-#### Menu Entry
+#### 菜单项
 
 ```javascript
 PluginAPI.registerMenuEntry({
@@ -453,7 +433,7 @@ PluginAPI.registerMenuEntry({
 });
 ```
 
-#### Side Panel Button
+#### 侧栏按钮
 
 ```javascript
 PluginAPI.registerSidePanelButton({
@@ -465,7 +445,7 @@ PluginAPI.registerSidePanelButton({
 });
 ```
 
-#### Keyboard Shortcut
+#### 键盘快捷键
 
 ```javascript
 PluginAPI.registerShortcut({
@@ -493,14 +473,7 @@ const hooks = {
 };
 ```
 
-`PERSISTED_DATA_CHANGED` fires whenever this plugin's persisted data
-changes — local writes, remote sync deliveries, and bulk imports —
-_after_ the host has finished its initial boot load. The handler
-receives no payload; re-call `loadSyncedData(key?)` for any key your
-plugin tracks to get fresh data. There is no replay-on-register and no
-guaranteed ordering across rapid changes, so handlers must be
-idempotent. The typical pattern is: call `loadSyncedData()` once on
-plugin init, then subscribe to this hook for subsequent updates.
+`PERSISTED_DATA_CHANGED` 会在本插件的持久化数据发生变化时触发——本地写入、远程同步投递与批量导入——且是在宿主完成初始启动加载 _之后_。处理程序不接收载荷；对插件跟踪的任意 key 重新调用 `loadSyncedData(key?)` 以获取新数据。没有注册时重放，对快速变化也无保证顺序，因此处理程序必须幂等。典型模式是：插件初始化时调用一次 `loadSyncedData()`，然后订阅此 hook 以接收后续更新。
 
 ```javascript
 // Register hook listener
@@ -518,13 +491,9 @@ PluginAPI.registerHook(PluginAPI.Hooks.ACTION, (action) => {
 });
 ```
 
-### Data Persistence
+### 数据持久化
 
-You can persist data that will also be synced via the `persistDataSynced` and
-`loadSyncedData` APIs. Host-side `plugin.js` code can use `localStorage` for
-data that should stay local. Iframe plugins should prefer the synced
-persistence APIs because direct iframe browser storage is not part of the
-portable plugin contract and can vary by runtime.
+可通过 `persistDataSynced` 与 `loadSyncedData` API 持久化也会同步的数据。宿主侧 `plugin.js` 代码可对应仅留在本地的数据使用 `localStorage`。Iframe 插件应优先使用同步持久化 API，因为直接的 iframe 浏览器存储不属于可移植插件约定，且可能因运行时而异。
 
 ```javascript
 // Save plugin data
@@ -535,12 +504,11 @@ const data = await PluginAPI.loadSyncedData();
 console.log(data); // '{ count: 42 }'
 ```
 
-### Secret Storage
+### 密钥存储（Secret Storage）
 
-For credentials — IMAP/SMTP passwords, API tokens, app passwords — use
-`setSecret` / `getSecret` / `deleteSecret`. Secrets are stored **local-only**:
-they are never synced, exported, or included in backups, and each plugin can
-only read its own keys.
+对于凭据——IMAP/SMTP 密码、API 令牌、应用密码——请使用
+`setSecret` / `getSecret` / `deleteSecret`。密钥为 **仅本地** 存储：
+永不同步、导出或包含在备份中，且每个插件只能读取自己的 key。
 
 ```javascript
 // Store a credential (key must be a non-empty string)
@@ -553,28 +521,19 @@ const pw = await PluginAPI.getSecret('imapPassword'); // string | null
 await PluginAPI.deleteSecret('imapPassword');
 ```
 
-Rules of thumb:
+经验法则：
 
-- **Never** put a credential in `persistDataSynced` or in issue-provider
-  config — those sync to the server and land in exports/backups. Keep only
-  non-secret connection details there (host, port, username, filters) and put
-  the password/token in secret storage.
-- Secrets are **per-device**: a value set on desktop is not available on mobile,
-  so prompt the user to enter the credential on each device. (This matches how
-  IMAP app-passwords are typically used anyway.)
-- Secrets are stored unencrypted at rest today (the same as plugin OAuth
-  tokens); the guarantee is "stays on this device, never synced," not
-  hardware-level encryption. Don't store anything you wouldn't accept living in
-  the app's local profile.
-- All secrets for a plugin are purged automatically when the plugin is
-  uninstalled.
+- **切勿** 将凭据放入 `persistDataSynced` 或 issue-provider
+  配置——那些会同步到服务器并进入导出/备份。那里只保留非机密连接细节（主机、端口、用户名、过滤器），并将密码/令牌放入密钥存储。
+- 密钥是 **按设备** 的：在桌面设置的值在移动端不可用，因此请提示用户在每台设备上输入凭据。（这通常也符合 IMAP 应用密码的用法。）
+- 密钥目前静态未加密存储（与插件 OAuth
+  令牌相同）；保证是「留在本设备，永不同步」，而非硬件级加密。不要存储你不愿意放在应用本地配置中的任何内容。
+- 卸载插件时，该插件的所有密钥会自动清除。
 
-#### Secrets in issue-provider plugins
+#### Issue-provider 插件中的密钥
 
-Issue-provider plugins get the same secret API (an issue provider is a normal
-plugin that also calls `registerIssueProvider`). Your definition callbacks
-(`getHeaders`, `getById`, `searchIssues`, …) run in your plugin's context, so
-they can read secrets directly:
+Issue-provider 插件获得相同的密钥 API（issue provider 是同时调用 `registerIssueProvider` 的普通插件）。你的定义回调
+（`getHeaders`、`getById`、`searchIssues`、…）在插件上下文中运行，因此可直接读取密钥：
 
 ```javascript
 PluginAPI.registerIssueProvider({
@@ -597,64 +556,41 @@ PluginAPI.registerIssueProvider({
 });
 ```
 
-The host passes only the synced `config` into these callbacks — there is no
-secret parameter, and the declarative `configFields` form always writes to the
-synced config. So collect the secret through your own UI (a config dialog
-registered via `registerConfigHandler`, or a side panel) and store it with
-`setSecret` there; do **not** add the credential as a `configFields` entry.
+宿主只向这些回调传入已同步的 `config`——没有密钥参数，且声明式 `configFields` 表单始终写入同步配置。因此请通过你自己的 UI（通过 `registerConfigHandler` 注册的配置对话框，或侧栏）收集密钥并用 `setSecret` 存储；**不要** 将凭据添加为 `configFields` 条目。
 
-## Best Practices
+## 最佳实践
 
-### 1. Performance
+### 1. 性能
 
-- **Lazy load resources**: Don't load everything on plugin initialization
-- **Be responsive with using resources**: Avoid heavy operations and don't save excessive amounts of data.
-- **Keep it lightweight**: Super Productivity is not the only app on the users system and your plugin is not the only plugin.
+- **懒加载资源**：不要在插件初始化时加载一切
+- **克制地使用资源**：避免重操作，不要保存过量数据。
+- **保持轻量**：Super Productivity 不是用户系统上唯一的应用，你的插件也不是唯一的插件。
 
-### 2. User Experience
+### 2. 用户体验
 
-- **Provide feedback**: Show loading states and confirmations
-- **Be non-intrusive**: Don't spam notifications
-- **Follow the app's design**: Use the injected theme variables and try to keep styles minimal.
-- **Respect user preferences**: Check dark mode, and language settings (if possible or stick to english if not)
+- **提供反馈**：显示加载状态与确认
+- **不侵扰**：不要滥发通知
+- **遵循应用设计**：使用注入的主题变量，并尽量保持样式精简。
+- **尊重用户偏好**：检查深色模式与语言设置（若可能；否则可坚持英语）
 
-### 3. Security
+### 3. 安全
 
-- **Request minimal permissions**: Only what you need
+- **请求最少权限**：只请求你需要的
 
-### Node.js Script Execution
+### Node.js 脚本执行
 
-Plugins with `"permissions": ["nodeExecution"]` can run Node.js scripts in the Electron
-desktop app after the user allows the desktop permission prompt.
+带有 `"permissions": ["nodeExecution"]` 的插件可在用户允许桌面权限提示后，在 Electron 桌面应用中运行 Node.js 脚本。
 
-Both built-in and uploaded (community) plugins may request `nodeExecution`. The grant is
-issued by the Electron **main** process after a native consent dialog and is bound to the
-plugin id. For uploaded plugins the app cannot verify the manifest, so the dialog flags
-the plugin as unverified third-party code with full machine access that Super Productivity
-cannot sandbox, and defaults to **Deny** — only allow plugins whose source you trust. If
-the user denies, the plugin returns to a disabled state; enabling it again reopens the
-prompt.
+内置与上传（社区）插件均可请求 `nodeExecution`。授权由 Electron **main** 进程在原生同意对话框后签发，并绑定到插件 id。对上传插件，应用无法验证清单，因此对话框会将该插件标记为未验证的第三方代码，具有 Super Productivity 无法沙箱化的完整机器访问权限，并默认 **Deny**——仅允许你信任其源码的插件。若用户拒绝，插件回到禁用状态；再次启用会重新打开提示。
 
-Consent handling differs by plugin type:
+按插件类型，同意处理不同：
 
-- **Uploaded (community) plugins:** consent is remembered **once per plugin** in a
-  main-owned, local-only store (`Allow` is not asked again on the next launch). The
-  consent is **never synced** — granting on one device does not auto-grant on another;
-  the other device prompts afresh on first node use. Consent is automatically cleared
-  (forcing a fresh prompt) when you **disable**, **uninstall**, or **re-upload** the
-  plugin, so replacing a plugin's code under the same id always re-asks. To revoke access
-  without removing the plugin, simply disable it.
-- **Built-in plugins** (e.g. `sync-md`) keep the per-session prompt and are not persisted.
+- **上传（社区）插件：** 同意按插件 **记住一次**，保存在 main 拥有的仅本地存储中（下次启动不再询问 `Allow`）。同意 **永不同步**——在一台设备上授权不会自动授权另一台；另一台设备首次使用 node 时会重新提示。当你 **禁用**、**卸载** 或 **重新上传** 插件时，同意会自动清除（强制重新提示），因此在同一 id 下替换插件代码总会重新询问。若要在不移除插件的情况下撤销访问，只需禁用它。
+- **内置插件**（例如 `sync-md`）保持按会话提示，且不持久化。
 
-> **Plugin id constraints (for `nodeExecution`):** the consent grant keys on your
-> manifest `id`, so it must be a single safe token — no whitespace, control/bidi
-> characters, `:`, path separators (`/`, `\`), and at most 100 characters. Lowercase
-> kebab-case is recommended; dots and uppercase are accepted.
+> **插件 id 约束（针对 `nodeExecution`）：** 同意授权以你的清单 `id` 为键，因此它必须是单个安全令牌——无空白、控制/双向文字字符、`:`、路径分隔符（`/`、`\`），且最多 100 个字符。推荐小写 kebab-case；点号与大写也可接受。
 
-> **Security note:** a granted `nodeExecution` plugin can run any program with full
-> access to your files and system. The file/IPC channel a plugin uses to talk to a
-> companion process is an open local channel — treat any data it reads as untrusted
-> input (never `eval`/`require` its contents).
+> **安全说明：** 已授权 `nodeExecution` 的插件可以以完整文件与系统访问权限运行任意程序。插件用于与伴随进程通信的文件/IPC 通道是开放的本地通道——将其读取的任何数据视为不可信输入（切勿对其内容 `eval`/`require`）。
 
 ```javascript
 const result = await plugin.executeNodeScript({
@@ -670,11 +606,9 @@ if (result.success) {
 }
 ```
 
-**Important — use `plugin.onReady()` for startup calls:**
+**重要 — 启动调用请使用 `plugin.onReady()`：**
 
-`executeNodeScript` requires the Electron IPC bridge to be available. On cold boot this
-bridge may not be ready when `plugin.js` first runs. Always put `executeNodeScript` calls
-(and any other startup init code) inside `plugin.onReady()`:
+`executeNodeScript` 需要 Electron IPC 桥可用。冷启动时，该桥可能在 `plugin.js` 首次运行时尚未就绪。请始终将 `executeNodeScript` 调用（以及任何其他启动初始化代码）放在 `plugin.onReady()` 内：
 
 ```javascript
 // ❌ May fail on cold boot
@@ -686,26 +620,15 @@ plugin.onReady(async () => {
 });
 ```
 
-`plugin.onReady(fn)` fires after `plugin.js` has fully evaluated **and** the app has
-confirmed the Node.js IPC bridge is responding (with automatic retry). If the bridge is
-unavailable after retries, an error is shown in the plugin management UI and `onReady` does
-not fire.
+`plugin.onReady(fn)` 在 `plugin.js` 完全求值 **且** 应用确认 Node.js IPC 桥正在响应（带自动重试）之后触发。若重试后桥仍不可用，插件管理 UI 会显示错误，且 `onReady` 不会触发。
 
-You can also use `onReady` for any other startup work that should run after the plugin
-script has finished setting up its hooks and registrations — not just for `nodeExecution`.
+你也可将 `onReady` 用于应在插件脚本完成 hooks 与注册设置之后运行的任何其他启动工作——不仅限于 `nodeExecution`。
 
-**Iframe plugins:** `PluginAPI.onReady()` is available inside `index.html`. It fires on
-the next microtask after the callback is registered — without an IPC bridge ping. This is
-fine in practice because iframe plugins are rendered on user navigation (well after host
-startup). Iframe API calls still go through the host bridge when they are made;
-cold-boot bridge pings are only performed for host-side plugin code.
+**Iframe 插件：** `PluginAPI.onReady()` 在 `index.html` 内可用。它在注册回调后的下一个微任务触发——不做 IPC 桥 ping。实践中没问题，因为 iframe 插件在用户导航时渲染（远在宿主启动之后）。Iframe API 调用在发出时仍经宿主桥；冷启动桥 ping 仅对宿主侧插件代码执行。
 
-**Clean up with `plugin.onUnload()`:**
+**用 `plugin.onUnload()` 清理：**
 
-Code-based plugins (`plugin.js`) run directly in the app's renderer, so timers and
-listeners they create are **not** cleaned up automatically when the plugin is disabled,
-reloaded, or uninstalled — a `setInterval` started by your plugin keeps firing until the
-app is fully reloaded. Register a teardown callback to clear them yourself:
+基于代码的插件（`plugin.js`）直接运行在应用的 renderer 中，因此它们创建的定时器与监听器在插件被禁用、重新加载或卸载时 **不会** 自动清理——你的插件启动的 `setInterval` 会一直触发，直到应用完全重新加载。请注册拆除回调自行清理：
 
 ```javascript
 const intervalId = setInterval(doWork, 60000);
@@ -716,29 +639,19 @@ plugin.onUnload(() => {
 });
 ```
 
-The host invokes the callback at the start of plugin teardown, while the Plugin API is
-still usable for calls like persisting data — but don't register new hooks or listeners
-from inside it (the plugin is going away; re-registering `onUnload` there is ignored).
-The returned promise is **not awaited** — do synchronous cleanup (`clearInterval` etc.)
-before any `await`, since teardown continues immediately. Registering again replaces the
-previous callback, so register once and do all cleanup there. Errors thrown by the
-callback are logged and do not block teardown.
+宿主在插件拆除开始时调用该回调，此时 Plugin API 仍可用于诸如持久化数据的调用——但不要在其中注册新的 hooks 或监听器（插件正在离开；在那里重新注册 `onUnload` 会被忽略）。返回的 Promise **不会被等待**——在任何 `await` 之前做同步清理（`clearInterval` 等），因为拆除会立即继续。再次注册会替换先前的回调，因此请注册一次并在那里完成所有清理。回调抛出的错误会被记录且不阻塞拆除。
 
-Plugins distributed independently of the app should feature-detect it
-(`if (plugin.onUnload) { ... }`) — hosts predating the hook don't provide it.
+独立于应用分发的插件应做特性检测（`if (plugin.onUnload) { ... }`）——该 hook 之前的宿主不提供它。
 
-**Iframe plugins:** `onUnload` exists but is a no-op — the host unmounts the iframe on
-unload, which takes its timers and listeners with it. Don't rely on it for unload-time
-persistence in iframes; persist when the data changes instead.
+**Iframe 插件：** `onUnload` 存在但是空操作——宿主在卸载时卸载 iframe，定时器与监听器随之带走。不要依赖它在 iframe 中做卸载时持久化；应在数据变化时持久化。
 
-### 4. Don't spam the logs
+### 4. 不要滥打日志
 
-`console.logs` should be kept to a minimum.
+`console.logs` 应保持最少。
 
-### 5. Iframe plugins: keep assets self-contained
+### 5. Iframe 插件：保持资源自包含
 
-1. **Prefer self-contained HTML**: inline CSS, JavaScript, and small assets are the
-   most portable option for iframe plugins
+1. **优先自包含 HTML**：内联 CSS、JavaScript 与小型资源是 iframe 插件最可移植的选项
 
 ```html
 <!-- Portable: Everything needed by the iframe is in index.html -->
@@ -758,62 +671,41 @@ persistence in iframes; persist when the data changes instead.
 </html>
 ```
 
-## Security Considerations
+## 安全注意事项
 
-### Execution model & trust
+### 执行模型与信任
 
-Plugins are **not** strongly sandboxed from the host — installing a plugin means
-trusting its code with your data:
+插件相对宿主 **并非** 强沙箱——安装插件意味着信任其代码访问你的数据：
 
-- JavaScript (`plugin.js`) plugins run in the host app's renderer via `new Function`,
-  in the same context as the app. They can reach privileged host APIs (including, on
-  desktop, `window.ea`).
-- Iframe plugins render with the `allow-same-origin` sandbox flag (required so the UI
-  paints on the packaged `file://` desktop build). Being same-origin, they can read
-  `window.parent.ea` directly, so the `postMessage` bridge is a convenience, not a hard
-  security boundary.
-- Filesystem/process access on desktop goes through `executeNodeScript()`, which stays
-  gated by an explicit main-process consent prompt (`nodeExecution` permission). This is
-  the only sanctioned way for a plugin to run native code.
-- There is no `window.ea.exec()`: the old IPC that ran arbitrary shell commands via
-  `child_process.exec` (reachable by any plugin/iframe/XSS, bypassing the `nodeExecution`
-  consent) was removed. Legacy `COMMAND` task attachments no longer execute.
+- JavaScript（`plugin.js`）插件通过 `new Function` 在宿主应用的 renderer 中运行，与应用同一上下文。它们可触及特权宿主 API（包括在桌面上的 `window.ea`）。
+- Iframe 插件以 `allow-same-origin` sandbox 标志渲染（打包的 `file://` 桌面构建需要它才能绘制 UI）。由于同源，它们可直接读取 `window.parent.ea`，因此 `postMessage` 桥是便利设施，而非硬性安全边界。
+- 桌面上的文件系统/进程访问通过 `executeNodeScript()`，仍由显式的 main 进程同意提示（`nodeExecution` 权限）门控。这是插件运行原生代码的唯一正式途径。
+- 没有 `window.ea.exec()`：曾通过 `child_process.exec` 运行任意 shell 命令的旧 IPC（任何插件/iframe/XSS 可达，绕过 `nodeExecution` 同意）已移除。旧版 `COMMAND` 任务附件不再执行。
 
-Only install plugins from sources you trust, and read the code first.
+仅从你信任的来源安装插件，并先阅读代码。
 
-### Iframe API Surface
+### Iframe API 表面
 
-Iframe plugins receive a filtered `window.PluginAPI` object injected into `index.html`.
-The iframe can use the injected task/project/tag APIs, dialog and notification APIs,
-navigation helpers, persistence helpers, counters, action dispatch, `registerHook()`,
-and `registerWorkContextHeaderButton()`. Callback-heavy registration methods such as
-`registerHeaderButton()`, `registerMenuEntry()`, `registerSidePanelButton()`,
-`registerShortcut()`, and `registerConfigHandler()` must be registered from
-host-side `plugin.js` code. APIs not injected into the iframe are unavailable, even if
-they exist on the host-side plugin bridge.
+Iframe 插件会获得注入到 `index.html` 的经过过滤的 `window.PluginAPI` 对象。Iframe 可使用注入的任务/项目/标签 API、对话框与通知 API、导航助手、持久化助手、计数器、action 派发、`registerHook()` 以及 `registerWorkContextHeaderButton()`。偏回调的注册方法如 `registerHeaderButton()`、`registerMenuEntry()`、`registerSidePanelButton()`、`registerShortcut()` 与 `registerConfigHandler()` 必须从宿主侧 `plugin.js` 代码注册。未注入 iframe 的 API 不可用，即使它们存在于宿主侧插件桥上。
 
-`executeNodeScript()` is proxied through the host bridge for iframe plugins when
-the desktop app grants the plugin `nodeExecution` permission.
+当桌面应用授予插件 `nodeExecution` 权限时，iframe 插件的 `executeNodeScript()` 会通过宿主桥代理。
 
-### Iframe Boundary
+### Iframe 边界
 
-- Iframe plugins render with `allow-same-origin` (required so the UI paints on the
-  packaged `file://` desktop build; an opaque-origin iframe stays blank — see #8467)
-- Because they are same-origin, iframe plugins can read `window.parent.ea` directly;
-  the filtered `postMessage` bridge is the intended API, not an enforced boundary
-- Remote assets depend on the app/runtime CSP and should not be relied on
-- Restoring opaque-origin isolation (serving the renderer from an `app://` scheme) is
-  tracked separately
+- Iframe 插件以 `allow-same-origin` 渲染（打包的 `file://` 桌面构建需要它才能绘制 UI；不透明源 iframe 会保持空白——见 #8467）
+- 由于同源，iframe 插件可直接读取 `window.parent.ea`；经过过滤的 `postMessage` 桥是预期 API，而非强制边界
+- 远程资源取决于应用/运行时 CSP，不应依赖
+- 恢复不透明源隔离（从 `app://` scheme 提供 renderer）另行跟踪
 
-## Testing Your Plugin
+## 测试你的插件
 
-### 1. Local Development
+### 1. 本地开发
 
-1. Build the plugin ZIP and upload it from **Settings** → **Plugins**
-2. Open DevTools (F12 or Ctrl+Shift+i) to see console logs
-3. Use the API Test Plugin as reference
+1. 构建插件 ZIP，并从 **Settings** → **Plugins** 上传
+2. 打开 DevTools（F12 或 Ctrl+Shift+i）查看控制台日志
+3. 以 API Test Plugin 为参考
 
-### 2. Debugging Tips
+### 2. 调试技巧
 
 ```javascript
 // Add debug logging
@@ -839,57 +731,56 @@ async function testAPI() {
 }
 ```
 
-### 3. Common Issues
+### 3. 常见问题
 
-**Plugin not loading:**
+**插件未加载：**
 
-- Check manifest.json syntax
-- Verify minSupVersion compatibility
-- Look for errors in console
+- 检查 manifest.json 语法
+- 验证 minSupVersion 兼容性
+- 查看控制台错误
 
-**API methods failing:**
+**API 方法失败：**
 
-- Check if method is available in current context
-- Verify permissions in manifest
-- If `executeNodeScript` fails on startup or cold boot, wrap your init code in
-  `plugin.onReady(async () => { ... })` — this ensures the Node.js bridge is ready before
-  your code runs
+- 检查方法在当前上下文是否可用
+- 验证清单中的权限
+- 若 `executeNodeScript` 在启动或冷启动时失败，将初始化代码包在
+  `plugin.onReady(async () => { ... })` 中——这确保在代码运行前 Node.js 桥已就绪
 
-**Iframe not displaying:**
+**Iframe 未显示：**
 
-- Check that all resources are inlined
-- Verify no external dependencies
-- Look for CSP violations in console
+- 检查所有资源是否已内联
+- 确认无外部依赖
+- 查看控制台中的 CSP 违规
 
-## Resources
+## 资源
 
-- **Plugin API Types**: [@super-productivity/plugin-api](https://www.npmjs.com/package/@super-productivity/plugin-api)
-- **Plugin Boilerplate**: [boilerplate-solid-js](../packages/plugin-dev/boilerplate-solid-js)
-- **Example Plugins**: [plugin-dev](../packages/plugin-dev)
-- **Community Plugins**:
+- **Plugin API Types**：[@super-productivity/plugin-api](https://www.npmjs.com/package/@super-productivity/plugin-api)
+- **Plugin Boilerplate**：[boilerplate-solid-js](../packages/plugin-dev/boilerplate-solid-js)
+- **Example Plugins**：[plugin-dev](../packages/plugin-dev)
+- **Community Plugins**：
   - [counter-tester-plugin](https://github.com/Mustache-Games/counter-tester-plugin) by [Mustache Dev](https://github.com/Mustache-Games)
   - [sp-reporter](https://github.com/dougcooper/sp-reporter) by [dougcooper](https://github.com/dougcooper)
 
-## Contributing
+## 贡献
 
-If you create a useful plugin, consider:
+若你创建了有用的插件，可考虑：
 
-1. Posting on reddit or GitHub discussions about it
-2. Submitting a PR to add it to the community plugins list (coming soon)
+1. 在 reddit 或 GitHub discussions 上发帖介绍
+2. 提交 PR，将其加入社区插件列表（即将推出）
 
-Happy plugin development! 🚀
+祝插件开发愉快！🚀
 
-## Bonus: Vibe Coding your Plugins
+## 附赠：用 Vibe Coding 编写插件
 
-### Tips
+### 提示
 
-- Don't test on your real world data! Use a test instance! (you can use https://test-app.super-productivity.com/ if you don't know how get one)
-- Be as specific as possible
-- Outline what APIs your plugin should use
-- Test for errors (`Ctrl+Shift+i` opens the console) and iterate until it works. Don't expect that everything works on your first try.
-- Read the code! Don't trust it blindly.
+- 不要在真实数据上测试！使用测试实例！（若不知道如何获取，可使用 https://test-app.super-productivity.com/）
+- 尽量具体
+- 勾勒插件应使用的 API
+- 测试错误（`Ctrl+Shift+i` 打开控制台）并迭代直到可用。不要期望第一次就全部成功。
+- 阅读代码！不要盲目信任。
 
-### Example
+### 示例
 
 ```md
 Can you you write me a plugin for Super Productivity that plays a beep sound every time i click on a header button (You need to add a header button via PluginAPI.registerHeaderButton).

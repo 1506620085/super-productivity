@@ -1,16 +1,16 @@
 # @super-productivity/plugin-api
 
-Official TypeScript definitions for developing [Super Productivity](https://github.com/super-productivity/super-productivity) plugins.
+用于开发 [Super Productivity](https://github.com/super-productivity/super-productivity) 插件的官方 TypeScript 类型定义。
 
-## Installation
+## 安装
 
 ```bash
 npm install @super-productivity/plugin-api
 ```
 
-## Usage
+## 用法
 
-### TypeScript Plugin Development
+### TypeScript 插件开发
 
 ```typescript
 import type {
@@ -52,7 +52,7 @@ PluginAPI.registerShortcut({
 });
 ```
 
-### Plugin Manifest
+### 插件清单
 
 ```json
 {
@@ -70,32 +70,32 @@ PluginAPI.registerShortcut({
 }
 ```
 
-## Available Types
+## 可用类型
 
-### Core Types
+### 核心类型
 
-- `PluginAPI` - Main plugin API interface
-- `PluginManifest` - Plugin configuration
-- `PluginHooks` - Available hook types
-- `PluginBaseCfg` - Runtime configuration
+- `PluginAPI` - 主插件 API 接口
+- `PluginManifest` - 插件配置
+- `PluginHooks` - 可用的 hook 类型
+- `PluginBaseCfg` - 运行时配置
 
-### Data Types
+### 数据类型
 
-- `TaskData` - Task information
-- `ProjectData` - Project information
-- `TagData` - Tag information
+- `TaskData` - 任务信息
+- `ProjectData` - 项目信息
+- `TagData` - 标签信息
 
-### UI Types
+### UI 类型
 
-- `DialogCfg` - Dialog configuration
-- `DialogResult` - Dialog return value
-- `SnackCfg` - Notification configuration
-- `PluginMenuEntryCfg` - Menu entry configuration
-- `PluginShortcutCfg` - Keyboard shortcut configuration
+- `DialogCfg` - 对话框配置
+- `DialogResult` - 对话框返回值
+- `SnackCfg` - 通知配置
+- `PluginMenuEntryCfg` - 菜单项配置
+- `PluginShortcutCfg` - 键盘快捷键配置
 
-## Plugin Development Guide
+## 插件开发指南
 
-### 1. Available Hooks
+### 1. 可用 Hooks
 
 ```typescript
 enum PluginHooks {
@@ -109,38 +109,30 @@ enum PluginHooks {
 }
 ```
 
-**`PERSISTED_DATA_CHANGED`** fires on any persistent-data change to this
-plugin after the host has finished its initial boot load — including
-remote sync deliveries and bulk imports. Handler receives no payload;
-re-call `loadSyncedData(key?)` for any key your plugin tracks to get
-fresh data (scoped to the calling plugin). Contract: call
-`loadSyncedData()` on plugin init for the initial state; then use this
-hook for subsequent changes. There is no replay-on-register, no
-per-key discrimination in the event, and no guaranteed ordering across
-rapid changes. Handlers must be idempotent.
+**`PERSISTED_DATA_CHANGED`** 会在宿主完成初始启动加载之后，对本插件的任何持久化数据变更触发——包括远程同步下发与批量导入。处理器不接收 payload；请再次调用 `loadSyncedData(key?)`，针对插件跟踪的任意 key 获取最新数据（作用域限于当前调用插件）。约定：插件初始化时调用 `loadSyncedData()` 获取初始状态；之后用此 hook 处理后续变更。没有注册时回放、事件中无按 key 区分，也无对快速连续变更的排序保证。处理器必须幂等。
 
-### 2. Required Permissions
+### 2. 所需权限
 
-Add these to your manifest.json based on what your plugin needs:
+根据插件需要，将这些权限加入 `manifest.json`：
 
-- `showSnack` - Show notifications
-- `notify` - System notifications
-- `showIndexHtmlAsView` - Display plugin UI
-- `openDialog` - Show dialogs
-- `getTasks` - Read tasks
-- `getArchivedTasks` - Read archived tasks
-- `getCurrentContextTasks` - Read current context tasks
-- `getSelectedTask` - Read the task selected in the task detail panel
-- `getFocusedTask` - Read the currently focused task row, if any
-- `addTask` - Create tasks
-- `getAllProjects` - Read projects
-- `addProject` - Create projects
-- `getAllTags` - Read tags
-- `addTag` - Create tags
-- `persistDataSynced` - Persist plugin data
-- `getAppState` - Read-only snapshot of application state
+- `showSnack` - 显示通知
+- `notify` - 系统通知
+- `showIndexHtmlAsView` - 显示插件 UI
+- `openDialog` - 显示对话框
+- `getTasks` - 读取任务
+- `getArchivedTasks` - 读取已归档任务
+- `getCurrentContextTasks` - 读取当前上下文任务
+- `getSelectedTask` - 读取任务详情面板中选中的任务
+- `getFocusedTask` - 读取当前聚焦的任务行（若有）
+- `addTask` - 创建任务
+- `getAllProjects` - 读取项目
+- `addProject` - 创建项目
+- `getAllTags` - 读取标签
+- `addTag` - 创建标签
+- `persistDataSynced` - 持久化插件数据
+- `getAppState` - 只读的应用状态快照
 
-### 3. Plugin Structure
+### 3. 插件结构
 
 ```
 my-plugin/
@@ -150,7 +142,7 @@ my-plugin/
 └── icon.svg (optional)
 ```
 
-### 4. Example Plugin
+### 4. 示例插件
 
 ```javascript
 // plugin.js
@@ -180,10 +172,10 @@ PluginAPI.registerHeaderButton({
 const state = await PluginAPI.getAppState();
 ```
 
-## License
+## 许可证
 
-MIT - See the main Super Productivity repository for details.
+MIT - 详见主 Super Productivity 仓库。
 
-## Contributing
+## 贡献
 
-Please contribute to the main [Super Productivity repository](https://github.com/super-productivity/super-productivity).
+请向主 [Super Productivity 仓库](https://github.com/super-productivity/super-productivity) 贡献。

@@ -1,38 +1,38 @@
-# E2E Testing Guide for Super Productivity
+# Super Productivity E2E 测试指南
 
-This guide provides comprehensive information for writing and maintaining end-to-end tests for Super Productivity using Playwright.
+本指南提供使用 Playwright 为 Super Productivity 编写与维护端到端测试的完整信息。
 
-## Table of Contents
+## 目录
 
-- [Overview](#overview)
-- [Running Tests](#running-tests)
-- [Test Structure](#test-structure)
-- [Page Objects](#page-objects)
-- [Common Patterns](#common-patterns)
-- [Selectors](#selectors)
-- [Wait Utilities](#wait-utilities)
-- [Writing New Tests](#writing-new-tests)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## Overview
-
-Our E2E tests are built with Playwright and follow the Page Object Model (POM) pattern for maintainability and reusability. Tests are organized by feature and use shared fixtures for common setup.
-
-### Key Technologies
-
-- **Playwright**: Modern E2E testing framework
-- **TypeScript**: Type-safe test code
-- **Page Object Model**: Encapsulates page interactions
-- **Fixtures**: Shared setup and utilities
+- [概览](#概览)
+- [运行测试](#运行测试)
+- [测试结构](#测试结构)
+- [页面对象](#页面对象)
+- [常见模式](#常见模式)
+- [选择器](#选择器)
+- [等待工具](#等待工具)
+- [编写新测试](#编写新测试)
+- [最佳实践](#最佳实践)
+- [故障排查](#故障排查)
 
 ---
 
-## Running Tests
+## 概览
 
-### Basic Commands
+我们的 E2E 测试基于 Playwright，并遵循页面对象模型（POM）模式以提升可维护性与复用性。测试按功能组织，并使用共享 fixture 完成通用搭建。
+
+### 关键技术
+
+- **Playwright**：现代 E2E 测试框架
+- **TypeScript**：类型安全的测试代码
+- **页面对象模型**：封装页面交互
+- **Fixtures**：共享搭建与工具
+
+---
+
+## 运行测试
+
+### 基本命令
 
 ```bash
 # Run all tests
@@ -54,7 +54,7 @@ npm run e2e:debug
 npm run e2e:show-report
 ```
 
-### WebDAV Sync Tests
+### WebDAV 同步测试
 
 ```bash
 # Run WebDAV tests (starts Docker container)
@@ -63,9 +63,9 @@ npm run e2e:webdav
 
 ---
 
-## Test Structure
+## 测试结构
 
-### Directory Layout
+### 目录布局
 
 ```
 e2e/
@@ -101,15 +101,15 @@ e2e/
 
 ---
 
-## Page Objects
+## 页面对象
 
-Page Objects encapsulate interactions with specific pages or components. All page objects extend `BasePage` and receive a `page` and optional `testPrefix`.
+页面对象封装对特定页面或组件的交互。所有页面对象继承 `BasePage`，并接收 `page` 与可选的 `testPrefix`。
 
-### Available Page Objects
+### 可用页面对象
 
-#### 1. **BasePage** (`base.page.ts`)
+#### 1. **BasePage**（`base.page.ts`）
 
-Base class for all page objects. Provides common functionality:
+所有页面对象的基类。提供通用功能：
 
 ```typescript
 class BasePage {
@@ -118,16 +118,16 @@ class BasePage {
 }
 ```
 
-**Example:**
+**示例：**
 
 ```typescript
 await workViewPage.addTask('My Task');
 // Creates task with name "W0-P0-My Task" (prefixed for isolation)
 ```
 
-#### 2. **WorkViewPage** (`work-view.page.ts`)
+#### 2. **WorkViewPage**（`work-view.page.ts`）
 
-Interactions with the main work view:
+与主工作视图的交互：
 
 ```typescript
 class WorkViewPage extends BasePage {
@@ -136,7 +136,7 @@ class WorkViewPage extends BasePage {
 }
 ```
 
-**Example:**
+**示例：**
 
 ```typescript
 await workViewPage.waitForTaskList();
@@ -145,9 +145,9 @@ const task = page.locator('task').first();
 await workViewPage.addSubTask(task, 'Child Task');
 ```
 
-#### 3. **TaskPage** (`task.page.ts`)
+#### 3. **TaskPage**（`task.page.ts`）
 
-Task-specific operations:
+任务相关操作：
 
 ```typescript
 class TaskPage extends BasePage {
@@ -165,7 +165,7 @@ class TaskPage extends BasePage {
 }
 ```
 
-**Example:**
+**示例：**
 
 ```typescript
 const task = taskPage.getTask(1); // First task
@@ -173,9 +173,9 @@ await taskPage.markTaskAsDone(task);
 await expect(taskPage.getDoneTasks()).toHaveCount(1);
 ```
 
-#### 4. **ProjectPage** (`project.page.ts`)
+#### 4. **ProjectPage**（`project.page.ts`）
 
-Project management:
+项目管理：
 
 ```typescript
 class ProjectPage extends BasePage {
@@ -187,7 +187,7 @@ class ProjectPage extends BasePage {
 }
 ```
 
-**Example:**
+**示例：**
 
 ```typescript
 await projectPage.createProject('My Project');
@@ -195,9 +195,9 @@ await projectPage.navigateToProjectByName('My Project');
 await projectPage.addNote('Project notes here');
 ```
 
-#### 5. **SettingsPage** (`settings.page.ts`)
+#### 5. **SettingsPage**（`settings.page.ts`）
 
-Settings and configuration:
+设置与配置：
 
 ```typescript
 class SettingsPage extends BasePage {
@@ -212,7 +212,7 @@ class SettingsPage extends BasePage {
 }
 ```
 
-**Example:**
+**示例：**
 
 ```typescript
 await settingsPage.navigateToPluginSettings();
@@ -220,9 +220,9 @@ await settingsPage.enablePlugin('Test Plugin');
 expect(await settingsPage.isPluginEnabled('Test Plugin')).toBeTruthy();
 ```
 
-#### 6. **DialogPage** (`dialog.page.ts`)
+#### 6. **DialogPage**（`dialog.page.ts`）
 
-Dialog and modal interactions:
+对话框与模态框交互：
 
 ```typescript
 class DialogPage extends BasePage {
@@ -237,7 +237,7 @@ class DialogPage extends BasePage {
 }
 ```
 
-**Example:**
+**示例：**
 
 ```typescript
 await dialogPage.waitForDialog();
@@ -248,9 +248,9 @@ await dialogPage.waitForDialogToClose();
 
 ---
 
-## Common Patterns
+## 常见模式
 
-### Pattern 1: Basic Task CRUD
+### 模式 1：基本任务 CRUD
 
 ```typescript
 test('should create and edit task', async ({ page, workViewPage, taskPage }) => {
@@ -271,7 +271,7 @@ test('should create and edit task', async ({ page, workViewPage, taskPage }) => 
 });
 ```
 
-### Pattern 2: Project Workflow
+### 模式 2：项目工作流
 
 ```typescript
 test('should create project and add tasks', async ({ projectPage, workViewPage }) => {
@@ -282,7 +282,7 @@ test('should create project and add tasks', async ({ projectPage, workViewPage }
 });
 ```
 
-### Pattern 3: Settings Configuration
+### 模式 3：设置配置
 
 ```typescript
 test('should enable plugin', async ({ settingsPage, waitForNav }) => {
@@ -293,7 +293,7 @@ test('should enable plugin', async ({ settingsPage, waitForNav }) => {
 });
 ```
 
-### Pattern 4: Dialog Interactions
+### 模式 4：对话框交互
 
 ```typescript
 test('should edit date in dialog', async ({ taskPage, dialogPage }) => {
@@ -309,11 +309,11 @@ test('should edit date in dialog', async ({ taskPage, dialogPage }) => {
 
 ---
 
-## Selectors
+## 选择器
 
-All selectors are centralized in `constants/selectors.ts`. Always use these constants instead of hardcoding selectors in tests.
+所有选择器集中在 `constants/selectors.ts`。测试中请始终使用这些常量，不要硬编码选择器。
 
-### Using Selectors
+### 使用选择器
 
 ```typescript
 import { cssSelectors } from '../constants/selectors';
@@ -325,27 +325,27 @@ const task = page.locator(TASK).first();
 const title = task.locator(TASK_TITLE);
 ```
 
-### Selector Categories
+### 选择器分类
 
-- **Navigation**: `SIDENAV`, `NAV_ITEM`, `SETTINGS_BTN`
-- **Layout**: `ROUTE_WRAPPER`, `BACKDROP`, `PAGE_TITLE`
-- **Tasks**: `TASK`, `TASK_TITLE`, `TASK_DONE_BTN`, `SUB_TASK`
-- **Add Task**: `ADD_TASK_INPUT`, `ADD_TASK_SUBMIT`
-- **Dialogs**: `MAT_DIALOG`, `DIALOG_FULLSCREEN_MARKDOWN`
-- **Settings**: `PAGE_SETTINGS`, `PLUGIN_SECTION`, `PLUGIN_MANAGEMENT`
-- **Projects**: `PAGE_PROJECT`, `CREATE_PROJECT_BTN`, `WORK_CONTEXT_MENU`
+- **导航**：`SIDENAV`、`NAV_ITEM`、`SETTINGS_BTN`
+- **布局**：`ROUTE_WRAPPER`、`BACKDROP`、`PAGE_TITLE`
+- **任务**：`TASK`、`TASK_TITLE`、`TASK_DONE_BTN`、`SUB_TASK`
+- **添加任务**：`ADD_TASK_INPUT`、`ADD_TASK_SUBMIT`
+- **对话框**：`MAT_DIALOG`、`DIALOG_FULLSCREEN_MARKDOWN`
+- **设置**：`PAGE_SETTINGS`、`PLUGIN_SECTION`、`PLUGIN_MANAGEMENT`
+- **项目**：`PAGE_PROJECT`、`CREATE_PROJECT_BTN`、`WORK_CONTEXT_MENU`
 
 ---
 
-## Wait Utilities
+## 等待工具
 
-Located in `utils/waits.ts`, these utilities help handle Angular's async nature.
+位于 `utils/waits.ts`，这些工具有助于处理 Angular 的异步特性。
 
-### Available Wait Functions
+### 可用等待函数
 
 #### `waitForAngularStability(page, timeout?)`
 
-Waits for Angular to finish all async operations.
+等待 Angular 完成所有异步操作。
 
 ```typescript
 await waitForAngularStability(page);
@@ -353,7 +353,7 @@ await waitForAngularStability(page);
 
 #### `waitForAppReady(page, options?)`
 
-Comprehensive wait for app initialization.
+全面等待应用初始化完成。
 
 ```typescript
 await waitForAppReady(page, {
@@ -365,7 +365,7 @@ await waitForAppReady(page, {
 
 #### `waitForStatePersistence(page)`
 
-Waits for IndexedDB persistence to complete (important before sync operations).
+等待 IndexedDB 持久化完成（在同步操作前很重要）。
 
 ```typescript
 await workViewPage.addTask('Task');
@@ -375,9 +375,9 @@ await waitForStatePersistence(page); // Ensure saved to IndexedDB
 
 ---
 
-## Writing New Tests
+## 编写新测试
 
-### Step 1: Create Test File
+### 步骤 1：创建测试文件
 
 ```typescript
 // e2e/tests/my-feature/my-feature.spec.ts
@@ -390,7 +390,7 @@ test.describe('My Feature', () => {
 });
 ```
 
-### Step 2: Use Page Objects
+### 步骤 2：使用页面对象
 
 ```typescript
 test('my test', async ({ workViewPage, taskPage, dialogPage }) => {
@@ -407,7 +407,7 @@ test('my test', async ({ workViewPage, taskPage, dialogPage }) => {
 });
 ```
 
-### Step 3: Handle Waits Properly
+### 步骤 3：正确处理等待
 
 ```typescript
 // GOOD: Use Angular stability waits
@@ -419,7 +419,7 @@ await expect(page.locator('task')).toBeVisible();
 await page.waitForTimeout(5000); // Avoid unless necessary
 ```
 
-### Step 4: Use Selectors from Constants
+### 步骤 4：使用常量中的选择器
 
 ```typescript
 import { cssSelectors } from '../../constants/selectors';
@@ -430,18 +430,18 @@ const title = page.locator(TASK).first().locator(TASK_TITLE);
 
 ---
 
-## Best Practices
+## 最佳实践
 
-### ✅ DO
+### ✅ 应当
 
-1. **Use page objects** for all interactions
-2. **Use centralized selectors** from `constants/selectors.ts`
-3. **Wait for Angular stability** after state changes
-4. **Use test prefixes** (automatic via fixtures) for isolation
-5. **Test one thing per test** - keep tests focused
-6. **Use descriptive test names** - "should create task and mark as done"
-7. **Clean up state** - tests should be independent
-8. **Use role-based selectors** when possible (accessibility)
+1. **使用页面对象**处理所有交互
+2. **使用集中式选择器**，来自 `constants/selectors.ts`
+3. **状态变更后等待 Angular 稳定**
+4. **使用测试前缀**（由 fixture 自动提供）以实现隔离
+5. **每个测试只测一件事**——保持测试聚焦
+6. **使用描述性测试名称**——例如 "should create task and mark as done"
+7. **清理状态**——测试应相互独立
+8. **尽可能使用基于角色的选择器**（无访问性）
 
 ```typescript
 // GOOD
@@ -451,26 +451,26 @@ await page.getByRole('button', { name: 'Save' }).click();
 await page.locator('.save-btn').click();
 ```
 
-### ❌ DON'T
+### ❌ 不要
 
-1. **Don't hardcode selectors** - use `cssSelectors`
-2. **Don't use arbitrary waits** - use `waitForAngularStability`
-3. **Don't share state between tests** - each test should be independent
-4. **Don't access DOM directly** - use page objects
-5. **Don't skip error handling** - tests should fail clearly
-6. **Don't use `any` types** - maintain type safety
+1. **不要硬编码选择器**——使用 `cssSelectors`
+2. **不要使用任意等待**——使用 `waitForAngularStability`
+3. **不要在测试间共享状态**——每个测试应独立
+4. **不要直接访问 DOM**——使用页面对象
+5. **不要跳过错误处理**——测试失败应清晰明确
+6. **不要使用 `any` 类型**——保持类型安全
 
-### Test Isolation
+### 测试隔离
 
-Each test gets:
+每个测试获得：
 
-- Isolated browser context (clean storage)
-- Unique test prefix (`W0-P0-`, `W1-P0-`, etc.)
-- Fresh page instance
+- 隔离的浏览器上下文（干净的存储）
+- 唯一的测试前缀（`W0-P0-`、`W1-P0-` 等）
+- 全新的页面实例
 
-This ensures tests don't interfere with each other.
+这确保测试不会互相干扰。
 
-### Handling Flakiness
+### 处理不稳定（Flakiness）
 
 ```typescript
 // Use waitFor with explicit conditions
@@ -488,30 +488,30 @@ await waitForAngularStability(page); // GOOD
 
 ---
 
-## Troubleshooting
+## 故障排查
 
-### Test Fails with "Element not found"
+### 测试失败："Element not found"
 
-1. Check if selector is correct in `constants/selectors.ts`
-2. Add wait before interaction: `await waitForAngularStability(page)`
-3. Use `await element.waitFor({ state: 'visible' })`
-4. Check if element is in a different context (iframe, shadow DOM)
+1. 检查 `constants/selectors.ts` 中的选择器是否正确
+2. 交互前添加等待：`await waitForAngularStability(page)`
+3. 使用 `await element.waitFor({ state: 'visible' })`
+4. 检查元素是否在不同上下文中（iframe、shadow DOM）
 
-### Test Timeout
+### 测试超时
 
-1. Increase timeout in specific waitFor calls
-2. Check if Angular is stuck - look for pending HTTP requests
-3. Use `page.pause()` to debug interactively
-4. Check network tab for failed requests
+1. 在特定 waitFor 调用中增加超时时间
+2. 检查 Angular 是否卡住——查看是否有挂起的 HTTP 请求
+3. 使用 `page.pause()` 进行交互式调试
+4. 检查网络面板中是否有失败请求
 
-### Flaky Tests
+### 不稳定的测试
 
-1. Add proper waits: `waitForAngularStability`, `waitForAppReady`
-2. Avoid `page.waitForTimeout()` - use condition-based waits
-3. Check for race conditions - ensure state is persisted
-4. Use `waitForStatePersistence` before operations that depend on saved state
+1. 添加正确的等待：`waitForAngularStability`、`waitForAppReady`
+2. 避免 `page.waitForTimeout()`——使用基于条件的等待
+3. 检查竞态条件——确保状态已持久化
+4. 在依赖已保存状态的操作前使用 `waitForStatePersistence`
 
-### Debugging
+### 调试
 
 ```typescript
 // Pause execution and open Playwright Inspector
@@ -528,7 +528,7 @@ const text = await page.locator('task').first().textContent();
 console.log('Task text:', text);
 ```
 
-### Running Single Test
+### 运行单个测试
 
 ```bash
 # Run specific file
@@ -543,9 +543,9 @@ npm run e2e:headed
 
 ---
 
-## Examples
+## 示例
 
-### Example 1: Full Task CRUD Test
+### 示例 1：完整任务 CRUD 测试
 
 ```typescript
 import { test, expect } from '../../fixtures/test.fixture';
@@ -576,7 +576,7 @@ test.describe('Task CRUD', () => {
 });
 ```
 
-### Example 2: Project Workflow
+### 示例 2：项目工作流
 
 ```typescript
 test('should create project with tasks', async ({
@@ -597,7 +597,7 @@ test('should create project with tasks', async ({
 });
 ```
 
-### Example 3: Settings Test
+### 示例 3：设置测试
 
 ```typescript
 test('should configure plugin', async ({ settingsPage, page }) => {
@@ -616,26 +616,26 @@ test('should configure plugin', async ({ settingsPage, page }) => {
 
 ---
 
-## Getting Help
+## 获取帮助
 
-- Check existing tests in `e2e/tests/` for examples
-- Review page objects in `e2e/pages/` for available methods
-- Look at `constants/selectors.ts` for available selectors
-- Use Playwright Inspector (`npm run e2e:debug`) for debugging
-- Check Playwright docs: https://playwright.dev/
+- 在 `e2e/tests/` 中查看现有测试作为示例
+- 在 `e2e/pages/` 中查阅页面对象的可用方法
+- 查看 `constants/selectors.ts` 了解可用选择器
+- 使用 Playwright Inspector（`npm run e2e:debug`）进行调试
+- 查阅 Playwright 文档：https://playwright.dev/
 
 ---
 
-## Summary Checklist
+## 总结检查清单
 
-When writing a new test:
+编写新测试时：
 
-- [ ] Create test file in appropriate `tests/` subdirectory
-- [ ] Import `test` and `expect` from `fixtures/test.fixture.ts`
-- [ ] Use page objects for all interactions
-- [ ] Use selectors from `constants/selectors.ts`
-- [ ] Add proper waits (`waitForAngularStability`, etc.)
-- [ ] Use descriptive test names
-- [ ] Ensure test is isolated (no shared state)
-- [ ] Run test locally before committing
-- [ ] Test passes consistently (run 3+ times)
+- [ ] 在合适的 `tests/` 子目录中创建测试文件
+- [ ] 从 `fixtures/test.fixture.ts` 导入 `test` 和 `expect`
+- [ ] 所有交互使用页面对象
+- [ ] 使用 `constants/selectors.ts` 中的选择器
+- [ ] 添加适当的等待（`waitForAngularStability` 等）
+- [ ] 使用描述性测试名称
+- [ ] 确保测试隔离（无共享状态）
+- [ ] 提交前在本地运行测试
+- [ ] 测试能稳定通过（运行 3 次以上）

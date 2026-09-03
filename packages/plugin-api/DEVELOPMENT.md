@@ -1,16 +1,16 @@
-# Plugin API Development Guide
+# 插件 API 开发指南
 
-## For Plugin Developers
+## 面向插件开发者
 
-### Installation
+### 安装
 
 ```bash
 npm install @super-productivity/plugin-api
 ```
 
-### TypeScript Setup
+### TypeScript 配置
 
-Create a `tsconfig.json` in your plugin project:
+在插件项目中创建 `tsconfig.json`：
 
 ```json
 {
@@ -28,7 +28,7 @@ Create a `tsconfig.json` in your plugin project:
 }
 ```
 
-### Basic Plugin Structure
+### 基础插件结构
 
 ```
 my-plugin/
@@ -43,15 +43,15 @@ my-plugin/
 └── tsconfig.json
 ```
 
-### Development Workflow
+### 开发流程
 
-1. **Write TypeScript code** with full type safety
-2. **Compile to JavaScript** for Super Productivity
-3. **Test in Super Productivity** plugin system
+1. **编写 TypeScript 代码**，享受完整类型安全
+2. **编译为 JavaScript**，供 Super Productivity 使用
+3. **在 Super Productivity** 的插件系统中测试
 
-### Example Build Script
+### 示例构建脚本
 
-Add to your `package.json`:
+加入你的 `package.json`：
 
 ```json
 {
@@ -67,26 +67,26 @@ Add to your `package.json`:
 }
 ```
 
-### Plugin Template
+### 插件模板
 
-See `example/my-plugin.ts` for a complete TypeScript plugin example.
+完整的 TypeScript 插件示例见 `example/my-plugin.ts`。
 
-## For Core Developers
+## 面向核心开发者
 
-### Updating the API
+### 更新 API
 
-When adding new features to the plugin system:
+向插件系统添加新功能时：
 
-1. **Update `src/types.ts`** with new interfaces/types
-2. **Update `src/index.ts`** to export new types
-3. **Update `README.md`** with usage examples
-4. **Version bump** the package
-5. **Rebuild and test**
-6. **Publish to npm**
+1. **更新 `src/types.ts`**，加入新的接口/类型
+2. **更新 `src/index.ts`**，导出新类型
+3. **更新 `README.md`**，补充用法示例
+4. **提升包版本号**
+5. **重新构建并测试**
+6. **发布到 npm**
 
-### Syncing with Main Project
+### 与主项目同步
 
-The main Super Productivity project should eventually import types from this package instead of maintaining local definitions:
+主 Super Productivity 项目最终应从本包导入类型，而不是维护本地定义：
 
 ```typescript
 // Before:
@@ -96,55 +96,55 @@ import { PluginManifest } from './plugin-api.model';
 import type { PluginManifest } from '@super-productivity/plugin-api';
 ```
 
-### Testing Changes
+### 测试变更
 
-1. Build the package: `npm run build`
-2. Test locally: `npm link` in this directory
-3. In test project: `npm link @super-productivity/plugin-api`
-4. Verify types work correctly
+1. 构建包：`npm run build`
+2. 本地测试：在本目录执行 `npm link`
+3. 在测试项目中：`npm link @super-productivity/plugin-api`
+4. 确认类型工作正常
 
-### Release Process
+### 发布流程
 
-1. Update version: `npm version patch|minor|major`
-2. Build: `npm run build`
-3. Test: `npm pack --dry-run`
-4. Publish: `npm publish --access public`
+1. 更新版本：`npm version patch|minor|major`
+2. 构建：`npm run build`
+3. 测试：`npm pack --dry-run`
+4. 发布：`npm publish --access public`
 
-## Available Types Reference
+## 可用类型参考
 
-### Core Interfaces
+### 核心接口
 
-- `PluginAPI` - Main API interface
-- `PluginManifest` - Plugin configuration
-- `PluginBaseCfg` - Runtime configuration
+- `PluginAPI` - 主 API 接口
+- `PluginManifest` - 插件配置
+- `PluginBaseCfg` - 运行时配置
 
-### Hook Types
+### Hook 类型
 
-- `PluginHooks` - Available hook events
-- `PluginHookHandler` - Hook function signature
+- `PluginHooks` - 可用的 hook 事件
+- `PluginHookHandler` - Hook 函数签名
 
-### Data Types
+### 数据类型
 
-- `TaskData` - Task information
-- `ProjectData` - Project information
-- `TagData` - Tag information
-- `PluginCreateTaskData` - Task creation data
+- `TaskData` - 任务信息
+- `ProjectData` - 项目信息
+- `TagData` - 标签信息
+- `PluginCreateTaskData` - 创建任务的数据
 
-### UI Types
+### UI 类型
 
-- `DialogCfg` - Dialog configuration
-- `DialogResult` - Dialog return value
-- `DialogButtonCfg` - Dialog button configuration
-- `SnackCfg` - Notification configuration
-- `NotifyCfg` - System notification configuration
-- `PluginMenuEntryCfg` - Menu entry configuration
-- `PluginShortcutCfg` - Keyboard shortcut configuration
-- `PluginHeaderBtnCfg` - Header button configuration
+- `DialogCfg` - 对话框配置
+- `DialogResult` - 对话框返回值
+- `DialogButtonCfg` - 对话框按钮配置
+- `SnackCfg` - 通知配置
+- `NotifyCfg` - 系统通知配置
+- `PluginMenuEntryCfg` - 菜单项配置
+- `PluginShortcutCfg` - 键盘快捷键配置
+- `PluginHeaderBtnCfg` - 顶栏按钮配置
 
-## Best Practices
+## 最佳实践
 
-1. **Always use TypeScript** for plugin development
-2. **Import types only** to avoid runtime dependencies
-3. **Follow semantic versioning** for plugin releases
-4. **Test thoroughly** before publishing
-5. **Document your plugins** for other developers
+1. **始终使用 TypeScript** 开发插件
+2. **仅导入类型**，避免引入运行时依赖
+3. **遵循语义化版本** 管理插件发布
+4. **发布前充分测试**
+5. **为其他开发者编写文档**

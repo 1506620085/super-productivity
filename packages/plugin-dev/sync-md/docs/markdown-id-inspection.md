@@ -1,74 +1,74 @@
-# Markdown ID Inspection Results
+# Markdown ID 检查结果
 
-## Overview
+## 概述
 
-The SuperProductivity sync-md plugin uses HTML comments embedded in task notes to track the relationship between SuperProductivity tasks and their corresponding markdown file entries.
+SuperProductivity 的 sync-md 插件使用嵌入在任务备注中的 HTML 注释，跟踪 SuperProductivity 任务与对应 markdown 文件条目之间的关系。
 
-## ID Format
+## ID 格式
 
-The plugin uses the following format to store markdown IDs in task notes:
+插件使用以下格式在任务备注中存储 markdown ID：
 
 ```
 <!-- sp:id -->
 ```
 
-Where `id` is typically the task ID from SuperProductivity, creating a bidirectional link between the task and its markdown representation.
+其中 `id` 通常是来自 SuperProductivity 的任务 ID，从而在任务与其 markdown 表示之间建立双向链接。
 
-## How It Works
+## 工作原理
 
-1. **In Markdown Files**: When tasks are synced to markdown, each task line includes the ID:
+1. **在 Markdown 文件中**：任务同步到 markdown 时，每行任务都会包含 ID：
 
    ```markdown
    - [ ] <!-- sp:task-id-123 --> Task title here
    - [x] <!-- sp:task-id-456 --> Completed task
    ```
 
-2. **In SuperProductivity**: The same ID is stored in the task's notes field, allowing the sync process to match tasks between the two systems.
+2. **在 SuperProductivity 中**：同一 ID 存储在任务的备注字段中，使同步过程能够在两个系统之间匹配任务。
 
-## Inspection Script
+## 检查脚本
 
-A script has been created at `/scripts/inspect-sync.ts` that can be run within the SuperProductivity plugin context to:
+已在 `/scripts/inspect-sync.ts` 创建脚本，可在 SuperProductivity 插件上下文中运行，用于：
 
-- Count total tasks and how many have markdown IDs
-- Find duplicate IDs (potential sync issues)
-- Identify orphaned IDs (where markdown ID differs from task ID)
-- Group tasks by project
-- Detect malformed ID patterns
+- 统计任务总数以及带有 markdown ID 的任务数
+- 查找重复 ID（潜在同步问题）
+- 识别孤立 ID（markdown ID 与任务 ID 不一致）
+- 按项目分组任务
+- 检测格式错误的 ID 模式
 
-### Running the Inspection
+### 运行检查
 
-To run the inspection script:
+运行检查脚本：
 
-1. Ensure the sync-md plugin is loaded in SuperProductivity
-2. The script will automatically execute when loaded in the plugin context
-3. Check the console output for detailed results
+1. 确保 sync-md 插件已在 SuperProductivity 中加载
+2. 脚本在插件上下文中加载时会自动执行
+3. 查看控制台输出以获取详细结果
 
-### What to Look For
+### 关注点
 
-- **No IDs Found**: If no tasks have markdown IDs, it means no tasks have been synced to markdown yet
-- **Duplicate IDs**: Multiple tasks sharing the same markdown ID indicates a sync problem
-- **Orphaned IDs**: When the markdown ID doesn't match the task ID, it might indicate manual edits
-- **Malformed IDs**: IDs with incorrect formatting that might not sync properly
+- **未找到 ID**：若没有任务带有 markdown ID，说明尚未有任务同步到 markdown
+- **重复 ID**：多个任务共享同一 markdown ID，表明存在同步问题
+- **孤立 ID**：当 markdown ID 与任务 ID 不匹配时，可能是手动编辑所致
+- **格式错误的 ID**：格式不正确的 ID 可能无法正常同步
 
-## Common Patterns
+## 常见模式
 
-Based on the code analysis, here are the patterns the plugin uses:
+基于代码分析，插件使用以下模式：
 
-1. **Standard Format**: `<!-- sp:task-id -->` - Used by the sync-md plugin
-2. **Legacy Format**: `(task-id)` - Used in older sync logic (in parentheses at start of title)
+1. **标准格式**：`<!-- sp:task-id -->` - 由 sync-md 插件使用
+2. **旧版格式**：`(task-id)` - 用于较旧的同步逻辑（标题开头的括号）
 
-## Troubleshooting
+## 故障排除
 
-If tasks aren't syncing properly:
+若任务未能正确同步：
 
-1. Run the inspection script to check for ID issues
-2. Look for duplicate or malformed IDs
-3. Check if tasks have notes field populated
-4. Verify the markdown file has the correct ID format
+1. 运行检查脚本以排查 ID 问题
+2. 查找重复或格式错误的 ID
+3. 检查任务的备注字段是否已填充
+4. 确认 markdown 文件使用了正确的 ID 格式
 
-## Technical Details
+## 技术细节
 
-- IDs are sanitized to only contain: `a-zA-Z0-9_-`
-- The ID comment must have exact spacing: `<!-- sp:id -->`
-- IDs are parsed using regex: `/<!-- sp:([a-zA-Z0-9_-]+) -->/`
-- The sync process matches tasks by these IDs to determine what needs updating
+- ID 会被净化，仅保留：`a-zA-Z0-9_-`
+- ID 注释必须精确间距：`<!-- sp:id -->`
+- ID 使用正则解析：`/<!-- sp:([a-zA-Z0-9_-]+) -->/`
+- 同步过程通过这些 ID 匹配任务，以确定需要更新的内容
