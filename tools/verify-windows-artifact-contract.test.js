@@ -12,7 +12,8 @@ const BUILDER_YAML = readRoot('electron-builder.yaml');
 const RELEASE_WORKFLOW = readRoot('.github', 'workflows', 'build.yml');
 
 const sectionValue = (sectionName, key) => {
-  const lines = BUILDER_YAML.split('\n');
+  // Normalize CRLF so Windows checkouts still match `nsis:` / `portable:`.
+  const lines = BUILDER_YAML.split(/\r?\n/);
   const sectionStart = lines.indexOf(`${sectionName}:`);
   assert.notEqual(sectionStart, -1, `${sectionName} section not found`);
 
