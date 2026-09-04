@@ -568,7 +568,9 @@
     "ISSUE_PANEL": {
       "CALENDAR_AGENDA": {
         "OFFLINE_BANNER_MSG": "顯示快取的日曆結果。資料可能已過時。"
-      }
+      },
+      "CONNECT_CALENDAR": "連接日曆",
+      "SETUP_ISSUE_PROVIDER": "新增問題整合"
     },
     "JIRA": {
       "BANNER": {
@@ -1856,6 +1858,7 @@
         "FOCUS_SESSION": "開始專注時段",
         "MARK_DONE": "標記為已完成",
         "MOVE_TO_BACKLOG": "移至待辦事項",
+        "MOVE_TO_BOTTOM": "移至底部",
         "MOVE_TO_OTHER_PROJECT": "移至專案",
         "MOVE_TO_REGULAR": "移至一般清單",
         "MOVE_TO_TOP": "移至頂部",
@@ -2402,6 +2405,8 @@
     "SUBMIT": "送出",
     "TITLE": "標題",
     "TODAY_TAG_TITLE": "今天",
+    "URGENT_TAG_TITLE": "緊急",
+    "IMPORTANT_TAG_TITLE": "重要",
     "TOGGLE_PASSWORD_VISIBILITY": "切換密碼可見性",
     "UNDO": "復原",
     "WITHOUT_PROJECT": "無專案",

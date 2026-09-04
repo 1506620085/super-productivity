@@ -143,13 +143,22 @@
           <mat-icon [ngStyle]="{ 'font-size': '18px', width: '18px', height: '18px' }">
             {{ data.isFolder ? 'folder' : 'assignment' }}
           </mat-icon>
-          <span>{{
-            data.node.data?.k === MenuTreeKind.FOLDER
-              ? data.node.data.name
-              : data.node.data?.k === MenuTreeKind.PROJECT
-                ? data.node.data.project.title
-                : data.node.data?.tag.title
-          }}</span>
+          <span>
+            @if (data.node.data?.k === MenuTreeKind.FOLDER) {
+              {{ data.node.data.name }}
+            } @else if (data.node.data?.k === MenuTreeKind.PROJECT) {
+              {{ data.node.data.project.title }}
+            } @else if (data.node.data?.k === MenuTreeKind.TAG) {
+              @if (
+                data.node.data.tag.id | systemTagTitleKey: data.node.data.tag.title;
+                as titleKey
+              ) {
+                {{ titleKey | translate }}
+              } @else {
+                {{ data.node.data.tag.title }}
+              }
+            }
+          </span>
         </div>
       </ng-template>
     </tree-dnd>

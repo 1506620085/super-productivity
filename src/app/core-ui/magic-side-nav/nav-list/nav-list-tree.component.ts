@@ -18,6 +18,7 @@ import { MatDivider } from '@angular/material/divider';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { TranslatePipe } from '@ngx-translate/core';
 import { TreeDndComponent } from '../../../ui/tree-dnd/tree.component';
+import { SystemTagTitleKeyPipe } from '../../../features/tag/system-tag-title-key.pipe';
 import { TreeNode } from '../../../ui/tree-dnd/tree.types';
 import { NavItemComponent } from '../nav-item/nav-item.component';
 import { NavItem, NavTreeItem } from '../magic-side-nav.model';
@@ -57,6 +58,7 @@ export const getProjectVisibilityIconColor = (project: Project): string | null =
     MatTooltip,
     MatMenuModule,
     TranslatePipe,
+    SystemTagTitleKeyPipe,
     TreeDndComponent,
     NavItemComponent,
     MatDivider,

@@ -23,6 +23,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { TaskService } from '../../tasks/task.service';
 import { MenuTreeService } from '../../menu-tree/menu-tree.service';
 import { SelectOptionRowComponent } from '../../../ui/select-option-row/select-option-row.component';
+import { getLocalizedTagTitle } from '../system-tag-title.util';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'tag-toggle-menu-list',
@@ -45,6 +47,7 @@ export class TagToggleMenuListComponent {
   private _taskService = inject(TaskService);
   private _matDialog = inject(MatDialog);
   private _menuTreeService = inject(MenuTreeService);
+  private _translateService = inject(TranslateService);
 
   task = input.required<TaskCopy>();
 
@@ -75,6 +78,10 @@ export class TagToggleMenuListComponent {
 
   openMenu(ev?: MouseEvent | KeyboardEvent | TouchEvent): void {
     this.tagMenuTriggerEl()?.openMenu();
+  }
+
+  localizedTagTitle(tag: { id: string; title: string }): string {
+    return getLocalizedTagTitle(tag, this._translateService);
   }
 
   openAddNewTag(): void {

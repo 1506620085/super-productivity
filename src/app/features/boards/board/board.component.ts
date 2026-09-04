@@ -21,7 +21,7 @@ import {
   IN_PROGRESS_TAG,
   URGENT_TAG,
 } from '../../tag/tag.const';
-import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe } from '@ngx-translate/core';
 import { MatDialog } from '@angular/material/dialog';
 import { DialogBoardEditComponent } from '../dialog-board-edit/dialog-board-edit.component';
 import { T } from '../../../t.const';
@@ -39,7 +39,6 @@ import { T } from '../../../t.const';
 })
 export class BoardComponent {
   private _store = inject(Store);
-  private _translateService = inject(TranslateService);
   private _matDialog = inject(MatDialog);
 
   boardCfg = input.required<BoardCfg>();
@@ -63,10 +62,7 @@ export class BoardComponent {
         const defaultTag = defaultTags.find((tagInner) => tagInner.id === tagId);
 
         const tag = defaultTag
-          ? {
-              ...defaultTag,
-              title: this._translateService.instant(defaultTag.title),
-            }
+          ? { ...defaultTag }
           : {
               ...DEFAULT_TAG,
               id: tagId,

@@ -26,7 +26,15 @@
       [class.label-hidden]="!showLabels()"
       [attr.aria-hidden]="!showLabels() ? 'true' : 'false'"
     >
-      {{ workContext()!.title }}
+      @if (
+        type() === WorkContextType.TAG &&
+          (workContext()!.id | systemTagTitleKey: workContext()!.title);
+        as titleKey
+      ) {
+        {{ titleKey | translate }}
+      } @else {
+        {{ workContext()!.title }}
+      }
     </span>
   </button>
 

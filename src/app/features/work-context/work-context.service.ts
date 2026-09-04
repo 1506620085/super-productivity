@@ -27,6 +27,7 @@ import {
   withLatestFrom,
 } from 'rxjs/operators';
 import { TODAY_TAG } from '../tag/tag.const';
+import { getSystemTagTitleKey } from '../tag/system-tag-title.util';
 import { Tag } from '../tag/tag.model';
 import { DEFAULT_TAG_COLOR } from './work-context.const';
 import { getDefaultWorkContextTheme } from './work-context-default-theme.util';
@@ -206,14 +207,16 @@ export class WorkContextService {
 
   activeWorkContextTitle$: Observable<string> = this.activeWorkContext$.pipe(
     switchMap((activeContext) => {
-      if (activeContext.id === TODAY_TAG.id && activeContext.title === TODAY_TAG.title) {
-        return this._translateService.stream(T.G.TODAY_TAG_TITLE);
-      }
       if (
         activeContext.id === INBOX_PROJECT.id &&
         activeContext.title === INBOX_PROJECT.title
       ) {
         return this._translateService.stream(T.G.INBOX_PROJECT_TITLE);
+      }
+
+      const titleKey = getSystemTagTitleKey(activeContext.id, activeContext.title);
+      if (titleKey) {
+        return this._translateService.stream(titleKey);
       }
 
       return of(activeContext.title);

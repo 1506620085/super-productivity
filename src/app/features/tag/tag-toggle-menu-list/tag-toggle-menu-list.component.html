@@ -17,7 +17,7 @@
           mat-menu-item
         >
           <select-option-row
-            [title]="tag.title"
+            [title]="localizedTagTitle(tag)"
             [icon]="tag.icon"
             defaultIcon="label"
             [color]="tag.color || tag.theme?.primary"

@@ -577,7 +577,9 @@
     "ISSUE_PANEL": {
       "CALENDAR_AGENDA": {
         "OFFLINE_BANNER_MSG": "正在显示缓存中的日历结果。请注意，数据可能已过时。"
-      }
+      },
+      "CONNECT_CALENDAR": "连接日历",
+      "SETUP_ISSUE_PROVIDER": "添加 Issue 集成"
     },
     "JIRA": {
       "BANNER": {
@@ -1846,6 +1848,7 @@
         "MARK_DONE": "标记为完成",
         "MARK_UNDONE": "标记为未完成",
         "MOVE_TO_BACKLOG": "移至待办列表",
+        "MOVE_TO_BOTTOM": "移至底部",
         "MOVE_TO_OTHER_PROJECT": "移至其他项目",
         "MOVE_TO_REGULAR": "移至常规列表",
         "MOVE_TO_TOP": "移至顶部",
@@ -2358,6 +2361,8 @@
     "SUBMIT": "提交",
     "TITLE": "标题",
     "TODAY_TAG_TITLE": "今天",
+    "URGENT_TAG_TITLE": "紧急",
+    "IMPORTANT_TAG_TITLE": "重要",
     "TOGGLE_PASSWORD_VISIBILITY": "切换密码可见性",
     "UNDO": "撤销",
     "WITHOUT_PROJECT": "无项目",

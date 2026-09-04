@@ -34,6 +34,7 @@ import { DialogViewArchivedTaskComponent } from '../tasks/dialog-view-archived-t
 import { WorklogTaskRowComponent } from '../worklog/worklog-task-row/worklog-task-row.component';
 import { HistoryDayMetaComponent } from './history-day-meta/history-day-meta.component';
 import { DateService } from '../../core/date/date.service';
+import { DateTimeFormatService } from '../../core/date-time-format/date-time-format.service';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
 import { parseDbDateStr } from '../../util/parse-db-date-str';
 import { WorklogDay, WorklogMonth, WorklogYear } from '../worklog/worklog.model';
@@ -70,11 +71,14 @@ export class HistoryComponent {
   private readonly _store = inject(Store);
   private readonly _taskArchiveService = inject(TaskArchiveService);
   private readonly _dateService = inject(DateService);
+  private readonly _dateTimeFormatService = inject(DateTimeFormatService);
   private readonly _queryParams = toSignal(this._route.queryParams, {
     initialValue: this._route.snapshot.queryParams,
   });
 
   T: typeof T = T;
+  /** Locale for spelled-out month names (reacts to language / date-locale changes). */
+  readonly textLocale = this._dateTimeFormatService.textLocale;
   readonly worklogData = toSignal(this._worklogService.worklogData$);
   readonly enabledSimpleCounters = toSignal(
     this._simpleCounterService.enabledSimpleCounters$,

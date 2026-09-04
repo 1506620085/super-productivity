@@ -27,6 +27,7 @@ import { Task } from '../tasks/task.model';
 import { selectAllProjectColorsAndTitles } from '../project/store/project.selectors';
 import { mapArchiveToWorklog } from '../worklog/util/map-archive-to-worklog';
 import { DateService } from '../../core/date/date.service';
+import { DateTimeFormatService } from '../../core/date-time-format/date-time-format.service';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
 import { DialogWorklogExportComponent } from '../worklog/dialog-worklog-export/dialog-worklog-export.component';
 
@@ -115,6 +116,10 @@ describe('HistoryComponent', () => {
         { provide: WorkContextService, useValue: {} },
         { provide: SimpleCounterService, useValue: { enabledSimpleCounters$: of([]) } },
         { provide: WorklogService, useValue: worklogServiceSpy },
+        {
+          provide: DateTimeFormatService,
+          useValue: { textLocale: () => 'en-US' },
+        },
       ],
     }).compileComponents();
 

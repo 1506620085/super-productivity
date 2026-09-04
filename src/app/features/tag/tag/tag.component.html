@@ -25,5 +25,9 @@
   ></div>
 }
 @if (!isHideTitle()) {
-  <span class="tag-title">{{ tag().title }}</span>
+  @if (tag().id | systemTagTitleKey: tag().title; as titleKey) {
+    <span class="tag-title">{{ titleKey | translate }}</span>
+  } @else {
+    <span class="tag-title">{{ tag().title }}</span>
+  }
 }

@@ -35,6 +35,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { isSingleEmoji } from '../../../util/extract-first-emoji';
 import { MenuTreeKind } from '../../../features/menu-tree/store/menu-tree.model';
 import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon.component';
+import { SystemTagTitleKeyPipe } from '../../../features/tag/system-tag-title-key.pipe';
 
 @Component({
   selector: 'nav-item',
@@ -51,6 +52,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
     MatMenuModule,
     TranslatePipe,
     PluginIconComponent,
+    SystemTagTitleKeyPipe,
   ],
   templateUrl: './nav-item.component.html',
   styleUrl: './nav-item.component.scss',
@@ -70,6 +72,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
 })
 export class NavItemComponent {
   readonly T = T;
+  readonly WorkContextType = WorkContextType;
   private readonly _globalThemeService = inject(GlobalThemeService);
   private readonly _navConfigService = inject(MagicNavConfigService);
   private readonly _translateService = inject(TranslateService);

@@ -310,8 +310,13 @@ mat-option.isDone {
     margin-right: 14px;
   }
 
-  span {
+  // Keep labels left-aligned; don't push shortcut hints (`.key-i`) with auto margin
+  > span:not(.key-i) {
     margin-right: auto;
+  }
+
+  .key-i {
+    flex-shrink: 0;
   }
 }
 
@@ -471,6 +476,11 @@ body .mat-mdc-button-base .mat-icon {
 // MAT MENU
 .mat-mdc-menu-panel {
   overflow-x: hidden !important;
+}
+
+// Task context menu: grow with shortcut hints (default Material max-width is 280px)
+.mat-mdc-menu-panel.task-context-menu-panel {
+  max-width: min(92vw, 420px);
 }
 
 .mat-mdc-menu-content {

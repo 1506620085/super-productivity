@@ -51,7 +51,7 @@ export const DEFAULT_TAG: Tag = {
   },
 };
 
-// TODO translate
+// System tags for Eisenhower matrix and Kanban — titles localized via system-tag-title.util
 export const URGENT_TAG: Tag = {
   color: null,
   created: Date.now(),

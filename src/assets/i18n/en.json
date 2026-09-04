@@ -578,7 +578,9 @@
     "ISSUE_PANEL": {
       "CALENDAR_AGENDA": {
         "OFFLINE_BANNER_MSG": "Showing cached calendar results. Data may be outdated."
-      }
+      },
+      "CONNECT_CALENDAR": "Connect Calendar",
+      "SETUP_ISSUE_PROVIDER": "Setup Issue Provider"
     },
     "JIRA": {
       "BANNER": {
@@ -2422,6 +2424,8 @@
     "SUBMIT": "Submit",
     "TITLE": "Title",
     "TODAY_TAG_TITLE": "Today",
+    "URGENT_TAG_TITLE": "Urgent",
+    "IMPORTANT_TAG_TITLE": "Important",
     "TOGGLE_PASSWORD_VISIBILITY": "Toggle password visibility",
     "UNDO": "Undo",
     "WITHOUT_PROJECT": "Without Project",
