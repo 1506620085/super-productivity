@@ -104,9 +104,6 @@ export class MagicNavConfigService {
   private readonly isBoardsEnabled = computed(
     () => this._configService.appFeatures().isBoardsEnabled,
   );
-  private readonly isDonatePageEnabled = computed(
-    () => this._configService.appFeatures().isDonatePageEnabled,
-  );
   private readonly isHabitsEnabled = computed(
     () => this._configService.appFeatures().isHabitsEnabled,
   );
@@ -252,20 +249,7 @@ export class MagicNavConfigService {
       },
 
       // Help Menu (rendered as mat-menu)
-      // Donation links are disabled on native iOS and every macOS desktop build
-      // to keep App Store review behavior deterministic (Guideline 3.1.1).
-      ...(this.isDonatePageEnabled() && !IS_DONATION_UI_RESTRICTED
-        ? [
-            {
-              type: 'route',
-              id: 'donate',
-              label: T.MH.DONATE,
-              icon: 'favorite',
-              route: '/donate',
-              featureConfigKey: 'isDonatePageEnabled',
-            } as NavItem,
-          ]
-        : []),
+      // hangz: 「支持我们」捐赠入口已移除，不再展示侧栏项。
       {
         type: 'menu',
         id: 'help',

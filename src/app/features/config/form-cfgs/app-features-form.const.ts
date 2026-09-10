@@ -1,6 +1,5 @@
 import { ConfigFormSection, AppFeaturesConfig } from '../global-config.model';
 import { T } from '../../../t.const';
-import { IS_DONATION_UI_RESTRICTED } from '../../../app.constants';
 
 export const APP_FEATURES_FORM_CFG: ConfigFormSection<AppFeaturesConfig> = {
   title: T.GCF.APP_FEATURES.TITLE,
@@ -90,9 +89,8 @@ export const APP_FEATURES_FORM_CFG: ConfigFormSection<AppFeaturesConfig> = {
     {
       key: 'isDonatePageEnabled',
       type: 'slide-toggle',
-      // Donations are fully hidden on native iOS and macOS desktop builds, so
-      // this toggle would be inert there — hide it to avoid a dead control.
-      hideExpression: () => IS_DONATION_UI_RESTRICTED,
+      // hangz: 捐赠页已移除，设置里也不再提供开关。
+      hideExpression: () => true,
       templateOptions: {
         label: T.GCF.APP_FEATURES.DONATE_PAGE,
         icon: 'favorite',

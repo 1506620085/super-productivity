@@ -4,7 +4,6 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { DefaultStartPageGuard, DonatePageGuard } from './app.guard';
-import { IS_DONATION_UI_RESTRICTED_TOKEN } from './app.constants';
 import { DataInitStateService } from './core/data-init/data-init-state.service';
 import { GlobalConfigService } from './features/config/global-config.service';
 import { ProjectService } from './features/project/project.service';
@@ -176,7 +175,7 @@ describe('DefaultStartPageGuard', () => {
 });
 
 describe('DonatePageGuard', () => {
-  const setup = (isRestricted: boolean): Router => {
+  const setup = (): Router => {
     TestBed.configureTestingModule({
       providers: [
         provideLocationMocks(),
@@ -188,22 +187,13 @@ describe('DonatePageGuard', () => {
           },
           { path: '', component: HomeRouteTestComponent },
         ]),
-        { provide: IS_DONATION_UI_RESTRICTED_TOKEN, useValue: isRestricted },
       ],
     });
     return TestBed.inject(Router);
   };
 
-  it('navigates to the donate page on unrestricted platforms', async () => {
-    const router = setup(false);
-
-    await router.navigateByUrl('/donate');
-
-    expect(router.url).toBe('/donate');
-  });
-
-  it('redirects donate navigation on restricted platforms', async () => {
-    const router = setup(true);
+  it('always redirects donate navigation to home', async () => {
+    const router = setup();
 
     await router.navigateByUrl('/donate');
 

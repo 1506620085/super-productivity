@@ -31,7 +31,7 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfigState = {
     isProjectNotesEnabled: true,
     isSyncIconEnabled: true,
     isSearchEnabled: true,
-    isDonatePageEnabled: true,
+    isDonatePageEnabled: false,
     isHabitsEnabled: true,
     isFinishDayEnabled: true,
   },
