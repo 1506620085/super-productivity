@@ -39,7 +39,11 @@
       "ERROR": "Could not check for updates. Please try again later.",
       "UP_TO_DATE": "You are on the latest version ({{version}})."
     },
-    "UPDATE_WEB_APP": "New version available. Load new version?"
+    "UPDATE_WEB_APP": "New version available. Load new version?",
+    "MULTI_INSTANCE_BLOCKER": {
+      "TITLE": "App is already open",
+      "MSG": "Super Productivity is already running in another tab. Please close this tab or the other one."
+    }
   },
   "BL": {
     "NO_TASKS": "Your backlog is empty. Add tasks here to plan them later."

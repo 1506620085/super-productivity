@@ -44,7 +44,7 @@ test.describe('Multi-tab', () => {
 
     // The single-instance probe must have blocked the second tab's UI (the
     // first tab responds to the BroadcastChannel probe).
-    await expect(page2.getByText('App is already open')).toBeVisible();
+    await expect(page2.getByText(/App is already open|应用已打开/)).toBeVisible();
 
     // Let persistence and the second tab's background hydration settle —
     // NgRx effects write outside Angular's zone (same wait as the

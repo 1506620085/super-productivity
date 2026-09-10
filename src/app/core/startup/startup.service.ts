@@ -346,18 +346,31 @@ export class StartupService {
   }
 
   private _showMultiInstanceBlocker(): void {
-    const msg =
-      'Super Productivity is already running in another tab. Please close this tab or the other one.';
+    // Early blocker replaces the whole document; prefer TranslateService, but
+    // fall back to Chinese (hangz default) if translations are not ready yet.
+    const title = this._instantOrFallback(
+      T.APP.MULTI_INSTANCE_BLOCKER.TITLE,
+      '应用已打开',
+    );
+    const msg = this._instantOrFallback(
+      T.APP.MULTI_INSTANCE_BLOCKER.MSG,
+      '超级生产力已在另一个标签页中运行。请关闭此标签页或另一个标签页。',
+    );
     const style =
       'display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; font-family: sans-serif; padding: 2rem;';
     document.body.innerHTML = `
       <div style="${style}">
         <div>
-          <h1>App is already open</h1>
+          <h1>${title}</h1>
           <p>${msg}</p>
         </div>
       </div>
     `;
+  }
+
+  private _instantOrFallback(key: string, fallback: string): string {
+    const translated = this._translateService.instant(key);
+    return !translated || translated === key ? fallback : translated;
   }
 
   private _isTourLikelyToBeShown(): boolean {
