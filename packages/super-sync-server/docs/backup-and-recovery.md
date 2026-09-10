@@ -130,6 +130,10 @@ Server is down / data lost
 
 上述流程恢复的是**整台服务器**。另一种情况：某一用户的账户被清空——通常因为不良的 `SYNC_IMPORT` 将空或陈旧快照传播到其各设备——你需要将该*单个用户*回滚到某一时间点。
 
+**先检查受影响设备。** 每个客户端都保留本地恢复点：在应用远程全状态操作（`SYNC_IMPORT`、`BACKUP_IMPORT`、`REPAIR`）之前、在「Use server data」之前，以及在导入之前，会把完整状态快照进容量为三的环。用户在持有数据的那台设备上打开 **Settings → Sync & Backup → Import/Export → Browse backups**，选择标注为「before sync replaced local data」的条目并恢复。该恢复是普通本地导入，因此会作为新的全状态操作上传，并在其他设备下次同步时修复它们。这对加密账户也有效，且不需要服务器侧操作。见 `docs/sync-and-op-log/local-recovery-points.md`。
+
+仅当没有任何设备有可用恢复点时，再回退到下方的服务器侧选项。
+
 应用内的 **从历史恢复** 适用于未加密账户。它对端到端加密账户**无效**：服务器无法解密操作载荷，因此 `generateSnapshotAtSeq` 会抛出 `EncryptedOpsNotSupportedError`。
 
 ### 诊断加密下载失败
