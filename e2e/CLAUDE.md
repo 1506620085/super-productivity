@@ -27,8 +27,8 @@ docker compose -f docker-compose.yaml -f docker-compose.supersync.yaml up -d sup
 # Run with line reporter for real-time output
 npx playwright test --config e2e/playwright.config.ts --grep @supersync --reporter=line
 
-# Stop the server when done
-docker compose -f docker-compose.yaml -f docker-compose.supersync.yaml down supersync
+# Stop the server when done — `db` too, or it stays up and squats its host port
+docker compose -f docker-compose.yaml -f docker-compose.supersync.yaml down db supersync
 ```
 
 ## 测试模板
@@ -50,26 +50,26 @@ test.describe('Feature', () => {
 
 ## 导入路径
 
-| 测试位置                         | 导入路径                           |
+| 测试位置                         | 导入路径                         |
 | -------------------------------- | -------------------------------- |
 | `tests/feature/test.spec.ts`     | `../../fixtures/test.fixture`    |
 | `tests/feature/sub/test.spec.ts` | `../../../fixtures/test.fixture` |
 
 ## 全部 Fixture
 
-| Fixture        | 用途                                               |
-| -------------- | ------------------------------------------------ |
-| `workViewPage` | 任务列表、添加任务                                 |
-| `taskPage`     | 任务操作（获取、编辑、标记完成）                   |
-| `projectPage`  | 项目 CRUD、导航                                    |
-| `settingsPage` | 设置导航、插件管理                                 |
-| `dialogPage`   | 模态框/对话框交互                                  |
-| `plannerPage`  | 规划视图操作                                       |
-| `syncPage`     | WebDAV 同步设置                                    |
-| `tagPage`      | 标签管理                                           |
-| `notePage`     | 笔记功能                                           |
-| `sideNavPage`  | 侧边导航                                           |
-| `testPrefix`   | 自动加到任务/项目名称前缀以实现隔离                |
+| Fixture        | 用途                                |
+| -------------- | ----------------------------------- |
+| `workViewPage` | 任务列表、添加任务                  |
+| `taskPage`     | 任务操作（获取、编辑、标记完成）    |
+| `projectPage`  | 项目 CRUD、导航                     |
+| `settingsPage` | 设置导航、插件管理                  |
+| `dialogPage`   | 模态框/对话框交互                   |
+| `plannerPage`  | 规划视图操作                        |
+| `syncPage`     | WebDAV 同步设置                     |
+| `tagPage`      | 标签管理                            |
+| `notePage`     | 笔记功能                            |
+| `sideNavPage`  | 侧边导航                            |
+| `testPrefix`   | 自动加到任务/项目名称前缀以实现隔离 |
 
 ## 断言辅助函数
 

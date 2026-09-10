@@ -323,6 +323,11 @@ OperationLogHydratorService
 
 Genesis 操作（`MIGRATION` / `RECOVERY`）不可被其他客户端重放——它把本客户端的完整状态作为普通 Batch 操作携带，接收方将其当作空操作应用。历史仍仅含该 genesis 操作的客户端（从未同步、无全状态操作）在 join 时因此被当作「带本地数据的新客户端」：服务器非空则弹出本地数据冲突对话框，或用 `SYNC_IMPORT` 播种空服务器（`SyncLocalStateService.isNeverSyncedGenesisClient`，#9863）。由于真正把状态送出的是下载侧决策，基于 API 的提供方（SuperSync）从不上传 genesis 操作本身：`OperationLogUploadService` 将其排除出上传集，并在本轮全状态操作落定后在本地标为已同步（`isGenesisEntityType`，#9921）。上传仍被阻塞时（尚无加密密钥），或本客户端自己的 `SYNC_IMPORT` 刚因 `SYNC_IMPORT_EXISTS` 被丢弃时，该操作保持 pending，因为 pending genesis 正是触发「传入导入」门控提示的条件。基于文件的提供方仍会上传它：在那里写入状态快照的正是 ops 上传。服务器上仍可能留有旧客户端上传的 genesis 操作；接收方仍按空操作应用。
 
+两次 join 时决策都门控于 `SyncLocalStateService.hasMeaningfulStoreData`，它使用 `hasAnyUserData`——在 `hasMeaningfulStateData` 之上拓宽了归档、实时时间跟踪与重复配置，因为遗留客户端的工作可能全部已归档。已归档任务与已刷写时间跟踪只活在 IndexedDB 中，同步 store 快照会用空归档代替，因此当窄检查找不到任何内容时，门控回退到包含归档的快照（#9932）。它所计的一切都严格非默认，因此是播种自身检查（`hasServerMigrationStateData`）的子集。
+
+更宽的概念刻意只用于该门控。`hasMeaningfulStateData` 本身保持狭窄，因为 `hasNothingWorthUploading` 在拒绝方向上消费它（#9256）——在此把「有数据」报宽会让一台什么都没有的设备覆盖服务器；对着 onboarding 示例任务记的时间正是这类假阳性。
+`ServerMigrationService.handleServerMigration` 报告 `created` / `reused_pending` / `skipped`（带原因）。仅在服务器重置分支上，真正未能送出既有状态——校验失败或无 client id——才回答 `server_migration_skipped`，于是上传等待下一周期，而不是让客户端落在没有其基线状态的服务器上。被判定为空的状态无东西可送；服务器已不再为空则说明已被他人播种；二者都继续走普通上传，因为阻塞任一都会把周期卡住并留下客户端仍 pending 的 ops。
+
 ## A.4 压缩
 
 ### 目的

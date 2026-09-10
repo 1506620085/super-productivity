@@ -16,9 +16,9 @@ interface VectorClock {
 
 ### 常量
 
-| 常量                | 值 | 用途                           |
-| ----------------------- | ----- | --------------------------------- |
-| `MAX_VECTOR_CLOCK_SIZE` | 20    | 剪枝后时钟中的最大条目数 |
+| 常量                    | 值  | 用途                     |
+| ----------------------- | --- | ------------------------ |
+| `MAX_VECTOR_CLOCK_SIZE` | 20  | 剪枝后时钟中的最大条目数 |
 
 在 6 字符客户端 ID 下，20 条目时钟约 333 字节——带宽可忽略。用户需要 21+ 个唯一客户端 ID（重装/新浏览器）才会触发剪枝，对个人生产力应用而言极不可能。
 
@@ -146,17 +146,17 @@ Otherwise:
 
 ### 何时发生剪枝（穷尽列表）
 
-| 位置                                                                                                                                                                                                                             | 何时                                                                                                             | 保留什么                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| **服务器** `processOperation()`                                                                                                                                                                                                      | 冲突检测之后、存储之前                                                                         | 上传客户端 + 活跃全状态作者 |
-| **服务器** `getOpsSinceWithSeq()`                                                                                                                                                                                                    | 聚合快照向量钟                                                                                | 请求客户端                           |
-| **客户端** `OperationLogStoreService` — `calculateRemoteClockMerge`（远程合并 + reducer 检查点，事务内）                                                                                                              | 远程批次之后的持久时钟                                                                               | 当前客户端 + 最新全状态作者   |
-| **客户端** `OperationLogStoreService.pruneClockForStorage` — 在 `setVectorClock`、`saveStateCache`、`commitFileSnapshotBaseline` 内；由 `SyncHydrationService` / `ServerMigrationService` 对 SYNC_IMPORT 操作时钟直接调用 | 每一次其他持久时钟写入（快照保存、压缩、hydration 恢复、sync-hydration 基线、导入） | 当前客户端 + 最新全状态作者   |
-| **客户端** 调用方（快照、压缩、hydrator、sync-hydration、server-migration）                                                                                                                                                | **从不** — 它们传递原始时钟；存储负责剪枝（lint 强制）                                               | N/A                                         |
-| **客户端** 存储内直接时钟写入（`appendWithVectorClockOverwrite`、`runRemoteStateReplacement`、`runDestructiveStateReplacement`、`appendRecoveryOperationAndSnapshot`）                                                      | **从不** — 按设计写入完整、最小或已由服务器剪枝的时钟                                       | N/A                                         |
-| **客户端** `RepairOperationService`                                                                                                                                                                                                  | **从不** — REPAIR 发送完整时钟；服务器在冲突检测后剪枝                              | N/A                                         |
-| **客户端** 正常操作捕获                                                                                                                                                                                                         | **从不**                                                                                                        | N/A                                         |
-| **客户端** `SupersededOperationResolverService`                                                                                                                                                                                      | **从不**（冲突解决）                                                                                  | N/A                                         |
+| 位置                                                                                                                                                                                                                      | 何时                                                                                | 保留什么                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------- |
+| **服务器** `processOperation()`                                                                                                                                                                                           | 冲突检测之后、存储之前                                                              | 上传客户端 + 活跃全状态作者 |
+| **服务器** `getOpsSinceWithSeq()`                                                                                                                                                                                         | 聚合快照向量钟                                                                      | 请求客户端                  |
+| **客户端** `OperationLogStoreService` — `calculateRemoteClockMerge`（远程合并 + reducer 检查点，事务内）                                                                                                                  | 远程批次之后的持久时钟                                                              | 当前客户端 + 最新全状态作者 |
+| **客户端** `OperationLogStoreService.pruneClockForStorage` — 在 `setVectorClock`、`saveStateCache`、`commitFileSnapshotBaseline` 内；由 `SyncHydrationService` / `ServerMigrationService` 对 SYNC_IMPORT 操作时钟直接调用 | 每一次其他持久时钟写入（快照保存、压缩、hydration 恢复、sync-hydration 基线、导入） | 当前客户端 + 最新全状态作者 |
+| **客户端** 调用方（快照、压缩、hydrator、sync-hydration、server-migration）                                                                                                                                               | **从不** — 它们传递原始时钟；存储负责剪枝（lint 强制）                              | N/A                         |
+| **客户端** 存储内直接时钟写入（`appendWithVectorClockOverwrite`、`runRemoteStateReplacement`、`runDestructiveStateReplacement`、`appendRecoveryOperationAndSnapshot`）                                                    | **从不** — 按设计写入完整、最小或已由服务器剪枝的时钟                               | N/A                         |
+| **客户端** `RepairOperationService`                                                                                                                                                                                       | **从不** — REPAIR 发送完整时钟；服务器在冲突检测后剪枝                              | N/A                         |
+| **客户端** 正常操作捕获                                                                                                                                                                                                   | **从不**                                                                            | N/A                         |
+| **客户端** `SupersededOperationResolverService`                                                                                                                                                                           | **从不**（冲突解决）                                                                | N/A                         |
 
 ### 剪枝很少发生
 
@@ -185,6 +185,7 @@ Otherwise:
 1. 客户端收到带有 `existingClock` 的拒绝
 2. `SupersededOperationResolverService.resolveSupersededLocalOps()`：
    - 合并全局时钟 + 所有被取代操作的时钟 + 快照时钟 + 强制下载的额外时钟
+     （强制 seq-0 下载会从每条重新拉取的 op 收集时钟，但不会*投递*那些既落在已持久化游标之后、又已被本地时钟覆盖的 op——压缩可能已从本地日志剪掉它们，若再应用已剪掉的 `SYNC_IMPORT` 会把它当作新的传入导入重新浮现；游标半边则让因较新 schema 版本而阻塞的 op 仍可重试，因为这次合并可能在它们被应用前就已覆盖它们）
    - 调用 `mergeAndIncrementClocks()` — **无客户端侧剪枝！**
    - 用合并后的时钟创建新的 LWW Update 操作
 3. 重新上传 → 服务器比较完整合并时钟（现有 MAX+1 或更多条目）→ `GREATER_THAN` → 接受
@@ -204,23 +205,23 @@ Otherwise:
 
 导入是显式用户动作，将**所有客户端**恢复到特定状态。不知晓导入的操作被**丢弃**：
 
-| 比较     | 含义                                | 动作   |
-| -------------- | -------------------------------------- | -------- |
-| `GREATER_THAN` | 操作在看到导入之后创建         | **保留** |
-| `EQUAL`        | 与导入相同的因果历史          | **保留** |
+| 比较           | 含义                   | 动作     |
+| -------------- | ---------------------- | -------- |
+| `GREATER_THAN` | 操作在看到导入之后创建 | **保留** |
+| `EQUAL`        | 与导入相同的因果历史   | **保留** |
 | `CONCURRENT`   | 操作在不知晓导入时创建 | **丢弃** |
-| `LESS_THAN`    | 操作被导入支配              | **丢弃** |
+| `LESS_THAN`    | 操作被导入支配         | **丢弃** |
 
 即便来自未知客户端，`CONCURRENT` 操作也会被丢弃。这确保真正的「恢复到时间点」语义。
 
 ### 导入时钟如何创建
 
-| 来源                               | 方法                   | 时钟构造                                                                       |
-| ------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------------- |
-| `BACKUP_IMPORT`（干净石板）        | `BackupService`          | 新时钟 `{newClientId: 1}` — 小，无剪枝问题                                |
-| 服务器迁移                     | `ServerMigrationService` | 合并所有本地操作时钟 + 全局时钟 → 递增 → 剪枝到 MAX                      |
-| 同步 hydration（冲突解决） | `SyncHydrationService`   | 合并本地时钟 + 状态缓存时钟 + 远程快照时钟 → 递增 → 剪枝到 MAX |
-| 自动修复                          | `RepairOperationService` | 取当前全局时钟 → 递增；发送完整未剪枝时钟（服务器剪枝）      |
+| 来源                        | 方法                     | 时钟构造                                                       |
+| --------------------------- | ------------------------ | -------------------------------------------------------------- |
+| `BACKUP_IMPORT`（干净石板） | `BackupService`          | 新时钟 `{newClientId: 1}` — 小，无剪枝问题                     |
+| 服务器迁移                  | `ServerMigrationService` | 合并所有本地操作时钟 + 全局时钟 → 递增 → 剪枝到 MAX            |
+| 同步 hydration（冲突解决）  | `SyncHydrationService`   | 合并本地时钟 + 状态缓存时钟 + 远程快照时钟 → 递增 → 剪枝到 MAX |
+| 自动修复                    | `RepairOperationService` | 取当前全局时钟 → 递增；发送完整未剪枝时钟（服务器剪枝）        |
 
 ### 全状态操作跳过服务器冲突检测
 
@@ -422,23 +423,23 @@ Step 2: Client B has been working offline
 
 ## 10. 关键文件参考
 
-| 概念                                                     | 文件                                                                      |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| 核心算法（比较、合并、剪枝）                     | `packages/sync-core/src/vector-clock.ts`                                     |
-| 既有 shared-schema 导入的兼容性再导出  | （已移除 — 导入现直接面向 `@sp/sync-core`）                      |
-| 客户端包装器（空值处理、日志、校验）        | `src/app/core/util/vector-clock.ts`                                          |
-| 全局时钟管理、实体前沿                    | `src/app/op-log/sync/vector-clock.service.ts`                                |
-| 操作捕获（无剪枝、原子时钟更新）         | `src/app/op-log/capture/operation-log.effects.ts`                            |
-| 时钟持久化                                           | `src/app/op-log/persistence/operation-log-store.service.ts`                  |
-| 导入过滤 + 同客户端检查                        | `src/app/op-log/sync/sync-import-filter.service.ts`                          |
-| 冲突解决（无剪枝、合并时钟）             | `src/app/op-log/sync/superseded-operation-resolver.service.ts`               |
-| 冲突解决（LWW 逻辑、`mergeAndIncrementClocks`）  | `src/app/op-log/sync/conflict-resolution.service.ts`                         |
-| SYNC_IMPORT 创建（sync hydration）                       | `src/app/op-log/persistence/sync-hydration.service.ts`                       |
-| SYNC_IMPORT 创建（服务器迁移）                     | `src/app/op-log/sync/server-migration.service.ts`                            |
-| REPAIR 创建                                             | `src/app/op-log/validation/repair-operation.service.ts`                      |
-| 服务器：冲突检测 + 比较后剪枝         | `packages/super-sync-server/src/sync/sync.service.ts`                        |
-| 服务器：DoS 上限（清理，无剪枝）                      | `packages/super-sync-server/src/sync/services/validation.service.ts`         |
-| 服务器：下载优化期间的快照时钟剪枝 | `packages/super-sync-server/src/sync/services/operation-download.service.ts` |
+| 概念                                            | 文件                                                                         |
+| ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| 核心算法（比较、合并、剪枝）                    | `packages/sync-core/src/vector-clock.ts`                                     |
+| 既有 shared-schema 导入的兼容性再导出           | （已移除 — 导入现直接面向 `@sp/sync-core`）                                  |
+| 客户端包装器（空值处理、日志、校验）            | `src/app/core/util/vector-clock.ts`                                          |
+| 全局时钟管理、实体前沿                          | `src/app/op-log/sync/vector-clock.service.ts`                                |
+| 操作捕获（无剪枝、原子时钟更新）                | `src/app/op-log/capture/operation-log.effects.ts`                            |
+| 时钟持久化                                      | `src/app/op-log/persistence/operation-log-store.service.ts`                  |
+| 导入过滤 + 同客户端检查                         | `src/app/op-log/sync/sync-import-filter.service.ts`                          |
+| 冲突解决（无剪枝、合并时钟）                    | `src/app/op-log/sync/superseded-operation-resolver.service.ts`               |
+| 冲突解决（LWW 逻辑、`mergeAndIncrementClocks`） | `src/app/op-log/sync/conflict-resolution.service.ts`                         |
+| SYNC_IMPORT 创建（sync hydration）              | `src/app/op-log/persistence/sync-hydration.service.ts`                       |
+| SYNC_IMPORT 创建（服务器迁移）                  | `src/app/op-log/sync/server-migration.service.ts`                            |
+| REPAIR 创建                                     | `src/app/op-log/validation/repair-operation.service.ts`                      |
+| 服务器：冲突检测 + 比较后剪枝                   | `packages/super-sync-server/src/sync/sync.service.ts`                        |
+| 服务器：DoS 上限（清理，无剪枝）                | `packages/super-sync-server/src/sync/services/validation.service.ts`         |
+| 服务器：下载优化期间的快照时钟剪枝              | `packages/super-sync-server/src/sync/services/operation-download.service.ts` |
 
 ---
 
@@ -467,15 +468,15 @@ Step 2: Client B has been working offline
 
 ### 未来选项：感知陈旧度的驱逐（issue #9105 — 适用于哑中继模型）
 
-今日剪枝驱逐**最低计数器**条目，但低计数器与_重要性_相关（新鲜导入作者计数器为 1），而非与_死亡_相关——这是 #9089/#9096 保留集 bug 背后的启发式。Issue #9105 跟踪根因：客户端 ID 按安装/配置文件铸造且几乎从不退役，因此时钟只向 MAX 增长。#9105 上的决定是**搁置**修复——在 #9089/#9102 之后最坏情况是 §5 的良性额外往返——并在此记录约定方向。
+今日剪枝驱逐**最低计数器**条目，但低计数器与*重要性*相关（新鲜导入作者计数器为 1），而非与*死亡*相关——这是 #9089/#9096 保留集 bug 背后的启发式。Issue #9105 跟踪根因：客户端 ID 按安装/配置文件铸造且几乎从不退役，因此时钟只向 MAX 增长。#9105 上的决定是**搁置**修复——在 #9089/#9102 之后最坏情况是 §5 的良性额外往返——并在此记录约定方向。
 
 若剪枝在实践中不再罕见，改为驱逐**最陈旧**条目而非最低计数器条目。与上方协调者选项不同，这适配哑中继模型且无需线路格式变更：
 
 - **服务器：** `sync_devices` 表已按 `(userId, clientId)` 存储 `lastSeenAt`，在每次上传时更新——而上传是创建时钟条目的唯一路径。每日任务已 GC 超过 `retentionMs`（45 天）未见的行，因此登记表中的缺失可读为「最陈旧」。
 - **客户端（所有提供者）：** 保持小型持久的 `clientId → last-merged-op time` 映射，在合并远程时钟处更新（`mergeRemoteOpClocks`）——每条合并操作携带其作者 ID。无需服务器支持，因此也覆盖 WebDAV / LocalFile / Dropbox。
 
-安全概况与今日剪枝相同（条目无论如何都会被丢弃；返回的被丢弃 ID 最多付出 §5 的额外往返），但受害者选择严格更好：最近见过的 ID——例如新鲜导入作者——按定义存活，使 #9089/#9096 的保留集不变量成为_涌现_而非在每个剪枝站点手工维护（显式保留集仍作为双重保险）。陈旧度知识因节点而异，因此节点可能驱逐不同受害者；这增加时钟不对称但不增加新的失败类别——比较将缺失键视为零，且客户端已用不同保留集剪枝。
+安全概况与今日剪枝相同（条目无论如何都会被丢弃；返回的被丢弃 ID 最多付出 §5 的额外往返），但受害者选择严格更好：最近见过的 ID——例如新鲜导入作者——按定义存活，使 #9089/#9096 的保留集不变量成为*涌现*而非在每个剪枝站点手工维护（显式保留集仍作为双重保险）。陈旧度知识因节点而异，因此节点可能驱逐不同受害者；这增加时钟不对称但不增加新的失败类别——比较将缺失键视为零，且客户端已用不同保留集剪枝。
 
 今日支持的 GC 是**全状态导入**：时钟重置仅保留 `{import author, self}`（§7），且每会话一次的剪枝 snack 引导用户使用它（先同步所有设备——导入故意丢弃并发操作，见 `SyncImportFilterService`）。
 
-**重访触发：** 客户端剪枝将 `prunedIds` / `survivingIds` WARN 日志写入可导出的日志历史。若真实 bug 报告中出现剪枝警告——尤其是驱逐_活跃_ ID 的——将此项从搁置提升为已排期。
+**重访触发：** 客户端剪枝将 `prunedIds` / `survivingIds` WARN 日志写入可导出的日志历史。若真实 bug 报告中出现剪枝警告——尤其是驱逐*活跃* ID 的——将此项从搁置提升为已排期。
