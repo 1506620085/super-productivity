@@ -8,6 +8,8 @@ import { GlobalConfigService } from '../config/global-config.service';
 import { Router } from '@angular/router';
 import { WorkContextService } from '../work-context/work-context.service';
 import { LOCAL_ACTIONS } from '../../util/local-actions.token';
+import { TranslateService } from '@ngx-translate/core';
+import { T } from '../../t.const';
 
 @Injectable({
   providedIn: 'root',
@@ -19,6 +21,7 @@ export class ShepherdService {
   private globalConfigService = inject(GlobalConfigService);
   private _router = inject(Router);
   private workContextService = inject(WorkContextService);
+  private _translateService = inject(TranslateService);
 
   isActive = false;
   tour?: any; // Will be Shepherd.Tour when loaded
@@ -42,6 +45,7 @@ export class ShepherdService {
         this.layoutService,
         this.taskService,
         this.workContextService,
+        this._translateService,
       ) as any,
     );
   }
@@ -136,7 +140,7 @@ export class ShepherdService {
       },
       confirmCancel: false,
       keyboardNavigation: false,
-      tourName: 'Keyboard Navigation',
+      tourName: this._translateService.instant(T.SHEPHERD.KEYBOARD_NAV.TITLE),
       useModalOverlay: false,
       exitOnEsc: false,
     });

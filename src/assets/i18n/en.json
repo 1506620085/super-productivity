@@ -97,7 +97,7 @@
   "EXAMPLE_TASKS": {
     "LEARN_KEYBOARD_SHORTCUTS": {
       "TITLE": "Learn the keyboard shortcuts",
-      "NOTES": "Super Productivity is designed to be used with the keyboard. Learn the shortcuts to work faster.\n\n**How to start:**\n1. Open the **sidebar menu**\n2. Go to **Help**\n3. Click **How to: Keyboard Navigation**"
+      "NOTES": "Super Productivity is designed to be used with the keyboard. Learn the shortcuts to work faster.\n\n**How to start:**\n1. Open the **sidebar menu**\n2. Go to **Help**\n3. Click **How to: Keyboard**"
     },
     "CREATE_PROJECT": {
       "TITLE": "Create your first project",
@@ -2926,7 +2926,7 @@
       "CONTRIBUTE": "Contribute",
       "CREATE_TASK": "How to: Create a task",
       "GET_HELP_ONLINE": "Get help online",
-      "KEYBOARD": "How to: Keyboard Navigation",
+      "KEYBOARD": "How to: Keyboard",
       "REDDIT_COMMUNITY": "Reddit community",
       "REPORT_A_PROBLEM": "Report a problem",
       "SEND_FEEDBACK": "Send feedback",
@@ -3308,5 +3308,46 @@
     "WITHOUT_BREAK": "Without break:",
     "WORKING_TODAY": "Working today:",
     "WORKING_TODAY_ARCHIVED": "Time worked today on archived tasks"
+  },
+  "SHEPHERD": {
+    "NEXT": "Next",
+    "END_TOUR": "End tour",
+    "CREATE_TASK": {
+      "TITLE": "Create a task",
+      "INTRO": "<p>You can create tasks from the Add Task Bar. It also understands short syntax, so you can set useful details while typing the title.</p>",
+      "OPEN_BAR": "Open Add Task Bar",
+      "TRY_EXAMPLE": "Try creating a task with a planned date and time estimate:<br><br><code>Prepare demo @tomorrow 30m</code><br><br>Type it into the Add Task Bar and press <kbd>Enter</kbd>.",
+      "CLOSE_BAR_TITLE": "Close the Add Task Bar",
+      "CLOSE_BAR": "Press <kbd>Escape</kbd> to close the Add Task Bar.",
+      "SHORT_SYNTAX_TITLE": "Short syntax",
+      "SHORT_SYNTAX": "<p>The example title is cleaned up automatically. With the default Short Syntax settings, <code>@tomorrow</code> plans the task for tomorrow and <code>30m</code> sets a 30-minute estimate.</p><p>You can also use:</p><ul><li><code>#tag</code> to add a tag</li><li><code>+project</code> to assign a project</li><li><code>@friday</code> or <code>@16:00</code> to plan a task</li><li><code>!friday</code> or <code>!14:30</code> to set a deadline</li></ul>",
+      "SHORT_SYNTAX_SETTINGS_TITLE": "Short syntax settings",
+      "SHORT_SYNTAX_SETTINGS": "<p>You can turn each short-syntax option on or off under <strong>Settings → Tasks → Short Syntax</strong>.</p><p>You can start this guide again anytime from Help.</p>"
+    },
+    "KEYBOARD_NAV": {
+      "TITLE": "Keyboard Navigation",
+      "INTRO": "<p>The fastest way to use Super Productivity is with keyboard shortcuts. Don't worry — only a handful matter at first.</p><p>Most can be changed under <strong>Settings → Keyboard Shortcuts</strong>. Let's try them hands-on.</p>",
+      "ADD_TASKS": "Let's add a few tasks. Press {{key}}.",
+      "ENTER_TITLE_TITLE": "Enter a title",
+      "ENTER_TITLE": "Type a title and press <kbd>Enter</kbd>. <strong>Do this a few times until you have at least 4 tasks with different titles</strong>.",
+      "CLOSE_BAR_TITLE": "Close the Add Task Bar",
+      "CLOSE_BAR": "Press <kbd>Escape</kbd> to leave the Add Task Bar.",
+      "FOCUSED_TASK_TITLE": "A focused task",
+      "FOCUSED_TASK": "See the <span class=\"shepherd-colored-border\">colored border</span> around the first task? That means it is focused. Click elsewhere to unfocus it.",
+      "FOCUSING_TITLE": "Focusing tasks",
+      "FOCUSING": "If you lose focus, press {{key}} to jump back to the main list and focus the first task.",
+      "MOVING_AROUND_TITLE": "Moving around",
+      "MOVING_AROUND": "<p>With a task focused, use <kbd>↑</kbd> and <kbd>↓</kbd> to move between tasks.</p>",
+      "MOVING_TASKS_TITLE": "Moving tasks",
+      "MOVING_TASKS": "Move the focused task with {{up}} and {{down}}.",
+      "EDIT_TITLE_TITLE": "Edit the title",
+      "EDIT_TITLE": "Press <kbd>Enter</kbd> to edit the focused task's title.",
+      "DETAILS_TITLE": "Task details panel",
+      "DETAILS": "<p>Press <kbd>→</kbd> on a focused task to open its details.</p><p>Press <kbd>←</kbd> to close them.</p><p>Use <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> to move inside the panel.</p><p>Press <kbd>Escape</kbd> to leave most of these views.</p>",
+      "MORE_SHORTCUTS_TITLE": "More task shortcuts",
+      "MORE_SHORTCUTS": "<p>There are more shortcuts for a focused task. Check <strong>Settings → Keyboard Shortcuts → Tasks</strong>. The most useful ones:</p><ul><li>{{schedule}}: Schedule task</li><li>{{delete}}: Delete task</li><li>{{toggleDone}}: Toggle done</li><li>{{addSubTask}}: Add subtask</li><li>{{addAttachment}}: Attach a file or link</li><li>{{togglePlay}}: Start/stop tracking</li></ul>",
+      "CONGRATS_TITLE": "All done!",
+      "CONGRATS": "<p>That's the keyboard tour. You can restart it anytime from Help.</p><p>The best way to learn is to click around and try things. Have fun!</p>"
+    }
   }
 }
