@@ -26,6 +26,8 @@ Reducers **必须**对远程/重放操作运行（状态正是这样重建的）
 
 ✅ **由 `local-rules/no-actions-in-effects` 强制执行** — 你不可能写错；linter 会拒绝在 `*.effects.ts` 中使用 `inject(Actions)` / 导入 `Actions`。
 
+**Reducer 侧镜像：处理*非持久化* action 的 reducer 不得写入已同步实体字段。** 捕获从 action 载荷构建操作，而非从状态 diff，因此这类写入永远不会变成 op——本机相对其他设备漂移且无可检测冲突，`getPhantomChangeRisk()` 也看不见。目前无 lint 强制。若 UI 指针类 action（`setCurrentTask`、`setSelectedTask` 等）需要改任务数据，请从 `LOCAL_ACTIONS` effect 派发持久化 action（见 `TaskInternalEffects.reopenStartedDoneTask$`，#9904）。
+
 ## 边界 2 — Selector 边界
 
 **由 selector 驱动的会改写状态的 effects 必须守卫同步窗口。选择该来源是可丢弃还是必须延迟。**
@@ -63,7 +65,7 @@ Reducers **必须**对远程/重放操作运行（状态正是这样重建的）
 
 **跨实体变更应放在 meta-reducers 中，而不是 effects。批量 dispatch 循环需要让出。**
 
-- 一次必须原子重放且触及多个实体的转换（例如删除一个标签同时从每个任务中移除它）必须是**一次 reducer 遍历**，从而成为**一条操作**。把它放进 `src/app/root-store/meta/task-shared-meta-reducers/`，而不是放在会扇出分发后续 actions 的 effect 里。基于 effect 的扇出会为一次原子转换发出 N 条操作，_并且_会在重放时再次运行（这是边界 1 的重述）。
+- 一次必须原子重放且触及多个实体的转换（例如删除一个标签同时从每个任务中移除它）必须是**一次 reducer 遍历**，从而成为**一条操作**。把它放进 `src/app/root-store/meta/task-shared-meta-reducers/`，而不是放在会扇出分发后续 actions 的 effect 里。基于 effect 的扇出会为一次原子转换发出 N 条操作，*并且*会在重放时再次运行（这是边界 1 的重述）。
 - 不要仅仅因为工作流从一个用户手势开始，就把它折叠成一条操作。当各独立 action 的正常本地 effects 以及按实体划分的冲突边界很重要时，独立 actions 是合适的。项目完成故意先通过普通的逐任务 actions 解决任务，再翻转项目标志，接受无界的 N+1 操作计数与短暂的中间状态。这是该罕见语义例外已知的可扩展性残留，不是新的批量扇出先例；参见 [ADR #5: Project Completion](../../ARCHITECTURE-DECISIONS.md#5-project-completion-decoupled-resolution-over-atomic-multi-entity-op)。
 - `store.dispatch()` 与 NgRx reducers 同步运行；仅由捕获触发的 op-log 持久化是异步的。在 50+ 次 dispatch 的循环之后，加一次循环后的 macrotask 让出，`await new Promise((r) => setTimeout(r, 0))`，以在依赖的后续 action 之前保护捕获顺序。它不会分块或限制主线程上的 reducer 工作，也不会减少 N+1 上传放大。
 
@@ -90,15 +92,15 @@ Reducers **必须**对远程/重放操作运行（状态正是这样重建的）
 
 ## 决策表 — 「我正在写一个 effect」
 
-| 问题                                                        | 答案                                                                                                    | Linter                                           |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| 是否注入 actions 流？                              | 使用 `LOCAL_ACTIONS`（不要用 `Actions`）                                                                       | ✅ `no-actions-in-effects`（error）               |
-| selector 发射能否由下一次发射安全重试？ | 用 `skipDuringSyncWindow()` 丢弃它                                                                     | ✅ `require-hydration-guard`（error）             |
-| selector 发射是否为稀疏/不可恢复的边沿？           | 经所需的初始同步门进入，捕获其状态，再用 `waitForSyncWindow()` 延迟 | ✅ 仅窗口守卫；初始门是约定 |
-| 一次重放原子转换是否改变 **>1 个实体**？         | 做成 meta-reducer，而不是 effect                                                                     | ⚠️ `no-multi-entity-effect`（warn）               |
-| 是否在 **50+ 次循环**中 dispatch？                          | 之后让出一次以保证捕获顺序；这不是批处理                                             | —（约定）                                   |
+| 问题                                     | 答案                                                                | Linter                                |
+| ---------------------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
+| 是否注入 actions 流？                    | 使用 `LOCAL_ACTIONS`（不要用 `Actions`）                            | ✅ `no-actions-in-effects`（error）   |
+| selector 发射能否由下一次发射安全重试？  | 用 `skipDuringSyncWindow()` 丢弃它                                  | ✅ `require-hydration-guard`（error） |
+| selector 发射是否为稀疏/不可恢复的边沿？ | 经所需的初始同步门进入，捕获其状态，再用 `waitForSyncWindow()` 延迟 | ✅ 仅窗口守卫；初始门是约定           |
+| 一次重放原子转换是否改变 **>1 个实体**？ | 做成 meta-reducer，而不是 effect                                    | ⚠️ `no-multi-entity-effect`（warn）   |
+| 是否在 **50+ 次循环**中 dispatch？       | 之后让出一次以保证捕获顺序；这不是批处理                            | —（约定）                             |
 
-三者中有两条由机制强制执行 — 你不必死记硬背，只需理解_为什么_（文首的不变量）。
+三者中有两条由机制强制执行 — 你不必死记硬背，只需理解*为什么*（文首的不变量）。
 
 ---
 

@@ -25,7 +25,10 @@
 - `IndexedDbOpLogAdapter` 是生产后端。`OperationLogStoreService` 与 `ArchiveStoreService` 都通过 `OP_LOG_DB_ADAPTER_FACTORY` 获取适配器。
 - Store 初始化同时支持采纳连接的 IndexedDB 适配器与自我管理的适配器：后者调用 `adapter.init()` 且不打开 WebView 数据库。
 - `SqliteOpLogAdapter` 针对最小的 `SqliteDb` 接口实现该端口。它由内存翻译测试、真实的 `sql.js` 契约通过，以及 store 级集成通过覆盖。
-- 共享同一物理 `SqliteDb` 的独立适配器也共享按该连接键控的 FIFO 队列，防止重叠的 `BEGIN` 语句以及语句泄漏到另一事务。
+- 共享同一物理 `SqliteDb` 的独立适配器也共享按该连接键控的 FIFO 队列，防止重叠的 `BEGIN` 语句以及语句泄漏到另一事务（#8746）。store 级竞态——同一连接上的 op-log 追加与无锁归档刷写——由两侧后端的 `src/app/op-log/testing/integration/sqlite-shared-connection.integration.spec.ts` 覆盖。
+- 索引读取排除索引列为 NULL 的行（`bySyncedAt` / `bySourceAndStatus` 中的本地 op），与 IndexedDB 一致：缺少 keyPath 值的记录不会被索引（#8312）。
+- 范围仅为标量；复合索引按精确键元组查询（`DbIndexQuery`）。真正的复合范围在两侧后端没有共同语义，因此该端口无法表达。
+- `DbIterateOptions.limit` 将「首行 / 末行」扫描下推到 `LIMIT ?`，使 `getLastSeq()` 从不传输整张 ops 表（#8313）。
 - `migrateOpLogBackend()` 将所有操作日志 store 复制到空的目标事务中，并在提交前验证操作计数、最后序列与向量时钟。它在 CI 中针对真实 IndexedDB 到 `sql.js` 得到验证。
 - `local-rules/no-adapter-in-tx` 强制 SQLite 重入规则：事务回调中的代码必须使用其 `tx` 句柄，而不是在自身事务之后再入队另一次适配器调用。
 
@@ -75,7 +78,7 @@ SQLite 后端必须保留与 IndexedDB 相同的可观察保证：
 
 1. 添加原生 SQLite 依赖，以及覆盖单个应用私有数据库连接的薄 `SqliteDb` 包装。
 2. 在 Android 与 iOS 上验证插入 ID、事务/错误映射、应用暂停/恢复、突然终止，以及有代表性的批量写入。
-3. 为两个持久化服务提供覆盖同一物理连接的独立适配器。
+3. 为两个持久化服务提供覆盖同一物理连接的独立适配器，并先在 `SqliteOpLogAdapter` 上双跑组合多 store 事务的 store 级集成规格（`race-conditions`、`clean-slate-interrupt`），如同 `remote-apply-store-port` 与 `sqlite-shared-connection` 已做的那样。
 4. 添加仅原生、默认关闭的提供方选择。
 5. 接线启动检测、静默、`migrateOpLogBackend()`、完成标记、保留源回退，以及中断迁移恢复。
 6. 用该标志 dogfood，然后进行分阶段原生上线。仅在保留源窗口与回滚证据完成后，才移除 IndexedDB 回退与过渡性的 `adoptConnection` 桥接。
@@ -84,14 +87,14 @@ SQLite 后端必须保留与 IndexedDB 相同的可观察保证：
 
 ## 可执行所有者与验证
 
-| 关注点                                    | 所有者                                                     |
-| ------------------------------------------ | --------------------------------------------------------- |
-| 持久化端口与事务规则     | `src/app/op-log/persistence/op-log-db-adapter.ts`         |
-| 后端 DI 默认                         | `src/app/op-log/persistence/op-log-db-adapter.token.ts`   |
-| IndexedDB 后端                          | `src/app/op-log/persistence/indexed-db-op-log-adapter.ts` |
+| 关注点                    | 所有者                                                    |
+| ------------------------- | --------------------------------------------------------- |
+| 持久化端口与事务规则      | `src/app/op-log/persistence/op-log-db-adapter.ts`         |
+| 后端 DI 默认              | `src/app/op-log/persistence/op-log-db-adapter.token.ts`   |
+| IndexedDB 后端            | `src/app/op-log/persistence/indexed-db-op-log-adapter.ts` |
 | SQLite 后端与共享连接队列 | `src/app/op-log/persistence/sqlite-op-log-adapter.ts`     |
-| 后端迁移核心                     | `src/app/op-log/persistence/op-log-backend-migration.ts`  |
-| Schema                                     | `src/app/op-log/persistence/op-log-db-schema.ts`          |
+| 后端迁移核心              | `src/app/op-log/persistence/op-log-backend-migration.ts`  |
+| Schema                    | `src/app/op-log/persistence/op-log-db-schema.ts`          |
 
 聚焦的 CI 检查：
 
@@ -99,6 +102,7 @@ SQLite 后端必须保留与 IndexedDB 相同的可观察保证：
 npm run test:file src/app/op-log/persistence/sqlite-op-log-adapter.spec.ts
 npm run test:file src/app/op-log/persistence/op-log-backend-migration.spec.ts
 npm run test:file src/app/op-log/testing/integration/remote-apply-store-port.integration.spec.ts
+npm run test:file src/app/op-log/testing/integration/sqlite-shared-connection.integration.spec.ts
 ```
 
 CI 证明适配器与 SQLite 引擎语义，而非 Capacitor 桥接或设备生命周期。上线仍被阻塞，直到上述设备上门槛可复现。

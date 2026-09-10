@@ -6,8 +6,8 @@
 > Capacitor 内置的 `SystemBars`**（`insetsHandling: 'css'`）。边到边
 > inset（安全区/内边距）+ IME 内边距现由 SystemBars 在 **WebView ≥ 140**（或
 > API ≥ 35）上处理；**WebView < 140 / API < 35** 的尾部场景由 env() + 原生
-> 键盘 shim（`adjustWebViewHeightForKeyboardBelowApi30`，现已门控为
-> WebView < 140，以免与 SystemBars 冲突）覆盖。栏背景不再由插件绘制（SystemBars 没有颜色 API）——栏为透明，
+> 键盘 shim（`adjustWebViewHeightForKeyboard`，由 `NativeInsetShimGate`
+> 精确门控到该尾部，以免与 SystemBars 冲突）覆盖。栏背景不再由插件绘制（SystemBars 没有颜色 API）——栏为透明，
 > 主题色通过 `NavigationBarPlugin.setWebViewBackgroundColor`
 > （窗口装饰 + WebView 表面）透出。下方关于 #8508 的章节描述的是 _此前_
 > `@capawesome` 的机制，作为历史保留。迁移与设备矩阵验证已合入 [PR #8543](https://github.com/super-productivity/super-productivity/pull/8543)。
@@ -109,7 +109,7 @@ Pixel 8a、Tab S5e/Android 15）。
 
 ## #8508 后续 — SDK 28（Android 9）：添加任务栏位于键盘 BEHIND（后方）
 
-**状态：修复已实现（`CapacitorMainActivity.adjustWebViewForKeyboardBelowApi30`），
+**状态：修复已实现（`CapacitorMainActivity.adjustWebViewHeightForKeyboard`），
 待下方矩阵的设备上验证。** 18.12.0（补丁移除）之后，一名 **Android 9 / API 28** 用户报告全局添加任务栏位于
 软键盘 _下方 / 后方_。这正是上方未决事项 #4 的兑现，以及它所预测的设备类别。
 
@@ -140,7 +140,7 @@ Pixel 8a、Tab S5e/Android 15）。
 区分信号；原生层有明确几何信息。
 
 **已实现修复（原生，IME 弹出时显式设置 WebView 高度，限定于
-API < 30）——`CapacitorMainActivity.adjustWebViewHeightForKeyboardBelowApi30`。**
+API < 30）——`CapacitorMainActivity.adjustWebViewHeightForKeyboard`。**
 由既有键盘 `OnGlobalLayoutListener` 驱动：
 
 - 键盘弹出时：将 WebView 的显式 **布局高度** 设为键盘顶部，
@@ -235,7 +235,7 @@ iOS 规则暂时保留其 `- --safe-area-top` 项——其键盘运行时
 
 ## #8508 后续 — SDK 28（Android 9）：页眉绘制在状态栏 BEHIND（后方）
 
-**状态：修复已实现（`CapacitorMainActivity.pushStatusBarOverlapBelowApi30`），
+**状态：修复已实现（`CapacitorMainActivity.pushStatusBarOverlap`），
 待设备上验证。** 与键盘无关——在 API 28 上 web 页眉与 **状态栏** 重叠（无顶部空隙），在 #8508 上报。
 
 **根因。** SystemBars 迁移后，Android 不再从 JS 写入
@@ -250,12 +250,12 @@ _刘海/挖孔_ 映射为安全区内边距，而非状态栏）。因此
 **为何不能纯 Web 侧回退。** Web 侧无法区分「WebView 边到边延伸到状态栏下」与「WebView 已 inset 到其下方」——
 两种情况下 `env()` 都是 0，盲目加上状态栏高度会在已 inset 情况下双重计数。原生有几何信息。
 
-**修复（原生重叠 → SCSS 回退）——`pushStatusBarOverlapBelowApi30`。** 从既有键盘 `OnGlobalLayoutListener` 测量重叠
+**修复（原生重叠 → SCSS 回退）——`pushStatusBarOverlap`。** 从既有键盘 `OnGlobalLayoutListener` 测量重叠
 `max(0, rect.top − webViewTopOnScreen)`——`rect.top` 是可见 frame 顶部
 （= 状态栏高度，在 API 28 上可靠；与键盘路径读取的同一 frame），
 `getLocationOnScreen` 是 WebView 顶部（边到边时为 0，已 inset 后 == 状态栏高度）。将其发布（物理 px → CSS px，去重）为
-`--android-status-bar-overlap` CSS 变量，门控为 **SDK < 30 且 WebView < 140**
-（镜像键盘 shim，永不与 SystemBars 冲突）。该变量折入 SCSS 回退（`_css-variables.scss`）——不从 JS 写入，因此永不与 SystemBars 在 `--safe-area-inset-*` 上竞态：
+`--android-status-bar-overlap` CSS 变量，由 `NativeInsetShimGate` 门控
+（自 #9316 起为 **SDK < 35 且 WebView < 140**；原先为 SDK < 30——镜像键盘 shim，永不与 SystemBars 冲突）。该变量折入 SCSS 回退（`_css-variables.scss`）——不从 JS 写入，因此永不与 SystemBars 在 `--safe-area-inset-*` 上竞态：
 
 ```scss
 --safe-area-top: var(
@@ -272,12 +272,23 @@ _刘海/挖孔_ 映射为安全区内边距，而非状态栏）。因此
 - JS 读取方（`_patchCdkViewportForSafeArea`）仍将 `var(max(...))`
   词法解析为 0，因此覆盖层定位不变——保留 #8283 的作用域
   （仅页眉 padding 受影响）。
-- 已知小缺口：一台 **API 30–34**、**旧 WebView < 140** 的设备也会有
-  env()==0，但被 SDK < 30 门控排除；罕见（API 30 以上 WebView 会自动更新）——若出现可把门控放宽为仅 WebView。
+- ~~已知小缺口：一台 **API 30–34**、**旧 WebView < 140** 的设备也会有
+  env()==0，但被 SDK < 30 门控排除；罕见（API 30 以上 WebView 会自动更新）——若出现可把门控放宽为仅 WebView。~~ **已出现（#9316）；门控已放宽——见下一节。**
+- **已知缺口，既有问题——跟进项，非 #9316 范围：** SystemBars 8.4 还会在**每一** API 级别的非透传路径上以内联方式注入 `--safe-area-inset-top: 0px`（`SystemBars.initWindowInsetsListener`：清零的 `newInsets` → `injectSafeAreaCSS`，并在 `onPageCommitVisible`、`onDOMReady` 与每次 IME 切换时重触发）。因此 `var(--safe-area-inset-top, …)` 会解析为 `0px`，`max(env(), var(--android-status-bar-overlap))` 回退永不被咨询——`pushStatusBarOverlap` 发布的 overlap 变量在 shim 运行的频段上被遮蔽，上方页眉修复在该处很可能无效。尚未设备验证。若要核实：在 API 34 模拟器上记录 `getComputedStyle(document.documentElement).getPropertyValue('--safe-area-top')`；若为 `0px`，将 overlap 移出回退，例如 `max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), var(--android-status-bar-overlap, 0px))`（安全：该变量仅在门控开启处写入）。
 - 该变量仅作为文档上的内联样式存在，因此 Web 侧重载
   （`window.location.reload()`——语言切换、PWA 更新、同步冲突恢复）会擦除它。原生去重（`lastStatusBarOverlapCssPx`）在
   `flushPendingShareIntent()` 中重置（每次前端（重新）加载都会运行），以便下次布局
   重新发布；若不重置，未变化的值会被跳过，重叠会在重载后回退。
+
+## #9316 — API 34 + 旧 WebView：添加任务栏被键盘挡住
+
+**状态：门控已放宽（`NativeInsetShimGate`），并在两侧 inset 所有者上于 CI 验证**——`ImeInsetShimInstrumentedTest`（测量于 2026-09）。两名 **Android 14（API 34）** 用户报告添加任务栏（以及任务详情笔记字段）被键盘挡住。这正是上方「已知小缺口」的兑现。
+
+**根因——无人拥有 IME inset。** `SystemBars` 在**每一** API 级别都把 `OnApplyWindowInsetsListener` 装在 WebView 父级（activity 内容根，`capacitor_bridge_layout_main.xml`）上，因此 inset 所有者是它而非框架。但它只在两条路径上应用 IME padding（`SystemBars.initWindowInsetsListener`）：透传分支（门控 `webViewMajor >= 140 && viewport-fit=cover`），以及 `SDK_INT >= 35` 分支。在 **API < 35 且 WebView < 140** 上它什么都不做——而我们的 shim 曾门控为 `SDK_INT < 30`，因此也不会介入。没有任何东西收缩视口——`obscured = innerHeight − visualViewport.height` 为 0——`--keyboard-height: 0`——`position: fixed` 的栏停在仍延伸到 IME 后方的视口底部。
+
+**修复：** 将原生 shim 门控拓宽为 `NativeInsetShimGate`（**SDK < 35 && WebView < 140**），方法更名为 `adjustWebViewHeightForKeyboard` / `pushStatusBarOverlap`。在该尾部频段，IME 升起时显式设置 WebView 布局高度；频段外仍在写入前返回，不与 SystemBars 冲突。详见上游 #9316 与 `ImeInsetShimInstrumentedTest` 的验证矩阵。
+
+开放项 #3（API 30-34 + WebView < 140 的 IME 归属）已由上述门控拓宽覆盖；其余开放项仍待设备矩阵确认。
 
 ## 切勿做什么
 
