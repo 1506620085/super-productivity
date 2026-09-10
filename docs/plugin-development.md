@@ -772,7 +772,10 @@ async function testAPI() {
 若你创建了有用的插件，可考虑：
 
 1. 在 reddit 或 GitHub discussions 上发帖介绍
-2. 提交 PR，将其加入社区插件列表（即将推出）
+2. 提交 PR，将其加入 [community-plugins.json](../src/assets/community-plugins.json)
+
+   安装说明请写为：下载 release ZIP，然后 设置 → 插件 → Choose Plugin File。
+   上传 ZIP 是唯一安装路径——没有「从文件夹加载」选项。
 
 祝插件开发愉快！🚀
 

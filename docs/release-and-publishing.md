@@ -48,13 +48,13 @@ git push --atomic origin HEAD "vX.Y.Z"
 
 ## Tag 会触发什么
 
-| 产出                                                      | Workflow                                                      | 最终 tag                                        | 含 `-` 的 tag      |
-| --------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------- | ------------------ |
-| 草稿 GitHub release 与 Linux/macOS/Windows 桌面资源       | `.github/workflows/build.yml`                                 | 构建                                            | 构建               |
-| Android APK 与 GitHub release 资源                        | `.github/workflows/build-android.yml`                         | 上传到 Play `internal` 并附加 APK               | 仅构建/附加        |
-| iOS App Store                                             | `.github/workflows/build-ios.yml`                             | 上传并提交审核                                  | 仅上传             |
-| Mac App Store                                             | `.github/workflows/build-publish-to-mac-store-on-release.yml` | 上传并提交审核                                  | 仅上传             |
-| Microsoft Store `.appx`                                   | `.github/workflows/build-create-windows-store-on-release.yml` | 构建产物供手工 Partner Center 上传              | 构建产物           |
+| 产出                                                | Workflow                                                      | 最终 tag                           | 含 `-` 的 tag |
+| --------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------- | ------------- |
+| 草稿 GitHub release 与 Linux/macOS/Windows 桌面资源 | `.github/workflows/build.yml`                                 | 构建                               | 构建          |
+| Android APK 与 GitHub release 资源                  | `.github/workflows/build-android.yml`                         | 上传到 Play `internal` 并附加 APK  | 仅构建/附加   |
+| iOS App Store                                       | `.github/workflows/build-ios.yml`                             | 上传并提交审核                     | 仅上传        |
+| Mac App Store                                       | `.github/workflows/build-publish-to-mac-store-on-release.yml` | 上传并提交审核                     | 仅上传        |
+| Microsoft Store `.appx`                             | `.github/workflows/build-create-windows-store-on-release.yml` | 构建产物供手工 Partner Center 上传 | 构建产物      |
 
 Apple 的详细提交行为、API key 要求与恢复情形见 [Apple 发布自动化](apple-release-automation.md)。
 
@@ -77,12 +77,12 @@ Apple 的详细提交行为、API key 要求与恢复情形见 [Apple 发布自�
 
 对非预发布 release，发布草稿会启动：
 
-| 渠道        | Workflow                                                    | 结果                                            |
-| ----------- | ----------------------------------------------------------- | ----------------------------------------------- |
-| Google Play | `.github/workflows/auto-publish-google-play-on-release.yml` | 将 `internal` 提升到 `production`               |
-| Snap Store  | `.github/workflows/build-publish-to-snap-on-release.yml`    | 将 release Snap 发布到 `edge` 与 `stable`       |
-| Web 应用    | `.github/workflows/build-update-web-app-on-release.yml`     | 构建并部署生产 Web 资源                         |
-| Docker Hub  | `.github/workflows/publish-to-hub-docker.yml`               | 构建并发布应用镜像                              |
+| 渠道        | Workflow                                                    | 结果                                      |
+| ----------- | ----------------------------------------------------------- | ----------------------------------------- |
+| Google Play | `.github/workflows/auto-publish-google-play-on-release.yml` | 将 `internal` 提升到 `production`         |
+| Snap Store  | `.github/workflows/build-publish-to-snap-on-release.yml`    | 将 release Snap 发布到 `edge` 与 `stable` |
+| Web 应用    | `.github/workflows/build-update-web-app-on-release.yml`     | 构建并部署生产 Web 资源                   |
+| Docker Hub  | `.github/workflows/publish-to-hub-docker.yml`               | 构建并发布应用镜像                        |
 
 Docker Hub workflow 对任何已发布的 GitHub release 都会运行，且不含 Web、Play、Snap workflow 使用的预发布守卫。发布预发布前请考虑这一点。
 
@@ -93,6 +93,23 @@ Microsoft Store 上传仍为手工：下载 `WinStoreRelease` 产物，并在 Pa
 - 普通 `master` 推送会构建桌面产物、将开发 Android 构建上传到 Play `internal` 轨道，并将分支 Snap 发布到 `edge`。
 - 更改 SuperSync 服务器输入的 `master` 推送会发布 `ghcr.io/super-productivity/supersync:latest`；此镜像不按 release 打 tag。
 - 预发布与手动 Apple workflow 上传构建但不提交 App Review。提议的额外分支行为见 [TestFlight 计划](plans/2026-07-14-ios-testflight-master-builds.md)；那不是当前行为。
+
+## 可复现的 Android 构建
+
+Angular service-worker 构建器会发出 `ngsw.json`（带 `Date.now()` 戳记，外加各文件内容哈希的 `hashTable`）及其 worker 脚本，且 `npx cap sync` 会把它们复制进 APK 的 `assets/public/`。这使 Android 构建无法对照 [F-Droid 可复现构建检查](https://verification.f-droid.org/) 核验（#4155）。
+
+在 Android 上这些文件全无用处。`src/main.ts` 把两条 service-worker 注册路径都门控在 `!IS_NATIVE_PLATFORM && !IS_ELECTRON`，并在这些平台上主动*注销*任何已有 worker，因此它们是死重量。`sync:android` 因此在 `cap sync` 之后通过 `tools/strip-service-worker-assets.js` 删除它们。这是把 service worker 作为差异源剔除，而不是钉死其中某一字段，并减少 APK 体积。Lighthouse CI 任务对 `dist/browser` 使用同一脚本，因此文件列表只维护一处。
+
+挂钩点很重要：F-Droid 配方直接跑 `buildFrontend:prodWeb` 与 `sync:android`，从不调用 `dist:android:prod`，因此加在后者上的步骤到不了他们的构建。
+
+删除失败并非致命。找不到文件是合理的——某次构建可以关掉 service worker——unlink 失败会报告并跳过，因为为清理而打断 Android 构建（以及 F-Droid 的 prebuild）是更糟的取舍。（若未给出目标目录，脚本会以非零退出，但 `strip:sw:android` 硬编码路径，因此构建中不会触发。）
+
+警告不是安全网，因此在可检查处断言结果：`build-android.yml` 在打包后的 APK 上验证 `assets/public/` 下没有残留的 service-worker 条目。它覆盖构建、`cap sync`、strip 与打包整条链，而非单一步骤。该断言从不在 PR 上跑——仅 push（`master`、`release/*`、`test/git-actions`、`v*` tag）与 `workflow_dispatch`——因此门控的是发布而非合并。
+
+刻意不做的两件事：
+
+- **Web PWA 与 iOS 不动。** Web 应用确实使用 service worker。`sync:ios` 是对同一 `webDir` 的裸 `npx cap sync ios`，因此 iOS bundle 会收到同样的死文件——但 iOS 不是可复现目标，改 App Store bundle 内容没有收益。若将来统一，`sync:ios` 需要 `ios/App/App/public`。
+- **它不证明 APK 可复现。** Gradle/AAPT 层与工具链钉扎未动，因此确认字节一致仍需对照 F-Droid 构建跑 diffoscope。这只移除了已报告的阻塞点——#4155 的 diffoscope 报告锚定在 `assets-public-ngsw.json`——不一定是最后一个。
 
 ## 凭证与签名
 
