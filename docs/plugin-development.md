@@ -297,6 +297,7 @@ Iframe 插件会自动获得：
 - `getAllProjects()` - 获取所有项目
 - `addProject(project)` - 创建新项目
 - `updateProject(projectId, updates)` - 更新项目
+- `deleteProject(projectId)` - 删除项目**及其包含的任务**（含 backlog 与子任务），级联行为与 UI「删除项目」相同。删除 Inbox 会被拒绝；若删除的是当前活动项目，应用会回退到 Today 上下文。
 
 #### 标签（Tags）
 
@@ -312,14 +313,14 @@ Iframe 插件会自动获得：
 
 将计数器视为今日值的简单 `{ [id: string]: number }` 映射（通过 NgRx 自动 upsert）。
 
-| Method                                  | Description                                                                      | Example                                                                               |
-| --------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `getAllCounters()`                      | 获取所有计数器，形式为 `{ [id: string]: number }`                                   | `const counters = await PluginAPI.getAllCounters(); console.log(counters['my-key']);` |
-| `getCounter(id)`                        | 获取某计数器的今日值（未设置则返回 `null`）                        | `const val = await PluginAPI.getCounter('daily-commits');`                            |
+| Method                                  | Description                                               | Example                                                                               |
+| --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `getAllCounters()`                      | 获取所有计数器，形式为 `{ [id: string]: number }`         | `const counters = await PluginAPI.getAllCounters(); console.log(counters['my-key']);` |
+| `getCounter(id)`                        | 获取某计数器的今日值（未设置则返回 `null`）               | `const val = await PluginAPI.getCounter('daily-commits');`                            |
 | `setCounter(id, value)`                 | 设置今日值（非负数字；校验 id 正则 `/^[A-Za-z0-9_-]+$/`） | `await PluginAPI.setCounter('daily-commits', 5);`                                     |
-| `incrementCounter(id, incrementBy = 1)` | 递增并返回新值（下限为 0）                                     | `const newVal = await PluginAPI.incrementCounter('daily-commits', 2);`                |
-| `decrementCounter(id, decrementBy = 1)` | 递减并返回新值（下限为 0）                                     | `const newVal = await PluginAPI.decrementCounter('daily-commits');`                   |
-| `deleteCounter(id)`                     | 删除该计数器                                                               | `await PluginAPI.deleteCounter('daily-commits');`                                     |
+| `incrementCounter(id, incrementBy = 1)` | 递增并返回新值（下限为 0）                                | `const newVal = await PluginAPI.incrementCounter('daily-commits', 2);`                |
+| `decrementCounter(id, decrementBy = 1)` | 递减并返回新值（下限为 0）                                | `const newVal = await PluginAPI.decrementCounter('daily-commits');`                   |
+| `deleteCounter(id)`                     | 删除该计数器                                              | `await PluginAPI.deleteCounter('daily-commits');`                                     |
 
 **示例：**
 
@@ -337,16 +338,16 @@ PluginAPI.showSnack({
 
 高级用途：对带元数据的计数器进行完整 CRUD（标题、启用状态、通过 `countOnDay: { [date: string]: number }` 的日期特定值）。
 
-| Method                                   | Description                                                                       | Example                                                               |
-| ---------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `getAllSimpleCounters()`                 | 获取全部，类型为 `SimpleCounter[]`                                                      | `const all = await PluginAPI.getAllSimpleCounters();`                 |
+| Method                                   | Description                                                                 | Example                                                               |
+| ---------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `getAllSimpleCounters()`                 | 获取全部，类型为 `SimpleCounter[]`                                          | `const all = await PluginAPI.getAllSimpleCounters();`                 |
 | `getSimpleCounter(id)`                   | 按 id 获取一个（未找到则返回 `undefined`）                                  | `const counter = await PluginAPI.getSimpleCounter('my-id');`          |
 | `updateSimpleCounter(id, updates)`       | 部分更新（例如 `{ title: 'New Title', countOnDay: { '2025-11-17': 10 } }`） | `await PluginAPI.updateSimpleCounter('my-id', { isEnabled: false });` |
-| `toggleSimpleCounter(id)`                | 切换 `isOn` 状态（未找到则抛错）                                         | `await PluginAPI.toggleSimpleCounter('my-id');`                       |
-| `setSimpleCounterEnabled(id, isEnabled)` | 设置启用状态                                                                 | `await PluginAPI.setSimpleCounterEnabled('my-id', true);`             |
-| `deleteSimpleCounter(id)`                | 按 id 删除                                                                      | `await PluginAPI.deleteSimpleCounter('my-id');`                       |
+| `toggleSimpleCounter(id)`                | 切换 `isOn` 状态（未找到则抛错）                                            | `await PluginAPI.toggleSimpleCounter('my-id');`                       |
+| `setSimpleCounterEnabled(id, isEnabled)` | 设置启用状态                                                                | `await PluginAPI.setSimpleCounterEnabled('my-id', true);`             |
+| `deleteSimpleCounter(id)`                | 按 id 删除                                                                  | `await PluginAPI.deleteSimpleCounter('my-id');`                       |
 | `setSimpleCounterToday(id, value)`       | 设置今日值（YYYY-MM-DD）                                                    | `await PluginAPI.setSimpleCounterToday('my-id', 10);`                 |
-| `setSimpleCounterDate(id, date, value)`  | 为特定日期设置值（校验 YYYY-MM-DD）                                | `await PluginAPI.setSimpleCounterDate('my-id', '2025-11-16', 5);`     |
+| `setSimpleCounterDate(id, date, value)`  | 为特定日期设置值（校验 YYYY-MM-DD）                                         | `await PluginAPI.setSimpleCounterDate('my-id', '2025-11-16', 5);`     |
 
 **示例：**
 
@@ -449,13 +450,18 @@ PluginAPI.registerSidePanelButton({
 
 ```javascript
 PluginAPI.registerShortcut({
-  keys: 'ctrl+shift+p',
+  id: 'my-shortcut', // 可选；省略时由 label 派生
   label: 'My Plugin Shortcut',
-  action: () => {
+  onExec: () => {
     console.log('Shortcut triggered');
   },
 });
+
+// 再次移除该快捷键。
+PluginAPI.unregisterShortcut('my-shortcut');
 ```
+
+插件不自行选择按键组合：快捷键会出现在键盘设置的 **插件快捷键** 下，由用户分配。绑定按 shortcut id 存储，因此请在应用重启间保持 id 稳定。
 
 #### Hooks
 
@@ -686,7 +692,7 @@ plugin.onUnload(() => {
 
 ### Iframe API 表面
 
-Iframe 插件会获得注入到 `index.html` 的经过过滤的 `window.PluginAPI` 对象。Iframe 可使用注入的任务/项目/标签 API、对话框与通知 API、导航助手、持久化助手、计数器、action 派发、`registerHook()` 以及 `registerWorkContextHeaderButton()`。偏回调的注册方法如 `registerHeaderButton()`、`registerMenuEntry()`、`registerSidePanelButton()`、`registerShortcut()` 与 `registerConfigHandler()` 必须从宿主侧 `plugin.js` 代码注册。未注入 iframe 的 API 不可用，即使它们存在于宿主侧插件桥上。
+Iframe 插件会获得注入到 `index.html` 的经过过滤的 `window.PluginAPI` 对象。Iframe 可使用注入的任务/项目/标签 API、对话框与通知 API、导航助手、持久化助手、计数器、action 派发、`registerHook()` 以及 `registerWorkContextHeaderButton()`。偏回调的注册方法如 `registerHeaderButton()`、`registerMenuEntry()`、`registerSidePanelButton()`、`registerShortcut()`/`unregisterShortcut()` 与 `registerConfigHandler()` 必须从宿主侧 `plugin.js` 代码调用。未注入 iframe 的 API 不可用，即使它们存在于宿主侧插件桥上。
 
 当桌面应用授予插件 `nodeExecution` 权限时，iframe 插件的 `executeNodeScript()` 会通过宿主桥代理。
 

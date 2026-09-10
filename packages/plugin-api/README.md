@@ -127,6 +127,7 @@ enum PluginHooks {
 - `addTask` - 创建任务
 - `getAllProjects` - 读取项目
 - `addProject` - 创建项目
+- `deleteProject` - 删除项目及其全部内容（不可撤销）
 - `getAllTags` - 读取标签
 - `addTag` - 创建标签
 - `persistDataSynced` - 持久化插件数据

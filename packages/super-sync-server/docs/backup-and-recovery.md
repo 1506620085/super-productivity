@@ -8,12 +8,12 @@ Super Productivity 使用仅追加的操作日志进行同步。每个客户端�
 
 ## 备份保护的内容
 
-| 数据                                 | 存放位置                   | 为何备份                                   |
-| ------------------------------------ | -------------------------- | ------------------------------------------ |
-| 用户账户（邮箱、密码哈希）           | 仅服务器                   | 没有这些用户无法认证                       |
-| Passkey（WebAuthn 凭证）             | 仅服务器                   | 无法重新生成                               |
-| 操作日志                             | 服务器 + 所有客户端        | 若所有客户端设备丢失时的最后手段           |
-| 任务/项目/标签数据                   | 由操作日志派生             | 客户端从操作重建                           |
+| 数据                       | 存放位置            | 为何备份                         |
+| -------------------------- | ------------------- | -------------------------------- |
+| 用户账户（邮箱、密码哈希） | 仅服务器            | 没有这些用户无法认证             |
+| Passkey（WebAuthn 凭证）   | 仅服务器            | 无法重新生成                     |
+| 操作日志                   | 服务器 + 所有客户端 | 若所有客户端设备丢失时的最后手段 |
+| 任务/项目/标签数据         | 由操作日志派生      | 客户端从操作重建                 |
 
 ## 备份设置
 
@@ -28,22 +28,25 @@ Super Productivity 使用仅追加的操作日志进行同步。每个客户端�
 # Run manually
 ./scripts/backup.sh
 
-# Set up daily cron at 3 AM with 3-day retention
-(crontab -l 2>/dev/null; echo "0 3 * * * RETENTION_DAYS=3 /path/to/scripts/backup.sh >> /var/log/supersync-backup.log 2>&1") | crontab -
+# Set up daily cron at 3 AM with 3-day retention. flock keeps a slow dump from
+# overlapping the next night's run. The lock must live in a root-owned dir like /run —
+# in world-writable /tmp any local user could squat the path and silently block every
+# nightly run.
+(crontab -l 2>/dev/null; echo "0 3 * * * RETENTION_DAYS=3 flock -n /run/supersync-backup.lock /path/to/scripts/backup.sh >> /var/log/supersync-backup.log 2>&1") | crontab -
 ```
 
 备份保存到脚本目录旁的 `backups/`。
 
 ### 配置
 
-| 变量             | 默认值               | 说明                                       |
-| ---------------- | -------------------- | ------------------------------------------ |
-| `BACKUP_DIR`     | `../backups`         | 备份文件存放位置                           |
-| `RETENTION_DAYS` | `14`                 | 删除早于此天数的备份                       |
-| `DB_CONTAINER`   | `supersync-postgres` | Docker 容器名                              |
-| `POSTGRES_USER`  | `supersync`          | 数据库用户                                 |
-| `POSTGRES_DB`    | `supersync`          | 数据库名                                   |
-| `RCLONE_REMOTE`  | （空）               | 可选的 rclone 远端，用于异地上传           |
+| 变量             | 默认值               | 说明                             |
+| ---------------- | -------------------- | -------------------------------- |
+| `BACKUP_DIR`     | `../backups`         | 备份文件存放位置                 |
+| `RETENTION_DAYS` | `14`                 | 删除早于此天数的备份             |
+| `DB_CONTAINER`   | `supersync-postgres` | Docker 容器名                    |
+| `POSTGRES_USER`  | `supersync`          | 数据库用户                       |
+| `POSTGRES_DB`    | `supersync`          | 数据库名                         |
+| `RCLONE_REMOTE`  | （空）               | 可选的 rclone 远端，用于异地上传 |
 
 ### 异地备份（可选）
 

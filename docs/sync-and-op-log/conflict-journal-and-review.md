@@ -8,14 +8,14 @@ LWW 冲突自动解决如何被记录（冲突日志）、何时保留两次并�
 
 代码位于 `src/app/op-log/sync/`：
 
-| 关注点                        | 文件                                                               |
-| ------------------------------ | ------------------------------------------------------------------- |
-| 日志数据模型 + 存储     | `conflict-journal.model.ts`, `conflict-journal.service.ts`          |
+| 关注点              | 文件                                                                |
+| ------------------- | ------------------------------------------------------------------- |
+| 日志数据模型 + 存储 | `conflict-journal.model.ts`, `conflict-journal.service.ts`          |
 | 分类（分类法）      | `conflict-journal-emission.util.ts`                                 |
-| 不相交字段自动合并      | `conflict-disjoint-merge.util.ts`, `conflict-resolution.service.ts` |
+| 不相交字段自动合并  | `conflict-disjoint-merge.util.ts`, `conflict-resolution.service.ts` |
 | 审阅 UI 派生 + 操作 | `sync-conflict-review.util.ts`, `sync-conflict-ui.service.ts`       |
-| 横幅 / 徽章                 | `sync-conflict-banner.service.ts`                                   |
-| 页面                           | `src/app/pages/sync-conflicts-page/`                                |
+| 横幅 / 徽章         | `sync-conflict-banner.service.ts`                                   |
+| 页面                | `src/app/pages/sync-conflicts-page/`                                |
 
 ## 冲突日志
 
@@ -25,7 +25,7 @@ LWW 冲突自动解决如何被记录（冲突日志）、何时保留两次并�
 
 - **仅观察。** 记录一条条目绝不会影响 LWW 选择了哪条操作，且每一次日志写入都会吞掉自身错误——日志失败绝不能抛回冲突解决。推论：op-log 写入与日志写入**不是原子的**。Op log 是事实来源；日志是尽力而为的记录，两者之间的崩溃可能丢失一条日志条目但绝不会丢失一条操作。永不抛出契约也覆盖读取与状态写入（`list` → `[]`，`getEntry` → `undefined`，标记 kept/flipped 被吞掉）：`list()` 在解决后通知步骤中被 await，因此日志失败只会降级徽章/审阅界面，绝不会降级同步。一个不对称点：`merged` 条目声称「两侧都保留」，因此仅在合并后的操作被持久追加**之后**才写入日志——日志可以少报一次合并，但绝不会报告未发生的合并。
 - **仅本设备，永不同步。** 条目 verbatim 捕获冲突两侧的字段值与不透明 action 载荷——包括 op log 刻意丢弃的那一侧。上传它们会复活已丢弃的数据；它们也被排除在备份/导出之外（见 wiki `3.06-User-Data`）。
-- **在完整数据集替换时清空。** 日志条目描述的是操作历史上的冲突；当该历史被整批替换时，条目即过时（且跨用户配置文件时还是隐私泄漏）。`BackupService.importCompleteBackup`——每一条替换路径（配置文件切换、JSON 导入、本地备份恢复、SuperSync 恢复）都会汇入的瓶颈——调用 `ConflictJournalService.clearAll()`。
+- **在完整数据集替换时清空。** 日志条目描述的是操作历史上的冲突；当该历史被整批替换时，条目即过时，且可能暴露已被替换数据集中的值。`BackupService.importCompleteBackup`——每一条替换路径（JSON 导入、本地备份恢复、SuperSync 恢复）都会汇入的瓶颈——调用 `ConflictJournalService.clearAll()`。
 - **保留策略。** 每次剪枝应用先到先绑的边界：超过 14 天的条目（`JOURNAL_RETENTION_DAYS`），然后是超出最新 200 条的任何内容（`JOURNAL_MAX_ENTRIES`）。剪枝在应用启动时运行，并在会话中从 `record()` 机会性地运行——但会话中剪枝是**按计数触发的**：仅当存储增长超过软上限 `JOURNAL_MAX_ENTRIES + JOURNAL_PRUNE_SLACK`（220）时才触发，然后剪回最新 200 条。因此长时间低流量会话（条目很少、从未越过软上限）依赖下一次应用启动来强制执行 14 天年龄边界。
 
 ### 重新启用发射前的安全边界
