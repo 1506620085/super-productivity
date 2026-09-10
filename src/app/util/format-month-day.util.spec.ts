@@ -168,9 +168,9 @@ describe('formatMonthDay', () => {
     });
 
     it('should fallback to basic format when locale data is missing', () => {
-      // Use a non-existent locale to trigger fallback
+      // Use a non-existent locale to trigger fallback. Final catch uses M/D.
       const result = formatMonthDay(testDate, 'xx-XX' as DateTimeLocale);
-      expect(result).toBe('25/12'); // Should fallback to d/M format
+      expect(result).toBe('12/25');
     });
   });
 

@@ -20,33 +20,23 @@ import { safeFormatDate } from '../../../util/safe-format-date';
 /**
  * Regression guard for issue #7383 (NG0701 on /schedule).
  *
- * Root cause: src/main.ts lazily registers non-default locales via
- * requestIdleCallback. If the schedule view renders before idle fires
- * (e.g. during initial sync replay on a slow Electron host), Angular's
- * formatDate(date, fmt, 'zh-cn') throws RuntimeError(701).
+ * Upstream: non-default locales may be registered lazily via requestIdleCallback,
+ * so schedule could render before locale data is ready and formatDate('zh-cn')
+ * would throw NG0701. Fix: schedule goes through safeFormatDate (fallback).
  *
- * Fix: schedule's formatDate calls go through safeFormatDate (try/catch
- * with DEFAULT_LOCALE fallback) so a missing locale registration shows
- * a default-locale string instead of crashing.
+ * hangz: DEFAULT_LANGUAGE/DEFAULT_LOCALE are zh / zh-cn and register at
+ * bootstrap, so the "zh-cn unregistered" race is not reproducible here — do
+ * not assert that formatDate('zh-cn') throws. Keep the safeFormatDate /
+ * headerTitle guards below.
  */
 describe('issue #7383 — NG0701 race on /schedule', () => {
-  // Angular's locale registry is module-global. We avoid registering any
-  // locale data here so that zh-cn is consistently absent — that absence is
-  // the race window we're reproducing.
-
-  describe('via Angular formatDate (race window simulation)', () => {
-    it('throws NG0701 for zh-cn when locale data is not registered', () => {
-      expect(() => formatDate(new Date(2026, 3, 20), 'LLLL yyyy', 'zh-cn')).toThrowError(
-        /NG07?01|Missing locale data/i,
-      );
-    });
-
+  describe('via Angular formatDate', () => {
     it('does NOT throw for en-gb (Angular falls back to baked-in en data)', () => {
       expect(() => formatDate(new Date(2026, 3, 20), 'LLLL yyyy', 'en-gb')).not.toThrow();
     });
   });
 
-  describe('via ScheduleComponent.headerTitle() (race window simulation)', () => {
+  describe('via ScheduleComponent.headerTitle()', () => {
     let component: ScheduleComponent;
     let fixture: ComponentFixture<ScheduleComponent>;
     let mockScheduleService: jasmine.SpyObj<ScheduleService>;
@@ -145,15 +135,13 @@ describe('issue #7383 — NG0701 race on /schedule', () => {
       component = fixture.componentInstance;
     });
 
-    it('does NOT throw when zh-cn locale data is not yet registered (regression guard for #7383)', () => {
+    it('does NOT throw for headerTitle when locale is zh-cn (safeFormatDate / #7383)', () => {
       // headerTitle() in month view calls safeFormatDate(mid, 'LLLL yyyy', 'zh-cn').
-      // Pre-fix this would throw NG0701; safeFormatDate falls back to the
-      // default locale until lazy-loaded zh-cn registration completes.
+      // Must never crash the schedule view regardless of registration timing.
       let result: string | undefined;
       expect(() => {
         result = component.headerTitle();
       }).not.toThrow();
-      // Should produce a non-empty string (the fallback locale's rendering).
       expect(result).toMatch(/\S/);
     });
   });

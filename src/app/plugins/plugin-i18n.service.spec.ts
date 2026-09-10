@@ -18,6 +18,9 @@ describe('PluginI18nService', () => {
     });
 
     service = TestBed.inject(PluginI18nService);
+    // hangz DEFAULT_LANGUAGE is zh; align with the mock config lng so specs
+    // that assume English do not depend on effect flush timing.
+    service.setCurrentLanguage('en');
   });
 
   describe('loadPluginTranslationsFromContent', () => {

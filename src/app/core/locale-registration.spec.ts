@@ -30,6 +30,12 @@ describe('locale-registration', () => {
       expect(formatDate(onePm, 'shortTime', 'zh')).toMatch(/13:00|1:00/);
     });
 
+    it('registers the same data under DEFAULT_LOCALE (zh-cn)', () => {
+      registerDefaultLocale();
+      expect(formatDate(onePm, 'shortDate', 'zh-cn')).toMatch(/2024/);
+      expect(formatDate(onePm, 'MMMM', 'zh-cn')).toMatch(/\S/);
+    });
+
     it('registers en-GB under bare en and en-US under en-us', () => {
       registerDefaultLocale();
       expect(formatDate(onePm, 'shortDate', 'en')).toBe('15/01/2024');

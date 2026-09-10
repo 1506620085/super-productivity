@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { deviceType } from 'detect-it';
 import { InputIntentService, _inputIntentSignal } from './input-intent.service';
 
 describe('InputIntentService', () => {
@@ -19,6 +20,12 @@ describe('InputIntentService', () => {
   });
 
   it('should not modify body classes on non-hybrid device (test env is mouseOnly)', () => {
+    // detect-it evaluates deviceType at import time; hybrid hosts (common on
+    // Windows touch laptops) legitimately toggle body classes — skip there.
+    if (deviceType !== 'mouseOnly') {
+      pending(`host deviceType=${deviceType}; guard applies to mouseOnly only`);
+      return;
+    }
     const beforeClasses = Array.from(document.body.classList);
     TestBed.configureTestingModule({});
     TestBed.inject(InputIntentService);

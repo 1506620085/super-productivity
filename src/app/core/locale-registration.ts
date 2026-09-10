@@ -6,6 +6,7 @@ import { Log } from './log';
 import {
   DateTimeLocales,
   DEFAULT_LANGUAGE,
+  DEFAULT_LOCALE,
   DEFAULT_LOCALE_DATA,
   LanguageCode,
   NAVIGATOR_FALLBACK_LOCALE_IMPORT_FNS,
@@ -19,10 +20,14 @@ import {
 const LOCALE_LOAD_TIMEOUT_MS = 1500;
 
 /**
- * Registers the statically imported default locale data (Simplified Chinese
- * under the bare 'zh' id). Must run before Angular's first render: LocaleDatePipe
- * is pure, so a date rendered earlier would cache a wrong resolution for the
- * session. main.ts calls this at module scope, before bootstrapApplication.
+ * Registers the statically imported default locale data (Simplified Chinese).
+ * Must run before Angular's first render: LocaleDatePipe is pure, so a date
+ * rendered earlier would cache a wrong resolution for the session. main.ts
+ * calls this at module scope, before bootstrapApplication.
+ *
+ * Register under both the bare UI language id (`zh`) and {@link DEFAULT_LOCALE}
+ * (`zh-cn`) so date pipes / safeFormatDate that ask for either id resolve
+ * without relying on parent-locale shortcuts alone.
  *
  * Also seed en-GB under bare 'en' and en-US under 'en-us' so English date/time
  * choices stay correct from first paint (and navigator en-* fallbacks still
@@ -30,6 +35,7 @@ const LOCALE_LOAD_TIMEOUT_MS = 1500;
  */
 export const registerDefaultLocale = (): void => {
   registerLocaleData(DEFAULT_LOCALE_DATA, DEFAULT_LANGUAGE);
+  registerLocaleData(DEFAULT_LOCALE_DATA, DEFAULT_LOCALE);
   registerLocaleData(localeEnGB, LanguageCode.en);
   registerLocaleData(localeEnUs, DateTimeLocales.en_us);
 };
