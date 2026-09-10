@@ -17,18 +17,15 @@ import { NotesComponent } from '../note/notes/notes.component';
 import { IssuePanelComponent } from '../issue-panel/issue-panel.component';
 import { TaskViewCustomizerPanelComponent } from '../task-view-customizer/task-view-customizer-panel/task-view-customizer-panel.component';
 import { PluginPanelContainerComponent } from '../../plugins/ui/plugin-panel-container/plugin-panel-container.component';
+import { ScheduleDayPanelComponent } from '../schedule/schedule-day-panel/schedule-day-panel.component';
 import { fadeAnimation } from '../../ui/animations/fade.ani';
 import { taskDetailPanelTaskChangeAnimation } from '../tasks/task-detail-panel/task-detail-panel.ani';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { TaskService } from '../tasks/task.service';
 import { Log } from '../../core/log';
 import { PanelContentService, PanelContentType } from '../panels/panel-content.service';
 import { BottomPanelStateService } from '../../core-ui/bottom-panel-state.service';
 import { IS_TOUCH_ONLY } from '../../util/is-touch-only';
 import { BodyClass } from '../../app.constants';
-import { T } from '../../t.const';
-import { TranslatePipe } from '@ngx-translate/core';
 
 export interface BottomPanelData {
   panelContent: PanelContentType;
@@ -79,14 +76,6 @@ export const getInitialBottomPanelHeightRatio = (
   }
 };
 
-export const isBottomPanelCloseButtonVisible = (
-  panelContent: PanelContentType | null,
-): boolean => panelContent === 'NOTES';
-
-export const stopBottomPanelHeaderEventPropagation = (event: Event): void => {
-  event.stopPropagation();
-};
-
 const KEYBOARD_DETECT_THRESHOLD = 100;
 const KEYBOARD_SAFE_HEIGHT_MIN = 200;
 const KEYBOARD_SAFE_HEIGHT_RATIO = 0.85;
@@ -102,19 +91,16 @@ const CSS_VAR_VISUAL_VIEWPORT_HEIGHT = '--visual-viewport-height';
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [fadeAnimation, taskDetailPanelTaskChangeAnimation],
   imports: [
-    MatIconModule,
-    MatButtonModule,
     TaskDetailPanelComponent,
     NotesComponent,
     IssuePanelComponent,
     TaskViewCustomizerPanelComponent,
     PluginPanelContainerComponent,
-    TranslatePipe,
+    ScheduleDayPanelComponent,
   ],
   standalone: true,
 })
 export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
-  readonly T = T;
   private _bottomSheetRef = inject(MatBottomSheetRef<BottomPanelContainerComponent>);
   private _elementRef = inject(ElementRef);
   private _taskService = inject(TaskService);
@@ -131,9 +117,6 @@ export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
     const dataContent = this.data?.panelContent ?? null;
     return dataContent ?? this._panelContentService.getCurrentPanelType();
   });
-  readonly isShowCloseButton = computed<boolean>(() =>
-    isBottomPanelCloseButtonVisible(this.panelContent()),
-  );
   readonly selectedTask = toSignal(this._taskService.selectedTask$, {
     initialValue: null,
   });
@@ -194,10 +177,6 @@ export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
 
   close(): void {
     this._bottomSheetRef.dismiss();
-  }
-
-  stopHeaderEventPropagation(event: Event): void {
-    stopBottomPanelHeaderEventPropagation(event);
   }
 
   private _setupDragListeners(): void {
