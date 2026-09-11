@@ -19,6 +19,10 @@
 }
 
 {$DOMAIN} {
+    # 纯局域网 / 无公网域名：用 Caddy 内部 CA 自签，不要走 Let's Encrypt。
+    # 浏览器会提示「证书不受信任」，选择继续访问即可。有公网域名并要自动申证时删掉下一行。
+    tls internal
+
     reverse_proxy supersync:1900 {
         # Allow up to 85 seconds for long-running operations
         # (snapshot generation, large imports)
